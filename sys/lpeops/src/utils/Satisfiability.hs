@@ -1,0 +1,85 @@
+{-
+TorXakis - Model Based Testing
+Copyright (c) 2015-2017 TNO and University of Twente
+See LICENSE at root directory of this repository.
+-}
+
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Satisfiability
+-- Copyright   :  TNO and University of Twente
+-- License     :  BSD3
+-- Maintainer  :  djurrevanderwal@gmail.com
+-- Stability   :  experimental
+--
+-----------------------------------------------------------------------------
+
+{-# LANGUAGE ViewPatterns        #-}
+module Satisfiability (
+isInvariant,
+isSatisfiable,
+isUnsatisfiable
+) where
+
+import Control.Monad.State
+import qualified EnvCore as IOC
+import qualified EnvData
+import qualified TxsDefs
+-- import qualified FreeVar
+-- import qualified Solve
+import qualified SolveDefs
+import qualified SortId
+import qualified SortOf
+import ConstDefs hiding (sort)
+import VarId
+import ValExpr
+import ValExprVisitor
+import VarFactory
+
+-- Checks if the specified expression cannot be false.
+isInvariant :: TxsDefs.VExpr -> IOC.IOC Bool
+isInvariant expression = isUnsatisfiable (cstrNot expression)
+
+-- Checks if the specified expression can be true.
+isSatisfiable :: TxsDefs.VExpr -> IOC.IOC Bool
+isSatisfiable expression = do sat <- getSat expression
+                              case sat of
+                                SolveDefs.Solved _ -> return True
+                                _ -> return False
+-- isSatisfiable
+
+-- Checks if the specified expression cannot be true.
+isUnsatisfiable :: TxsDefs.VExpr -> IOC.IOC Bool
+isUnsatisfiable expression = do sat <- getSat expression
+                                case sat of
+                                  SolveDefs.Unsolvable -> return True
+                                  _ -> return False
+-- isUnsatisfiable
+
+-- Frequently used method; code is modified code from TxsCore.
+-- Checks whether the given expression is satisfiable.
+getSat :: TxsDefs.VExpr -> IOC.IOC (SolveDefs.SolveProblem VarId)
+getSat expression = do
+    envc <- get
+    case IOC.state envc of
+      IOC.Noning -> do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR "No 'solve' without model" ]
+                       return SolveDefs.Unsolvable
+      _ -> if SortOf.sortOf expression /= SortId.sortIdBool
+           then do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR "Value expression shall be Bool" ]
+                   return SolveDefs.Unsolvable
+           else do expr <- anyElm expression
+                   -- let frees = FreeVar.freeVars expr
+                   IOC.putMsgs [ EnvData.TXS_CORE_ANY ("Expression: " ++ (show expr)) ]
+                   return SolveDefs.Unsolvable
+-- getSat
+
+-- Eliminates occurrences of ANY by substituting them for fresh, free variables.
+anyElm :: ValExpr VarId -> IOC.IOC (ValExpr VarId)
+anyElm expr = visitValExpr anyElmVisitor expr
+
+-- Visitor for anyElm:
+anyElmVisitor :: ValExpr VarId -> IOC.IOC (ValExpr VarId)
+anyElmVisitor (view -> Vconst (Cany sort)) = do varId <- createFreshVar sort
+                                                return $ cstrVar varId
+anyElmVisitor expr                         = do return $ expr
+

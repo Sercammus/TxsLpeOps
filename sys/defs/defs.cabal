@@ -19,6 +19,7 @@ library
                       , TxsDDefs
                       , TxsDefs
                       , TxsShow
+                      , ShowBExpr
                       , TxsUtils
                       , StdTDefs
                       , Utils

@@ -35,6 +35,8 @@ import qualified Data.Set            as Set
 import qualified Data.Text           as T
 import           Data.Maybe
 import qualified Control.Arrow
+-- import qualified TxsShow
+import ShowBExpr
 
 import TranslatedProcDefs
 
@@ -484,9 +486,8 @@ lpeTransform procInst' procDefs'  =
                                      "LPE Transformation: undefined process instantiation" ]
                       return Nothing
        _ -> do EnvB.putMsgs [ EnvData.TXS_CORE_USER_ERROR
-                              "LPE Transformation: only defined for process instantiation" ]
+                              ("LPE Transformation: only defined for process instantiation (" ++ (showBExpr procInst') ++ " found)") ]
                return Nothing
-
 
 -- carsten original function for lpe
 lpeTransform' :: (EnvB.EnvB envb )   -- Monad for unique identifiers and error messages
