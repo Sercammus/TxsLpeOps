@@ -91,7 +91,7 @@ toLPEInstance procInst = do
 getLPESummands :: TxsDefs.ProcId               -- Id of the linear process (summands may only instantiate this process).
                -> TxsDefs.ProcDef              -- Definition of the linear process (body is analyzed).
                -> IOC.IOC (Maybe LPESummands)  -- List of summands (unless there is a problem).
-getLPESummands expectedProcId expectedProcDef@(TxsDefs.ProcDef _ _ (TxsDefs.view -> TxsDefs.Choice summands)) = getLPESummandIterator expectedProcId expectedProcDef summands
+getLPESummands expectedProcId expectedProcDef@(TxsDefs.ProcDef _ _ (TxsDefs.view -> TxsDefs.Choice summands)) = getLPESummandIterator expectedProcId expectedProcDef (Set.toList summands)
 getLPESummands expectedProcId expectedProcDef@(TxsDefs.ProcDef _ _ summand) = getLPESummandIterator expectedProcId expectedProcDef [summand]
 
 -- Helper method.
@@ -104,10 +104,13 @@ getLPESummandIterator _ _ [] = do return (Just [])
 getLPESummandIterator expectedProcId expectedProcDef@(TxsDefs.ProcDef _ params _) (summand:xs) = do
     -- Only two types of summands are valid, stop summands and linear summands:
     case TxsDefs.view summand of
-      TxsDefs.Stop -> do maybeOtherSummands <- getLPESummandIterator expectedProcId expectedProcDef xs
-                         return (case maybeOtherSummands of
-                           Just otherSummands -> Just (LPEStopSummand:otherSummands)
-                           _ -> Nothing)
+      TxsDefs.Choice choices -> if choices == Set.empty
+                                then do maybeOtherSummands <- getLPESummandIterator expectedProcId expectedProcDef xs
+                                        return (case maybeOtherSummands of
+                                          Just otherSummands -> Just (LPEStopSummand:otherSummands)
+                                          _ -> Nothing)
+                                else do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("getLPESummandIterator: invalid LPE instantiation, found " ++ (TxsShow.fshow (TxsDefs.view summand))) ]
+                                        return Nothing
       TxsDefs.ActionPref (TxsDefs.ActOffer { TxsDefs.offers = offers, TxsDefs.constraint = constraint }) procInst -> case TxsDefs.view procInst of
         TxsDefs.ProcInst procId _chans paramValues -> if (procId == expectedProcId) && (True) -- TODO check types of param values, channels!
                                                       then do maybeChannelOffers <- getChannelOffers (Set.toList offers)
@@ -162,7 +165,7 @@ fromLPEInstance (chans, paramEqs, summands) procName = do
                                    , ProcId.procvars = newProcParams
                                    , ProcId.procexit = ProcId.NoExit }
     let newProcInit = TxsDefs.procInst newProcId chans (map snd paramEqs)
-    let newProcDef = TxsDefs.ProcDef chans newProcParams (TxsDefs.choice (summandIterator summands newProcId))
+    let newProcDef = TxsDefs.ProcDef chans newProcParams (TxsDefs.choice (Set.fromList (summandIterator summands newProcId)))
     return (newProcInit, newProcDef)
     where
       -- Constructs a process expression from a summand:
@@ -171,7 +174,7 @@ fromLPEInstance (chans, paramEqs, summands) procName = do
       summandIterator (summand:xs) lpeProcId =
           case summand of
             LPEStopSummand -> (TxsDefs.stop):(summandIterator xs lpeProcId)
-            LPESummand channelOffers gd eqs -> let actPref = TxsDefs.ActOffer { TxsDefs.offers = Set.fromList (map fromOfferToOffer channelOffers), TxsDefs.constraint = gd } in
+            LPESummand channelOffers gd eqs -> let actPref = TxsDefs.ActOffer { TxsDefs.offers = Set.fromList (map fromOfferToOffer channelOffers), TxsDefs.constraint = gd, TxsDefs.hiddenvars = Set.empty } in
               let procInst = TxsDefs.procInst lpeProcId chans (map snd eqs) in
                 (TxsDefs.actionPref actPref procInst):(summandIterator xs lpeProcId)
       

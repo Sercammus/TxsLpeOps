@@ -209,8 +209,6 @@ getOrCreateFreshVar varId = do
 
 -- Translates a TXS behavioral expression to an mCRL2 process expression:
 behaviorExpr2procExpr :: TxsDefs.BExpr -> T2MMonad MCRL2Defs.PExpr
-behaviorExpr2procExpr (TxsDefs.view -> TxsDefs.Stop) = do
-    return $ MCRL2Defs.PDeadlock
 behaviorExpr2procExpr (TxsDefs.view -> TxsDefs.ActionPref actOffer expr) = do
     let offers = Set.toList (TxsDefs.offers actOffer)
     -- First (always!), create the variables that are introduced (or overwritten?) by the offer!
@@ -257,20 +255,23 @@ behaviorExpr2procExpr (TxsDefs.view -> TxsDefs.Guard condition ifBranch) = do
     translatedCondition <- valExpr2dataExpr condition
     translatedIfBranch <- behaviorExpr2procExpr ifBranch
     return $ MCRL2Defs.PGuard translatedCondition translatedIfBranch MCRL2Defs.PDeadlock
-behaviorExpr2procExpr (TxsDefs.view -> TxsDefs.Choice choices) = do
-    translatedChoices <- Monad.mapM behaviorExpr2procExpr choices
-    return $ MCRL2Defs.PChoice translatedChoices
+behaviorExpr2procExpr (TxsDefs.view -> TxsDefs.Choice choices) =
+    if choices == Set.empty
+    then do return $ MCRL2Defs.PDeadlock
+    else do translatedChoices <- Monad.mapM behaviorExpr2procExpr (Set.toList choices)
+            return $ MCRL2Defs.PChoice translatedChoices
 behaviorExpr2procExpr (TxsDefs.view -> TxsDefs.Parallel chans components) = do
-    if chans == []
+    if chans == Set.empty
     then do -- In the absence of any channels, the expression becomes very simple:
             translatedComponents <- Monad.mapM behaviorExpr2procExpr components
             case translatedComponents of
               x:xs -> do -- Return the parallel components (as a tree):
                          return $ foldr MCRL2Defs.PPar x xs
               _ -> do return MCRL2Defs.PDeadlock -- Should not happen!
-    else do translatedChans <- Monad.mapM getRegisteredAction chans
+    else do let chanList = Set.toList chans
+            translatedChans <- Monad.mapM getRegisteredAction chanList
             -- For each channel (~=~ action), a fresh temporary action of the same sort is created:
-            temporaryActions <- Monad.mapM (\((actionName, _action), chan) -> createFreshAction actionName chan) (zip translatedChans chans)
+            temporaryActions <- Monad.mapM (\((actionName, _action), chan) -> createFreshAction actionName chan) (zip translatedChans chanList)
             -- Relate channels with their temporary counterpart:
             let actionPairs = zip (map fst translatedChans) (map fst temporaryActions)
             -- Translate the parallel components:
@@ -308,7 +309,7 @@ behaviorExpr2procExpr (TxsDefs.view -> TxsDefs.ProcInst procId chanValues paramV
     -- Return the combination:
     return $ renaming
 behaviorExpr2procExpr (TxsDefs.view -> TxsDefs.Hide chans expr) = do
-    translatedChans <- Monad.mapM getRegisteredAction chans
+    translatedChans <- Monad.mapM getRegisteredAction (Set.toList chans)
     translatedExpr <- behaviorExpr2procExpr expr
     return $ MCRL2Defs.PHide (map fst translatedChans) translatedExpr
 behaviorExpr2procExpr (TxsDefs.view -> TxsDefs.ValueEnv _venv _expr) = do

@@ -17,6 +17,8 @@ library
 
   exposed-modules:    LPEOps
                     , LPEConstElm
+                    , LPEParElm
+                    , LPEParRemoval
                     , LPETypes
                     , Satisfiability
                     , ValExprVisitor
@@ -35,6 +37,7 @@ library
                       , coreenv
                       , solve
                       , defs
+                      , bexpr
                       , valexpr
 
   default-language:     Haskell2010
@@ -60,6 +63,7 @@ test-suite lpe-test
                      , coreenv
                      , solve
                      , defs
+                     , bexpr
                      , valexpr
 
   default-language:    Haskell2010

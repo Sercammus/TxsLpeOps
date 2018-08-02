@@ -25,8 +25,8 @@ import Control.Monad.State
 import qualified EnvCore as IOC
 import qualified EnvData
 import qualified TxsDefs
--- import qualified FreeVar
--- import qualified Solve
+import qualified FreeVar
+import qualified Solve
 import qualified SolveDefs
 import qualified SortId
 import qualified SortOf
@@ -44,7 +44,7 @@ isInvariant expression = isUnsatisfiable (cstrNot expression)
 isSatisfiable :: TxsDefs.VExpr -> IOC.IOC Bool
 isSatisfiable expression = do sat <- getSat expression
                               case sat of
-                                SolveDefs.Solved _ -> return True
+                                SolveDefs.Sat -> return True
                                 _ -> return False
 -- isSatisfiable
 
@@ -52,25 +52,29 @@ isSatisfiable expression = do sat <- getSat expression
 isUnsatisfiable :: TxsDefs.VExpr -> IOC.IOC Bool
 isUnsatisfiable expression = do sat <- getSat expression
                                 case sat of
-                                  SolveDefs.Unsolvable -> return True
+                                  SolveDefs.Unsat -> return True
                                   _ -> return False
 -- isUnsatisfiable
 
 -- Frequently used method; code is modified code from TxsCore.
 -- Checks whether the given expression is satisfiable.
-getSat :: TxsDefs.VExpr -> IOC.IOC (SolveDefs.SolveProblem VarId)
+getSat :: TxsDefs.VExpr -> IOC.IOC SolveDefs.SolvableProblem
 getSat expression = do
     envc <- get
     case IOC.state envc of
-      IOC.Noning -> do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR "No 'solve' without model" ]
-                       return SolveDefs.Unsolvable
+      IOC.Noning -> do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR "No 'satsolve' without model" ]
+                       return SolveDefs.Unsat
       _ -> if SortOf.sortOf expression /= SortId.sortIdBool
            then do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR "Value expression shall be Bool" ]
-                   return SolveDefs.Unsolvable
+                   return SolveDefs.Unsat
            else do expr <- anyElm expression
-                   -- let frees = FreeVar.freeVars expr
+                   let frees = FreeVar.freeVars expr
+                   let assertions = Solve.add expr Solve.empty
+                   smtEnv <- IOC.getSMT "current"
+                   (sat, smtEnv') <- lift $ runStateT (Solve.satSolve frees assertions) smtEnv
+                   IOC.putSMT "current" smtEnv'
                    IOC.putMsgs [ EnvData.TXS_CORE_ANY ("Expression: " ++ (show expr)) ]
-                   return SolveDefs.Unsolvable
+                   return sat
 -- getSat
 
 -- Eliminates occurrences of ANY by substituting them for fresh, free variables.

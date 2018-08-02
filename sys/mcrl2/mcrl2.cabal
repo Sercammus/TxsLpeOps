@@ -14,10 +14,10 @@ cabal-version:          >=1.10
 library
   hs-source-dirs:       src
 
-  exposed-modules:    TXS2MCRL2
-                    , TXS2MCRL2Env
+  exposed-modules:    MCRL2Defs
                     , MCRL22TXT
-                    , MCRL2Defs
+                    , TXS2MCRL2
+                    , TXS2MCRL2Env
 
   other-modules:      
 
@@ -31,6 +31,7 @@ library
                       , behaveenv
                       , coreenv
                       , defs
+                      , bexpr
                       , valexpr
 
   default-language:     Haskell2010
@@ -55,6 +56,7 @@ test-suite lpe-test
                      , behave
                      , coreenv
                      , defs
+                     , bexpr
                      , valexpr
 
   default-language:    Haskell2010
