@@ -190,6 +190,7 @@ constToSMT _ (Cbool b) = if b
 constToSMT _ (Cint n) = integer2smt n
 constToSMT _ (Cstring s)  =  "\"" <> stringToSMT s <> "\""
 constToSMT _ (Cregex r)  =  xsd2smt r
+-- constToSMT _ (Cany _)  =  "0"
 constToSMT enames (Cstr cd [])   =         justLookupCstr cd enames
 constToSMT enames (Cstr cd args') = "(" <> justLookupCstr cd enames <> " " <> T.intercalate " " (map (constToSMT enames) args') <> ")"
 constToSMT _ x = error ("Illegal input constToSMT - " <> show x)

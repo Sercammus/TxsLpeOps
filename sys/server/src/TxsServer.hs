@@ -188,6 +188,8 @@ cmdsIntpr = do
        "NCOMP"     | not $ IOS.isInited   modus  ->  cmdNoop      cmd
        "LPE"       |       IOS.isInited   modus  ->  cmdLPE       args
        "LPE"       | not $ IOS.isInited   modus  ->  cmdNoop      cmd
+       "cstelm"    |       IOS.isInited   modus  ->  cmdLPECstElm args
+       "cstelm"    | not $ IOS.isInited   modus  ->  cmdNoop      cmd
        _           ->  cmdUnknown   cmd
 
 
@@ -1014,6 +1016,38 @@ cmdLPE args = do
                  _                     -> do IFS.nack "LPE" [ "Could not generate LPE" ]
                                              cmdsIntpr
 
+-- ----------------------------------------------------------------------------------------- --
+
+cmdLPECstElm :: String -> IOS.IOS ()
+cmdLPECstElm args = do
+     tdefs <- lift TxsCore.txsGetTDefs
+     let mdefs = TxsDefs.modelDefs tdefs
+         mids  = [ modelid | (modelid@(TxsDefs.ModelId nm _uid), _) <- Map.toList mdefs
+                           , T.unpack nm == args
+                 ]
+         chids = Set.toList $ Set.unions [ Set.unions (chins ++ chouts ++ spls)
+                                         | (_, TxsDefs.ModelDef chins chouts spls _)
+                                           <- Map.toList mdefs
+                                         ]
+     case mids of
+       [ modelId ]
+         -> do mayModelId' <- lift $ TxsCore.txsLPECstElm (Right modelId)
+               case mayModelId' of
+                 Just (Right modelId') -> do IFS.pack "LPE" [ "LPE modeldef generated: "
+                                                            , TxsShow.fshow modelId'
+                                                            ]
+                                             cmdsIntpr
+                 _                     -> do IFS.nack "LPE" [ "Could not generate LPE" ]
+                                             cmdsIntpr
+       _ -> do bexpr       <- readBExpr chids args
+               mayBexpr'   <- lift $ TxsCore.txsLPECstElm (Left bexpr)
+               case mayBexpr' of
+                 Just (Left bexpr')    -> do IFS.pack "LPE" [ "LPE behaviour generated: "
+                                                            , TxsShow.fshow bexpr'
+                                                            ]
+                                             cmdsIntpr
+                 _                     -> do IFS.nack "LPE" [ "Could not generate LPE" ]
+                                             cmdsIntpr
 
 -- ----------------------------------------------------------------------------------------- --
 --
