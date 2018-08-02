@@ -49,7 +49,7 @@ type LPEInstance = ([TxsDefs.ChanId], LPEParamEqs, LPESummands)
 -- Each summand provides the following pieces of critical information:
 --  - Guard (capable of restricting the value of the communication variable).
 --  - A number of value initializations (for the instantiation of the next process).
-data LPESummand = LPEStopSummand | LPESummand LPEChannelOffers TxsDefs.VExpr LPEParamEqs
+data LPESummand = LPEStopSummand | LPESummand LPEChannelOffers TxsDefs.VExpr LPEParamEqs deriving (Eq)
 type LPESummands = [LPESummand]
 
 -- Convenience type.

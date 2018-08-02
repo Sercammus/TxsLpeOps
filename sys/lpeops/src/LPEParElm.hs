@@ -39,7 +39,7 @@ parElm lpeInstance@((_channels, paramEqs, summands)) = do
 -- Eliminate parameters from a list if they are used in the guard or channel communications of a given summand:
 filterInertParamsWithSummand :: [VarId] -> LPESummand -> [VarId]
 filterInertParamsWithSummand soFar LPEStopSummand = soFar
-filterInertParamsWithSummand soFar (LPESummand channelOffers guard _eqs) = do
+filterInertParamsWithSummand soFar (LPESummand channelOffers guard _eqs) =
     let channelOfferVars = foldl (++) [] (map snd channelOffers) in
       (soFar List.\\ channelOfferVars) List.\\ (FreeVar.freeVars guard)
 -- filterInertParamsWithSummand
