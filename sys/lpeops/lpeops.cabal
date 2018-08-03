@@ -43,14 +43,22 @@ library
 
   default-language:     Haskell2010
 
-test-suite lpe-test
+test-suite lpeops-test
   type:                 exitcode-stdio-1.0
   hs-source-dirs:       src
+                      , src/utils
                       , test
 
   main-is:              TestMain.hs
 
-  other-modules:        
+  other-modules:        LPEConstElm
+                      , LPEOps
+                      , LPEParRemoval
+                      , LPETypes
+                      , Satisfiability
+                      , ValExprVisitor
+                      , VarFactory
+                      , TestConstElm
 
   ghc-options:       -Werror -Wall -O2 -optc-O3 -optc-ffast-math -threaded -rtsopts -with-rtsopts=-N -fmax-pmcheck-iterations=100000000
 

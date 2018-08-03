@@ -14,6 +14,7 @@ See LICENSE at root directory of this repository.
 --
 -----------------------------------------------------------------------------
 
+{-# OPTIONS_GHC -Wno-unused-top-binds #-}
 module LPEConstElm (
 constElm
 ) where

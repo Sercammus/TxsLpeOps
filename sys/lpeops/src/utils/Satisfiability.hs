@@ -30,6 +30,7 @@ import qualified Solve
 import qualified SolveDefs
 import qualified SortId
 import qualified SortOf
+import qualified SMTData
 import ConstDefs hiding (sort)
 import VarId
 import ValExpr
@@ -63,18 +64,21 @@ getSat expression = do
     envc <- get
     case IOC.state envc of
       IOC.Noning -> do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR "No 'satsolve' without model" ]
-                       return SolveDefs.Unsat
+                       return SolveDefs.Unknown
       _ -> if SortOf.sortOf expression /= SortId.sortIdBool
            then do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR "Value expression shall be Bool" ]
-                   return SolveDefs.Unsat
+                   return SolveDefs.Unknown
            else do expr <- anyElm expression
                    let frees = FreeVar.freeVars expr
                    let assertions = Solve.add expr Solve.empty
                    smtEnv <- IOC.getSMT "current"
-                   (sat, smtEnv') <- lift $ runStateT (Solve.satSolve frees assertions) smtEnv
-                   IOC.putSMT "current" smtEnv'
-                   IOC.putMsgs [ EnvData.TXS_CORE_ANY ("Expression: " ++ (show expr)) ]
-                   return sat
+                   case smtEnv of
+                     SMTData.SmtEnvError -> do IOC.putMsgs [ EnvData.TXS_CORE_ANY "Could not locate SMT solver" ]
+                                               return SolveDefs.Unknown
+                     _ -> do (sat, smtEnv') <- lift $ runStateT (Solve.satSolve frees assertions) smtEnv
+                             IOC.putSMT "current" smtEnv'
+                             IOC.putMsgs [ EnvData.TXS_CORE_ANY ("Expression: " ++ (show expr)) ]
+                             return sat
 -- getSat
 
 -- Eliminates occurrences of ANY by substituting them for fresh, free variables.
