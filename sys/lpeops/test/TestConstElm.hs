@@ -15,6 +15,7 @@ where
 import Test.HUnit
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import qualified Data.Maybe as Maybe
 import qualified EnvData
 import Control.Monad.State
 import TxsDefs
@@ -22,6 +23,7 @@ import ProcId
 import ChanId
 import SortId
 import qualified Data.Text         as T
+import qualified SMT
 import VarId
 import ConstDefs
 import ValExpr
@@ -31,16 +33,20 @@ import qualified Config
 import qualified EnvCore as IOC
 import qualified ParamCore
 import qualified Solve.Params
+import StdTDefs (stdSortTable)
 
 import LPEOps
 import LPEConstElm
 
-initializeEnvC :: IOC.EnvC
-initializeEnvC = IOC.EnvC { IOC.config = initConfig
-                          , IOC.unid   = 0
-                          , IOC.params = Config.updateParamVals initParams $ Config.configuredParameters initConfig
-                          , IOC.state  = initState
-                          }
+initializeEnvC :: IO IOC.EnvC
+initializeEnvC = do
+    smtEnv <- SMT.createSMTEnv (Maybe.fromJust (Config.getProc initConfig)) True
+    (_info,smtEnv') <- runStateT SMT.openSolver smtEnv
+    return $ IOC.EnvC { IOC.config = initConfig
+                      , IOC.unid   = 0
+                      , IOC.params = Config.updateParamVals initParams $ Config.configuredParameters initConfig
+                      , IOC.state  = initState { IOC.smts = Map.singleton "current" smtEnv' }
+                      }
   where
     initConfig = Config.defaultConfig
     initState = IOC.Initing { IOC.smts = Map.empty
@@ -61,29 +67,73 @@ putMsgs msgs = do printMsg msgs
     printMsg (x:xs) = do liftIO $ putStrLn (show x)
                          printMsg xs
                          return ()
+-- putMsgs
+
+splitString :: String -> Int -> [String]
+splitString [] _ = []
+splitString str segmentLength =
+    let firstSegment = map snd (zip [0..(segmentLength-1)] str) in
+    let remainingSegments = map snd (filter (\x -> (fst x) >= segmentLength) (zip [0..(length str)] str)) in
+      firstSegment:(splitString remainingSegments segmentLength)
+-- splitString
+
+makeLength :: [String] -> Int -> [String]
+makeLength segments targetLength =
+    if (length segments) >= targetLength then segments else makeLength (segments ++ [[]]) targetLength
+-- makeLength
+
+splitPrint :: String -> String -> Int -> String
+splitPrint header str lineLength =
+    let segments = splitString str lineLength in
+      foldl (\soFar seg -> soFar ++ header ++ seg ++ "\n") "" segments
+-- splitPrint
+
+printSideBySide :: String -> String -> String -> String -> Int -> String
+printSideBySide header1 header2 s1 s2 lineLength =
+    let segs1 = splitString s1 lineLength in
+    let segments2 = makeLength (splitString s2 lineLength) (length segs1) in
+    let segments1 = makeLength segs1 (length segments2) in
+      foldl (\soFar (seg1, seg2) -> soFar ++ header1 ++ seg1 ++ "\n" ++ header2 ++ seg2 ++ "\n\n") "" (zip segments1 segments2)
+-- printSideBySide
 
 constElmFunc :: LPEInstance -> IO (Maybe LPEInstance)
-constElmFunc lpeInstance = evalStateT (constElm lpeInstance) initializeEnvC
+constElmFunc lpeInstance = do
+    env <- initializeEnvC
+    evalStateT (constElm lpeInstance) env
+-- constElmFunc
 
 testConstElm :: Test
 testConstElm = TestCase $ do
-    maybeResult <- constElmFunc lpeInstance
+    maybeResult <- constElmFunc lpeInstance1
     case maybeResult of
-      Just _result -> assertBool "True" (lpeInstance==lpeInstance)
-      _ -> assertBool "output of constElm is valid" False
+      Just result -> assertBool ("\n" ++ (splitPrint "   Input..." (show lpeInstance1) 120) ++ "\n-->\n\n" ++ (printSideBySide "Expected..." "   Found..." (show lpeInstance2) (show result) 120)) (result==lpeInstance2)
+      _ -> assertBool "Function constElm failed to produce output!" False
   where
-    summand1 :: LPESummand
-    summand1 = LPESummand
+    summand1_1 :: LPESummand
+    summand1_1 = LPESummand -- A ? z [z==0] >-> P(1, 0)
         [(chanIdA, [varIdZ])]
         (cstrEqual vexprZ vexpr0)
         [(varIdX, vexpr1), (varIdY, vexpr0)]
-    summand2 :: LPESummand
-    summand2 = LPESummand
+    summand1_2 :: LPESummand
+    summand1_2 = LPESummand -- A ? y [x==1 && y==0] >-> P(0, y)
         [(chanIdA, [varIdY])]
         (cstrAnd (Set.fromList [cstrEqual vexprX vexpr1, cstrEqual vexprY vexpr0]))
         [(varIdX, vexpr0), (varIdY, vexprY)]
-    lpeInstance :: LPEInstance
-    lpeInstance = ([chanIdA], [(varIdX, vexpr0), (varIdY, vexpr0)], [summand1, summand2])
+    lpeInstance1 :: LPEInstance
+    lpeInstance1 = ([chanIdA], [(varIdX, vexpr0), (varIdY, vexpr0)], [summand1_1, summand1_2])
+    
+    summand2_1 :: LPESummand
+    summand2_1 = LPESummand -- A ? z [z==0] >-> P(1)
+        [(chanIdA, [varIdZ])]
+        (cstrEqual vexprZ vexpr0)
+        [(varIdX, vexpr1)]
+    summand2_2 :: LPESummand
+    summand2_2 = LPESummand -- A ? __FV1 [0==0 && x==1] >-> P(0)
+        [(chanIdA, [varIdFV1])]
+        (cstrAnd (Set.fromList [cstrEqual vexprX vexpr1, cstrEqual vexpr0 vexpr0]))
+        [(varIdX, vexpr0)]
+    lpeInstance2 :: LPEInstance
+    lpeInstance2 = ([chanIdA], [(varIdX, vexpr0)], [summand2_1, summand2_2])
 -- testConstElm
 
 ---------------------------------------------------------------------------
@@ -108,6 +158,8 @@ varIdA1 :: VarId
 varIdA1 = VarId (T.pack "A$1") 34 intSort
 varIdB1 :: VarId
 varIdB1 = VarId (T.pack "B$1") 34 intSort
+varIdFV1 :: VarId
+varIdFV1 = VarId (T.pack "__FV1") (-1) intSort
 
 vexprX :: VExpr
 vexprX = cstrVar varIdX
@@ -119,6 +171,8 @@ vexprA1 :: VExpr
 vexprA1 = cstrVar varIdA1
 vexprB1 :: VExpr
 vexprB1 = cstrVar varIdB1
+vexprFV1 :: VExpr
+vexprFV1 = cstrVar varIdFV1
 
 vexpr0 :: VExpr
 vexpr0 = cstrConst (Cint 0)
@@ -203,8 +257,7 @@ actOfferBExclamX   = ActOffer {  offers = Set.singleton
 
 -- sorts, chanIds
 intSort :: SortId
-intSort = SortId {  SortId.name = T.pack "Int"
-                  , SortId.unid = 1}
+intSort = Maybe.fromMaybe (error "LPE module: could not find standard IntSort") (Map.lookup (T.pack "Int") stdSortTable)
 
 chanIdA :: ChanId
 chanIdA = ChanId    { ChanId.name = T.pack "A"
