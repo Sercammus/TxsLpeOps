@@ -19,10 +19,11 @@ parReset
 ) where
 
 import qualified Control.Monad       as Monad
-import qualified Data.List           as List
+import qualified Data.Map            as Map
 import qualified Data.Set            as Set
 import qualified EnvCore             as IOC
 import qualified FreeVar
+import qualified Subst
 import           LPEOps
 import           Satisfiability
 import           VarId
@@ -47,12 +48,9 @@ getImmediateSuccessors allSummands (LPESummand _channelOffers _guard paramEqs) =
     immediateSuccessors <- Monad.foldM addSummandIfImmediateSuccessor [] allSummands
     return $ immediateSuccessors
   where
-    getInstantiationEq :: ValExpr VarId
-    getInstantiationEq = cstrAnd (Set.fromList (map (\(p, v) -> cstrEqual (cstrVar p) v) paramEqs))
-    
     addSummandIfImmediateSuccessor :: [LPESummand] -> LPESummand -> IOC.IOC [LPESummand]
     addSummandIfImmediateSuccessor soFar summand@(LPESummand _ g _) = do
-      sat <- isSatisfiable (cstrAnd (Set.fromList [getInstantiationEq, g]))
+      sat <- isSatisfiable (Subst.subst (Map.fromList paramEqs) Map.empty g)
       return $ if sat then soFar ++ [summand] else soFar
     addSummandIfImmediateSuccessor soFar _ = do return soFar
 -- getImmediateSuccessors 
@@ -70,13 +68,13 @@ parResetLoop lpeInstance@(channels, initParamEqs, summands) successorsPerSummand
     
     updateSummand :: LPESummand -> LPESummand
     updateSummand summand@(LPESummand channelOffers guard paramEqs) =
-        case [ uvars | (smd, _sucs, uvars) <- successorsPerSummand, smd == summand ] of
-          [uvars] -> LPESummand channelOffers guard (updateParamEqs paramEqs uvars)
+        case [ usedVars | (smd, _sucs, usedVars) <- successorsPerSummand, smd == summand ] of
+          [usedVars] -> LPESummand channelOffers guard (updateParamEqs paramEqs usedVars)
           _ -> LPESummand channelOffers guard paramEqs
     updateSummand other = other
     
     updateParamEqs :: LPEParamEqs -> [VarId] -> LPEParamEqs
-    updateParamEqs paramEqs unusedVars = [ (p, if p `elem` unusedVars then cstrConst (Cany { sort = varsort p }) else v) | (p, v) <- paramEqs ]
+    updateParamEqs paramEqs usedVars = [ (p, if p `elem` usedVars then v else cstrConst (Cany { sort = varsort p })) | (p, v) <- paramEqs ]
 -- parResetLoop
 
 -- Updates the information collected about summands, in particular their lists of unused variables:
@@ -88,19 +86,26 @@ parResetUpdate successorsPerSummand = map updateSummand successorsPerSummand
     --  * They occur in the condition of the summand while not being defined as a communication variable, e.g. "CHANNEL ? x"; or
     --  * They are used in the assignment to a variable that IS used by a potential successor summand.
     updateSummand :: (LPESummand, [LPESummand], [VarId]) -> (LPESummand, [LPESummand], [VarId])
-    updateSummand (summand@(LPESummand channelOffers guard _paramEqs), successors, unusedVars) =
-        let channelOfferVars = foldl (++) [] (map snd channelOffers) in
-        let guardVars = FreeVar.freeVars guard in
-        let locallyUnusedVars = unusedVars List.\\ (guardVars List.\\ channelOfferVars) in
-        let successorUnusedVars = [ Set.fromList (uvars List.\\ (getSummandVarUsage smd uvars)) | (smd, _sucs, uvars) <- successorsPerSummand, suc <- successors, smd == suc ] in
-        let newUnusedVars = foldl Set.intersection (Set.fromList locallyUnusedVars) successorUnusedVars in
-          (summand, successors, Set.toList newUnusedVars)
-    updateSummand other = other
+    updateSummand (summand, successors, _usedVars) =
+        let relevantToSuccessorVars = foldl Set.union Set.empty (map getRelevantToSuccessorVars successors) in
+          (summand, successors, Set.toList relevantToSuccessorVars)
     
-    -- Of a given summand, determine which variables are used in its recursive call.
-    -- Assignments to variables that are considered unused (for now) are ignored!
-    getSummandVarUsage (LPESummand _channelOffers _guard paramEqs) unusedVars =
-        foldl (++) [] [ FreeVar.freeVars v | (p, v) <- paramEqs, not (p `elem` unusedVars) ]
-    getSummandVarUsage _ _ = []
+    getRelevantToSuccessorVars :: LPESummand -> Set.Set VarId
+    getRelevantToSuccessorVars successor@(LPESummand channelOffers guard paramEqs) =
+        let params = Set.fromList (map fst paramEqs) in
+        let usedVars = foldl (++) [] [uvars | (s, _g, uvars) <- successorsPerSummand, s == successor] in
+        
+        -- Parameters in the guard are relevant to the successor, because they enable/disable the instantiation:
+        let guardVars = Set.intersection params (Set.fromList (FreeVar.freeVars guard)) in
+        
+        -- Parameters used in assignments to used variables are relevant (because the variables are used):
+        let assignmentVars = Set.intersection params (Set.fromList (foldl (++) [] [FreeVar.freeVars v | (p, v) <- paramEqs, q <- usedVars, p == q])) in
+        
+        -- The successor communicates via these variables, so their values are NOT relevant to the successor:
+        let channelOfferVars = Set.intersection params (Set.fromList (foldl (++) [] (map snd channelOffers))) in
+        
+        -- Combine them all:
+          (Set.union guardVars assignmentVars) Set.\\ channelOfferVars
+    getRelevantToSuccessorVars _ = Set.empty
 -- parResetUpdate
 

@@ -51,10 +51,11 @@ test-suite lpeops-test
 
   main-is:              TestMain.hs
 
-  other-modules:        LPEConstElm
-                      , LPEOps
+  other-modules:        LPEOps
+                      , LPEConstElm
                       , LPEParElm
                       , LPEParRemoval
+                      , LPEParReset
                       , LPETypes
                       , Satisfiability
                       , ValExprVisitor
@@ -62,6 +63,7 @@ test-suite lpeops-test
                       , TestUtils
                       , TestConstElm
                       , TestParElm
+                      , TestParReset
 
   ghc-options:       -Werror -Wall -O2 -optc-O3 -optc-ffast-math -threaded -rtsopts -with-rtsopts=-N -fmax-pmcheck-iterations=100000000
 

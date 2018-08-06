@@ -11,6 +11,7 @@ import Test.HUnit
 
 import TestConstElm
 import TestParElm
+import TestParReset
 
 testList :: Test
 testList = TestList
@@ -18,7 +19,8 @@ testList = TestList
       TestLabel "constElmBasic"            testConstElmBasic
     , TestLabel "constElmXYX"              testConstElmXYX
     , TestLabel "parElmBasic"              testParElmBasic
-    , TestLabel "testParElmXUpperBound"    testParElmXUpperBound
+    , TestLabel "parElmXUpperBound"        testParElmXUpperBound
+    , TestLabel "parResetBasic"            testParResetBasic
     ]
 
 main :: IO ()
