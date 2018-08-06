@@ -6,10 +6,10 @@ See LICENSE at root directory of this repository.
      
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
-module TestConstElm
+module TestParElm
 (
-testConstElmBasic,
-testConstElmXYX,
+testParElmBasic,
+testParElmXUpperBound,
 )
 where
  
@@ -17,6 +17,7 @@ import Test.HUnit
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Maybe as Maybe
+import qualified FreeMonoidX as FMX
 import Control.Monad.State
 import TxsDefs
 import ProcId
@@ -30,92 +31,82 @@ import ValExpr
 import StdTDefs (stdSortTable)
 
 import LPEOps
-import LPEConstElm
+import LPEParElm
 import TestUtils
 
-constElmFunc :: LPEInstance -> IO (Maybe LPEInstance)
-constElmFunc lpeInstance = do
+parElmFunc :: LPEInstance -> IO (Maybe LPEInstance)
+parElmFunc lpeInstance = do
     env <- createTestEnvC
-    evalStateT (constElm lpeInstance) env
--- constElmFunc
+    evalStateT (parElm lpeInstance) env
+-- parElmFunc
 
-testConstElmBasic :: Test
-testConstElmBasic = TestCase $ do
-    maybeResult <- constElmFunc lpeInstance1
+testParElmBasic :: Test
+testParElmBasic = TestCase $ do
+    maybeResult <- parElmFunc lpeInstance1
     case maybeResult of
       Just result -> assertBool (printInputExpectedFound lpeInstance1 lpeInstance2 result) (result==lpeInstance2)
-      _ -> assertBool "Function constElm failed to produce output!" False
+      _ -> assertBool "Function parElm failed to produce output!" False
   where
     summand1_1 :: LPESummand
-    summand1_1 = LPESummand -- A ? z [z==0] >-> P(1, 0)
-        [(chanIdA, [varIdZ])]
-        (cstrEqual vexprZ vexpr0)
-        [(varIdX, vexpr1), (varIdY, vexpr0)]
-    summand1_2 :: LPESummand
-    summand1_2 = LPESummand -- A ? y [x==1 && y==0] >-> P(0, y)
+    summand1_1 = LPESummand -- A ? y >-> P(x)
         [(chanIdA, [varIdY])]
-        (cstrAnd (Set.fromList [cstrEqual vexprX vexpr1, cstrEqual vexprY vexpr0]))
-        [(varIdX, vexpr0), (varIdY, vexprY)]
+        (vexprTrue)
+        [(varIdX, vexprX)]
+    summand1_2 :: LPESummand
+    summand1_2 = LPESummand -- A ? z >-> P(x+1)
+        [(chanIdA, [varIdZ])]
+        (vexprTrue)
+        [(varIdX, vexprSum vexprX vexpr1)]
     lpeInstance1 :: LPEInstance
-    lpeInstance1 = ([chanIdA], [(varIdX, vexpr0), (varIdY, vexpr0)], [summand1_1, summand1_2])
+    lpeInstance1 = ([chanIdA], [(varIdX, vexpr0)], [summand1_1, summand1_2])
     
     summand2_1 :: LPESummand
-    summand2_1 = LPESummand -- A ? z [z==0] >-> P(1)
-        [(chanIdA, [varIdZ])]
-        (cstrEqual vexprZ vexpr0)
-        [(varIdX, vexpr1)]
+    summand2_1 = LPESummand -- A ? y >-> P()
+        [(chanIdA, [varIdY])]
+        (vexprTrue)
+        []
     summand2_2 :: LPESummand
-    summand2_2 = LPESummand -- A ? __FV1 [0==0 && x==1] >-> P(0)
-        [(chanIdA, [varIdFV1])]
-        (cstrAnd (Set.fromList [cstrEqual vexprX vexpr1, cstrEqual vexpr0 vexpr0]))
-        [(varIdX, vexpr0)]
+    summand2_2 = LPESummand -- A ? z >-> P()
+        [(chanIdA, [varIdZ])]
+        (vexprTrue)
+        []
+    lpeInstance2 :: LPEInstance
+    lpeInstance2 = ([chanIdA], [], [summand2_1, summand2_2])
+-- testParElmBasic
+
+testParElmXUpperBound :: Test
+testParElmXUpperBound = TestCase $ do
+    maybeResult <- parElmFunc lpeInstance1
+    case maybeResult of
+      Just result -> assertBool (printInputExpectedFound lpeInstance1 lpeInstance2 result) (result==lpeInstance2)
+      _ -> assertBool "Function parElm failed to produce output!" False
+  where
+    summand1_1 :: LPESummand
+    summand1_1 = LPESummand -- A ? y [x == 2] >-> P(x)
+        [(chanIdA, [varIdY])]
+        (cstrEqual vexprX vexpr2)
+        [(varIdX, vexprX)]
+    summand1_2 :: LPESummand
+    summand1_2 = LPESummand -- A ? z [x != 2] >-> P(x+1)
+        [(chanIdA, [varIdZ])]
+        (cstrNot (cstrEqual vexprX vexpr2))
+        [(varIdX, vexprSum vexprX vexpr1)]
+    lpeInstance1 :: LPEInstance
+    lpeInstance1 = ([chanIdA], [(varIdX, vexpr0)], [summand1_1, summand1_2])
+    
+    summand2_1 :: LPESummand
+    summand2_1 = LPESummand -- A ? y [x == 2] >-> P(x)
+        [(chanIdA, [varIdY])]
+        (cstrEqual vexprX vexpr2)
+        [(varIdX, vexprX)]
+    summand2_2 :: LPESummand
+    summand2_2 = LPESummand -- A ? z [x != 2] >-> P(x+1)
+        [(chanIdA, [varIdZ])]
+        (cstrNot (cstrEqual vexprX vexpr2))
+        [(varIdX, vexprSum vexprX vexpr1)]
     lpeInstance2 :: LPEInstance
     lpeInstance2 = ([chanIdA], [(varIdX, vexpr0)], [summand2_1, summand2_2])
--- testConstElmBasic
-
-testConstElmXYX :: Test
-testConstElmXYX = TestCase $ do
-    maybeResult <- constElmFunc lpeInstance1
-    case maybeResult of
-      Just result -> assertBool (printInputExpectedFound lpeInstance1 lpeInstance2 result) (result==lpeInstance2)
-      _ -> assertBool "Function constElm failed to produce output!" False
-  where
-    summand1_1 :: LPESummand
-    summand1_1 = LPESummand -- A ? z >-> P(x, 1, z)
-        [(chanIdA, [varIdZ])]
-        (vexprTrue)
-        [(varIdX, vexprX), (varIdY, vexpr1), (varIdZ, vexprZ)]
-    summand1_2 :: LPESummand
-    summand1_2 = LPESummand -- A ? z >-> P(y, x, z)
-        [(chanIdA, [varIdZ])]
-        (vexprTrue)
-        [(varIdX, vexprY), (varIdY, vexprX), (varIdZ, vexprZ)]
-    summand1_3 :: LPESummand
-    summand1_3 = LPESummand -- A ? z >-> P(1, x, 2)
-        [(chanIdA, [varIdZ])]
-        (vexprTrue)
-        [(varIdX, vexpr1), (varIdY, vexprX), (varIdZ, vexpr2)]
-    lpeInstance1 :: LPEInstance
-    lpeInstance1 = ([chanIdA], [(varIdX, vexpr1), (varIdY, vexpr1), (varIdZ, vexpr2)], [summand1_1, summand1_2, summand1_3])
-    
-    summand2_1 :: LPESummand
-    summand2_1 = LPESummand -- A ? __FV1 >-> P()
-        [(chanIdA, [varIdFV1])]
-        (vexprTrue)
-        []
-    summand2_2 :: LPESummand
-    summand2_2 = LPESummand -- A ? __FV2 >-> P()
-        [(chanIdA, [varIdFV2])]
-        (vexprTrue)
-        []
-    summand2_3 :: LPESummand
-    summand2_3 = LPESummand -- A ? __FV3 >-> P()
-        [(chanIdA, [varIdFV3])]
-        (vexprTrue)
-        []
-    lpeInstance2 :: LPEInstance
-    lpeInstance2 = ([chanIdA], [], [summand2_1, summand2_2, summand2_3])
--- testConstElmXYX
+-- testParElmXUpperBound
 
 ---------------------------------------------------------------------------
 -- Helper functions
@@ -162,6 +153,9 @@ vexprFV2 :: VExpr
 vexprFV2 = cstrVar varIdFV2
 vexprFV3 :: VExpr
 vexprFV3 = cstrVar varIdFV3
+
+vexprSum :: VExpr -> VExpr -> VExpr
+vexprSum v1 v2 = cstrSum (FMX.fromOccurListT [(v1, 1), (v2, 1)])
 
 vexpr0 :: VExpr
 vexpr0 = cstrConst (Cint 0)

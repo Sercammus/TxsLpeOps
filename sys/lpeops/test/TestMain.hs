@@ -10,11 +10,15 @@ import System.Exit
 import Test.HUnit
 
 import TestConstElm
+import TestParElm
 
 testList :: Test
 testList = TestList
     [
-      TestLabel "constElm"          testConstElm
+      TestLabel "constElmBasic"            testConstElmBasic
+    , TestLabel "constElmXYX"              testConstElmXYX
+    , TestLabel "parElmBasic"              testParElmBasic
+    , TestLabel "testParElmXUpperBound"    testParElmXUpperBound
     ]
 
 main :: IO ()
