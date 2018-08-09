@@ -28,7 +28,6 @@ import           LPEOps
 import           Satisfiability
 import           VarId
 import           ValExpr
-import           ConstDefs
 
 -- LPE rewrite method.
 -- Eliminates parameters that do not contribute to the behavior of a process from an LPE.
@@ -41,16 +40,19 @@ parReset lpeInstance@((_channels, paramEqs, summands)) = do
     return (Just newLPEInstance)
 -- parReset
 
--- Selects all potential successors summands of a given summand from a list with all summands:
+-- Selects all potential successors summands of a given summand from a list with all summands.
+-- (In actuality, an overapproximation of all potential successors is selected, namely those
+-- whose guard can be satisfied after the guard of the current summand has been satisfied and
+-- after the substitutions of the process recursion have taken place.)
 getImmediateSuccessors :: [LPESummand] -> LPESummand -> IOC.IOC [LPESummand]
 getImmediateSuccessors _ LPEStopSummand = do return []
-getImmediateSuccessors allSummands (LPESummand _channelOffers _guard paramEqs) = do
+getImmediateSuccessors allSummands (LPESummand _channelOffers guard paramEqs) = do
     immediateSuccessors <- Monad.foldM addSummandIfImmediateSuccessor [] allSummands
     return $ immediateSuccessors
   where
     addSummandIfImmediateSuccessor :: [LPESummand] -> LPESummand -> IOC.IOC [LPESummand]
     addSummandIfImmediateSuccessor soFar summand@(LPESummand _ g _) = do
-      sat <- isSatisfiable (Subst.subst (Map.fromList paramEqs) Map.empty g)
+      sat <- isSatisfiable (cstrAnd (Set.fromList [guard, Subst.subst (Map.fromList paramEqs) Map.empty g]))
       return $ if sat then soFar ++ [summand] else soFar
     addSummandIfImmediateSuccessor soFar _ = do return soFar
 -- getImmediateSuccessors 
@@ -74,7 +76,7 @@ parResetLoop lpeInstance@(channels, initParamEqs, summands) successorsPerSummand
     updateSummand other = other
     
     updateParamEqs :: LPEParamEqs -> [VarId] -> LPEParamEqs
-    updateParamEqs paramEqs usedVars = [ (p, if p `elem` usedVars then v else cstrConst (Cany { sort = varsort p })) | (p, v) <- paramEqs ]
+    updateParamEqs paramEqs usedVars = [ (p, if p `elem` usedVars then v else w) | (p, v) <- paramEqs, (q, w) <- initParamEqs, p == q ]
 -- parResetLoop
 
 -- Updates the information collected about summands, in particular their lists of unused variables:

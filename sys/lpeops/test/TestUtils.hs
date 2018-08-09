@@ -29,7 +29,7 @@ import LPETypes
 
 createTestEnvC :: IO IOC.EnvC
 createTestEnvC = do
-    smtEnv <- SMT.createSMTEnv (Maybe.fromJust (Config.getProc initConfig)) True
+    smtEnv <- SMT.createSMTEnv (Maybe.fromJust (Config.getProc initConfig)) False -- Set to True to write SMT solver logs!
     (_info,smtEnv') <- runStateT SMT.openSolver smtEnv
     return $ IOC.EnvC { IOC.config = initConfig
                       , IOC.unid   = 0
