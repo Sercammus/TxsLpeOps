@@ -55,29 +55,35 @@ getImmediateSuccessors allSummands (LPESummand _channelOffers guard paramEqs) = 
       sat <- isSatisfiable (cstrAnd (Set.fromList [guard, Subst.subst (Map.fromList paramEqs) Map.empty g]))
       return $ if sat then soFar ++ [summand] else soFar
     addSummandIfImmediateSuccessor soFar _ = do return soFar
--- getImmediateSuccessors 
+-- getImmediateSuccessors
 
 -- Updates the information collected about summands, in particular their lists of unused variables,
 -- until the information no longer changes.
 -- With the final information, assign ANY values to variables that are unused:
 parResetLoop :: LPEInstance -> [(LPESummand, [LPESummand], [VarId])] -> IOC.IOC LPEInstance
 parResetLoop lpeInstance@(channels, initParamEqs, summands) successorsPerSummand = do
+    let newSuccessorsPerSummand = parResetUpdate successorsPerSummand
     if newSuccessorsPerSummand == successorsPerSummand
-    then do return (channels, initParamEqs, map updateSummand summands)
+    then do newSummands <- Monad.mapM (resetParamsInSummand lpeInstance successorsPerSummand) summands
+            return (channels, initParamEqs, newSummands)
     else parResetLoop lpeInstance newSuccessorsPerSummand
-  where
-    newSuccessorsPerSummand = parResetUpdate successorsPerSummand
-    
-    updateSummand :: LPESummand -> LPESummand
-    updateSummand summand@(LPESummand channelOffers guard paramEqs) =
-        case [ usedVars | (smd, _sucs, usedVars) <- successorsPerSummand, smd == summand ] of
-          [usedVars] -> LPESummand channelOffers guard (updateParamEqs paramEqs usedVars)
-          _ -> LPESummand channelOffers guard paramEqs
-    updateSummand other = other
-    
-    updateParamEqs :: LPEParamEqs -> [VarId] -> LPEParamEqs
-    updateParamEqs paramEqs usedVars = [ (p, if p `elem` usedVars then v else w) | (p, v) <- paramEqs, (q, w) <- initParamEqs, p == q ]
 -- parResetLoop
+
+resetParamsInSummand :: LPEInstance -> [(LPESummand, [LPESummand], [VarId])] -> LPESummand -> IOC.IOC LPESummand
+resetParamsInSummand (_, initParamEqs, summands) successorsPerSummand summand@(LPESummand channelOffers guard paramEqs) =
+    case [ (usedVars, sucs) | (smd, sucs, usedVars) <- successorsPerSummand, smd == summand ] of
+      [(usedVars, sucs)] -> do let potentialResult = LPESummand channelOffers guard (updateParamEqs paramEqs usedVars)
+                               immediateSuccessors <- getImmediateSuccessors summands potentialResult
+                               -- We cannot permit that new successors are suddenly possible!
+                               -- This is likely in particular with the initial state.
+                               if Set.isSubsetOf (Set.fromList immediateSuccessors) (Set.fromList sucs)
+                               then do return $ potentialResult
+                               else do return $ LPESummand channelOffers guard paramEqs
+      _ -> do return $ LPESummand channelOffers guard paramEqs
+  where
+    updateParamEqs :: LPEParamEqs -> [VarId] -> LPEParamEqs
+    updateParamEqs eqs usedVars = [ (p, if p `elem` usedVars then v else w) | (p, v) <- eqs, (q, w) <- initParamEqs, p == q ]
+resetParamsInSummand _ _ other = do return other
 
 -- Updates the information collected about summands, in particular their lists of unused variables:
 parResetUpdate :: [(LPESummand, [LPESummand], [VarId])] -> [(LPESummand, [LPESummand], [VarId])]
@@ -97,7 +103,7 @@ parResetUpdate successorsPerSummand = map updateSummand successorsPerSummand
         let params = Set.fromList (map fst paramEqs) in
         let usedVars = foldl (++) [] [uvars | (s, _g, uvars) <- successorsPerSummand, s == successor] in
         
-        -- Parameters in the guard are relevant to the successor, because they enable/disable the instantiation:
+        -- Parameters in the guard are relevant to the successor, because they enable/disable the channel+instantiation:
         let guardVars = Set.intersection params (Set.fromList (FreeVar.freeVars guard)) in
         
         -- Parameters used in assignments to used variables are relevant (because the variables are used):

@@ -20,6 +20,7 @@ library
                     , LPEParElm
                     , LPEParRemoval
                     , LPEParReset
+                    , LPEConfCheck
                     , LPETypes
                     , Satisfiability
                     , ValExprVisitor
