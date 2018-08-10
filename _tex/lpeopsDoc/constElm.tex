@@ -1,0 +1,102 @@
+\chapter{constElm}
+
+\section{Introduction}
+
+A linearized process may have parameters that do not change value throughout the state space of that process.
+These parameters are essentially \emph{constants}.
+
+Constants can be removed from a process as follows:
+\begin{itemize}
+\item Substitute references to a constant by the explicit value of that constant;
+\item Remove the constant from the process parameter list.
+\end{itemize}
+
+The advantages of removing constants from a process are smaller state vectors (and therefore reduced memory usage) and faster performance in general.
+These advantages may be small; however, the detection and removal of constants can be done fairly cheaply.
+
+\section{Algorithm}
+
+The algorithm consists of the following steps \cite{groote2001computer}:
+
+\begin{enumerate}
+
+\item Mark all process parameters.
+(This means that, initially, we assume that all process parameters are constants.)
+
+\item Define a substitution $\rho = [p \rightarrow v_0(p) \;|\; p \in P]$, where $P$ is the set of all process parameters and where $v_0$ is a function that gives the initial value of a given process parameter.
+
+\item Consider each recursive process instantiations of the summands of the LPE.
+Construct an equation $p \neq v(p)$ for all $p \in P$, where $v$ is a function that gives the expression of which the value is assigned to the process parameter $p$ in the instantiation, and applying the substitution $\rho$ to it.
+If the result is unsatisfiable, $p$ remains marked, because $(p = v(p))[\rho] \Leftrightarrow v_0(p) = v(p)[\rho]$ seems to be an invariant (for now).
+Otherwise, unmark $p$.
+
+\item Repeat the previous step until no process parameter is unmarked.
+All remaining marked process parameters can be safely removed the process.
+
+\end{enumerate}
+
+\section{Example}
+
+Consider the following LPE:
+
+\begin{lstlisting}
+//Process definition:
+PROCDEF example[A :: Int](x, y, z :: Int)
+  = A >-> example[A](z-1, 1, 2)
+  + A >-> example[A](y, x, x+y)
+  + A >-> example[A](1, x, z+1)
+  ;
+
+//Initialization:
+example[A](1, 1, 2);
+\end{lstlisting}
+
+First, $\rho = [ x \rightarrow 1, y \rightarrow 1, z \rightarrow 2 ]$.
+
+We must check the satisfiability of the following equations:
+
+\begin{align*}
+(x \neq z-1)[\rho] &\Leftrightarrow (1 \neq 2-1) \Leftrightarrow \textit{false} \\
+(y \neq 1)[\rho] &\Leftrightarrow (1 \neq 1) \Leftrightarrow \textit{false} \\
+(z \neq 2)[\rho] &\Leftrightarrow (2 \neq 2) \Leftrightarrow \textit{false} \\
+(x \neq y)[\rho] &\Leftrightarrow (1 \neq 1) \Leftrightarrow \textit{false} \\
+(y \neq x)[\rho] &\Leftrightarrow (1 \neq 1) \Leftrightarrow \textit{false} \\
+(z \neq x+y)[\rho] &\Leftrightarrow (2 \neq 1+1) \Leftrightarrow \textit{false} \\
+(x \neq 1)[\rho] &\Leftrightarrow (1 \neq 1) \Leftrightarrow \textit{false} \\
+(y \neq x)[\rho] &\Leftrightarrow (1 \neq 1) \Leftrightarrow \textit{false} \\
+(z \neq z+1)[\rho] &\Leftrightarrow (2 \neq 2+1) \Leftrightarrow \textit{true} \\
+\end{align*}
+
+The last equation is clearly satisfiable, and so $z=2$ cannot be an invariant.
+$z$ is unmarked, and $\rho$ becomes $[ x \rightarrow 1, y \rightarrow 1 ]$.
+
+\clearpage
+The equations are now the following:
+
+\begin{align*}
+(x \neq z-1)[\rho] &\Leftrightarrow (1 \neq z-1) \\
+(y \neq 1)[\rho] &\Leftrightarrow (1 \neq 1) \Leftrightarrow \textit{false} \\
+(x \neq y)[\rho] &\Leftrightarrow (1 \neq 1) \Leftrightarrow \textit{false} \\
+(y \neq x)[\rho] &\Leftrightarrow (1 \neq 1) \Leftrightarrow \textit{false} \\
+(x \neq 1)[\rho] &\Leftrightarrow (1 \neq 1) \Leftrightarrow \textit{false} \\
+(y \neq x)[\rho] &\Leftrightarrow (1 \neq 1) \Leftrightarrow \textit{false} \\
+\end{align*}
+
+The first equation is unsatisfiable (take $z=0$), and so $x$ remains marked.
+None of the other equations result in a parameter being unmarked, either, which means that $x$ and $y$ are constants.
+Removing them from the LPE gives
+
+\begin{lstlisting}
+//Process definition:
+PROCDEF example[A :: Int](z :: Int)
+  = A >-> example[A](2)
+  + A >-> example[A](2)
+  + A >-> example[A](z+1)
+  ;
+
+//Initialization:
+example[A](2);
+\end{lstlisting}
+
+Obviously, more simplification is possible.
+
