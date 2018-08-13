@@ -18,7 +18,6 @@ It consists of two phases, a preparation phase and an iteration phase.
 
 Consider all possible pairs of summands of the LPE (including symmetric pairs).
 Of a given summand pair $(s, t)$, let $t$ be a \emph{successor} of $s$ if $s$ contains a recursive process instantiation and if the following equation is satisfiable:
-
 \begin{align*}
 c_s \land {c_t}[p \rightarrow v_s(p) \;|\; p \in P]
 \end{align*}
@@ -26,8 +25,7 @@ c_s \land {c_t}[p \rightarrow v_s(p) \;|\; p \in P]
 where
 
 \begin{itemize}
-\item $c_s$ is the guard of summand $s$;
-\item $c_t$ is the guard of summand $t$;
+\item $c_s$ and $c_t$ are the guards of summands $s$ and $t$, respectively;
 \item $P$ is the set of all process parameters;
 \item $v_s$ is a function that yields the expression that summand $s$ assigns to a given process parameter in its recursive process instantiation.
 \end{itemize}
@@ -45,30 +43,37 @@ This phase follows these steps:
 This means that, initially, we assume that all process parameters are used by one or more of the successors of $s$.
 
 \item For each summand $s$, set the value of $R_s$ to $\bigcup\limits_{t \in S_s}^{} r(t)$ where $S_s$ is the set of all successors of $s$ (as determined during the previous phase) and where $r$ is the function
-
 \begin{align*}
-r(t) = P \cap \left( \text{vars}(c_t) \cup \bigcup\limits_{x \in R_t}^{} v_t(x) \right)
+r(t) = \left( \text{vars}(c_t) \cup \bigcup\limits_{x \in R_t}^{} v_t(x) \right) \setminus C_t
 \end{align*}
 
 where
 
 \begin{itemize}
-\item $P$ is the set of all process parameters;
 \item $\text{vars}(c_t)$ gives the free variables in $c_t$, the guard of summand $t$;
-\item $v_t$ is a function that yields the expression that summand $t$ assigns to a given process parameter in its recursive process instantiation.
+\item $v_t$ is a function that yields the expression that summand $t$ assigns to a given process parameter in its recursive process instantiation;
+\item $C_t$ is the set of the communication variables used by summand $t$.
 \end{itemize}
 
 \item Repeat the previous step until the new value of $R_s$ is the same as before for all summands $s$.
 
-\item For each summand $s$ and each process parameter $x \notin R_s$, change the recursive process instantiation of $s$ so that $x$ is assigned ${v_s}(x)[x \rightarrow x_0]$ for a choice of $x_0$ such that ${c_s}[x \rightarrow x_0]$ is satisfiable.
-(This ensures that the set of summands that are successors of $s$ can only decrease.)
+\item For each summand $s$ with $R_s \subset P$, choose some $\rho = [x \rightarrow h_x \;|\; x \in P \cup C_s]$ so that ${c_s}[\rho]$ is satisfiable, where
 
-Note that it may be possible to merge summands in specific cases if the default value of $y$ is chosen cleverly and reused consistently.
-To find the optimal solution, a combinatorial problem must be solved, which is not expected to have a proportional payoff.
+\begin{itemize}
+\item $P$ is the set of all process parameters of the LPE;
+\item $h_x$ is a closed expression of the same sort as $x$;
+\item $C_t$ is the set of the communication variables used by summand $t$;
+\item $c_s$ is the guard of summand $s$.
+\end{itemize}
+
+For each process parameter $x \in P \setminus R_s$, change the recursive process instantiation of $s$ so that $x$ is assigned ${v_s}(x)[\rho]$.
+Note that this ensures that the set of summands that are successors of $s$ can only decrease.
+
+Also note that it may be possible to merge summands in specific cases if the default values of process parameters are chosen cleverly and reused for multiple summands.
+To find the optimal solution, however, a combinatorial problem must be solved, which is not expected to have a payoff that is proportional to the required effort.
 
 \end{enumerate}
 
-\clearpage
 \section{Example}
 
 Consider the following LPE:
