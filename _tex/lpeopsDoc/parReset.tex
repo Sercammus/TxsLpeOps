@@ -33,7 +33,7 @@ where
 \end{itemize}
 
 During the preparation phase, we determine all successors of each summand of the LPE.
-(This gives an overapproximation of the control flow graph of the LPE.)
+This gives an overapproximation of the control flow graph of the LPE.
 
 \subsection{Iteration phase}
 
@@ -60,8 +60,11 @@ where
 
 \item Repeat the previous step until the new value of $R_s$ is the same as before for all summands $s$.
 
-\item For each summand $s$ and each process parameter $x \notin R_s$, change the recursive process instantiation of $s$ so that $x$ is assigned ${v_s}[x \rightarrow x_0]$ for a choice of $x_0$ such that ${c_s}[x \rightarrow x_0]$ is satisfiable.
+\item For each summand $s$ and each process parameter $x \notin R_s$, change the recursive process instantiation of $s$ so that $x$ is assigned ${v_s}(x)[x \rightarrow x_0]$ for a choice of $x_0$ such that ${c_s}[x \rightarrow x_0]$ is satisfiable.
 (This ensures that the set of summands that are successors of $s$ can only decrease.)
+
+Note that it may be possible to merge summands in specific cases if the default value of $y$ is chosen cleverly and reused consistently.
+To find the optimal solution, a combinatorial problem must be solved, which is not expected to have a proportional payoff.
 
 \end{enumerate}
 
@@ -105,5 +108,6 @@ PROCDEF example[A :: Int, B](x, y :: Int)
 example[A, B](0, 0);
 \end{lstlisting}
 
-Note that it is not required for the default value of $y$ to be consistent!
+
+
 
