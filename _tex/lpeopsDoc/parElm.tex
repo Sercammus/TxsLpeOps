@@ -35,10 +35,10 @@ Consider the following LPE:
 \begin{lstlisting}
 //Process definition:
 PROCDEF example[A :: Int, B](x, y, z :: Int)
-  = A ? i [[x==0]] >-> example[A](i, y, z)
-  + A ? i [[x==1]] >-> example[A](0, i, z)
-  + B [[x==2]] >-> example[A](0, y, z)
-  + B >-> example[A](z, y, x)
+  = A ? i [[x==0]] >-> example[A, B](i, y, z)
+  + A ? i [[x==1]] >-> example[A, B](0, i, z)
+  + B [[x==2]] >-> example[A, B](0, y, z)
+  + B >-> example[A, B](z, y, x)
   ;
 
 //Initialization:
@@ -56,10 +56,10 @@ Removing $y$ gives
 \begin{lstlisting}
 //Process definition:
 PROCDEF example[A :: Int, B](x, z :: Int)
-  = A ? i [[x==0]] >-> example[A](i, z)
-  + A ? i [[x==1]] >-> example[A](0, z)
-  + B [[x==2]] >-> example[A](0, z)
-  + B >-> example[A](z, x)
+  = A ? i [[x==0]] >-> example[A, B](i, z)
+  + A ? i [[x==1]] >-> example[A, B](0, z)
+  + B [[x==2]] >-> example[A, B](0, z)
+  + B >-> example[A, B](z, x)
   ;
 
 //Initialization:
