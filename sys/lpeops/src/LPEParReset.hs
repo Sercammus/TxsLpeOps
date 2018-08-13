@@ -69,20 +69,17 @@ parResetLoop lpeInstance@(channels, initParamEqs, summands) successorsPerSummand
 -- parResetLoop
 
 resetParamsInSummand :: LPEInstance -> [(LPESummand, [LPESummand], [VarId])] -> LPESummand -> IOC.IOC LPESummand
-resetParamsInSummand (_, initParamEqs, summands) successorsPerSummand summand@(LPESummand channelOffers guard procInst) =
-    case [ (usedVars, sucs) | (smd, sucs, usedVars) <- successorsPerSummand, smd == summand ] of
-      [(usedVars, sucs)] -> do let potentialResult = LPESummand channelOffers guard (updateProcInst procInst usedVars)
-                               immediateSuccessors <- getImmediateSuccessors summands potentialResult
-                               -- We cannot permit that new successors are suddenly possible!
-                               -- This is likely in particular with the initial state.
-                               if Set.isSubsetOf (Set.fromList immediateSuccessors) (Set.fromList sucs)
-                               then do return potentialResult
-                               else do return summand
+resetParamsInSummand _ _ (summand@(LPESummand _ _ LPEStop)) = do return summand
+resetParamsInSummand (_, initParamEqs, _) successorsPerSummand summand@(LPESummand channelOffers guard (LPEProcInst paramEqs)) =
+    case [ uvars | (smd, _sucs, uvars) <- successorsPerSummand, smd == summand ] of
+      [uvars] -> if (length uvars) == (length initParamEqs)
+                 then do return summand
+                 else do sol <- getSomeSolution guard (map fst initParamEqs)
+                         case sol of
+                           Just solMap -> do let newParamEqs = [ (p, if p `elem` uvars then v else (Map.findWithDefault v p solMap)) | (p, v) <- paramEqs ]
+                                             return (LPESummand channelOffers guard (LPEProcInst newParamEqs))
+                           Nothing -> do return summand
       _ -> do return summand
-  where
-    updateProcInst :: LPEProcInst -> [VarId] -> LPEProcInst
-    updateProcInst LPEStop _ = LPEStop
-    updateProcInst (LPEProcInst eqs) usedVars = LPEProcInst [ (p, if p `elem` usedVars then v else w) | (p, v) <- eqs, (q, w) <- initParamEqs, p == q ]
 -- resetParamsInSummand
 
 -- Updates the information collected about summands, in particular their lists of unused variables:

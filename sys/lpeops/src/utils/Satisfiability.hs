@@ -25,6 +25,8 @@ getSomeSolution
 import Control.Monad.State
 import qualified EnvCore as IOC
 import qualified EnvData
+import qualified Data.Map as Map
+import qualified Data.Set as Set
 import qualified TxsDefs
 import qualified FreeVar
 import qualified Solve
@@ -84,26 +86,28 @@ getSat expression = do
 
 -- Frequently used method; code is modified code from TxsCore.
 -- Attempts to find a solution for the given expression.
-getSomeSolution :: TxsDefs.VExpr -> IOC.IOC SolveDefs.SolveProblem
-getSomeSolution expression = do
+getSomeSolution :: TxsDefs.VExpr -> [VarId] -> IOC.IOC (Maybe (Map.Map VarId TxsDefs.VExpr))
+getSomeSolution expression variables = do
     envc <- get
     case IOC.state envc of
       IOC.Noning -> do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR "No 'solve' without model" ]
-                       return SolveDefs.Unknown
+                       return Nothing
       _ -> if SortOf.sortOf expression /= SortId.sortIdBool
            then do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR "Value expression shall be Bool" ]
-                   return SolveDefs.Unknown
+                   return Nothing
            else do expr <- anyElm expression
-                   let frees = FreeVar.freeVars expr
+                   let frees = Set.toList (Set.fromList ((FreeVar.freeVars expr) ++ variables))
                    let assertions = Solve.add expr Solve.empty
                    smtEnv <- IOC.getSMT "current"
                    case smtEnv of
                      SMTData.SmtEnvError -> do IOC.putMsgs [ EnvData.TXS_CORE_ANY "Could not locate SMT solver" ]
-                                               return SolveDefs.Unknown
-                     _ -> do (solution, smtEnv') <- lift $ runStateT (Solve.solve frees assertions) smtEnv
+                                               return Nothing
+                     _ -> do (sol, smtEnv') <- lift $ runStateT (Solve.solve frees assertions) smtEnv
                              IOC.putSMT "current" smtEnv'
                              IOC.putMsgs [ EnvData.TXS_CORE_ANY ("Expression: " ++ (show expr)) ]
-                             return solution
+                             case sol of
+                               SolveDefs.Solved solMap -> return (Just (Map.map cstrConst solMap))
+                               _ -> return Nothing
 -- getSomeSolution
 
 -- Eliminates occurrences of ANY by substituting them for fresh, free variables.
