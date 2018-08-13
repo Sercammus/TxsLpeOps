@@ -19,6 +19,7 @@ module LPETypes (
 LPEInstance,
 LPESummand(..),
 LPESummands,
+LPEProcInst(..),
 LPEChannelOffer,
 LPEChannelOffers,
 LPEParamEq,
@@ -38,6 +39,8 @@ import qualified TxsShow
 import           VarId
 import           Name
 import qualified ProcId
+import           ConstDefs
+import           ValExpr
 
 -- Type around which this module revolves.
 -- It consists of the following parts:
@@ -45,12 +48,16 @@ import qualified ProcId
 --  - Information per summand of the LPE.
 type LPEInstance = ([TxsDefs.ChanId], LPEParamEqs, LPESummands)
 
--- Convenience type.
+-- Main building block of an LPE.
 -- Each summand provides the following pieces of critical information:
+--  - Channel offers (channel references and fresh variables for communication over those channel).
 --  - Guard (capable of restricting the value of the communication variable).
---  - A number of value initializations (for the instantiation of the next process).
-data LPESummand = LPEStopSummand | LPESummand LPEChannelOffers TxsDefs.VExpr LPEParamEqs deriving (Eq, Ord, Show)
+--  - Possibly a number of value initializations (for the instantiation of the next process).
+data LPESummand = LPESummand LPEChannelOffers TxsDefs.VExpr LPEProcInst deriving (Eq, Ord, Show)
 type LPESummands = [LPESummand]
+
+-- Summands can have a process instantiation or STOP:
+data LPEProcInst = LPEStop | LPEProcInst LPEParamEqs deriving (Eq, Ord, Show)
 
 -- Convenience type.
 -- Relates a channel with communication variables over which that channel must be synchronized.
@@ -107,7 +114,7 @@ getLPESummandIterator expectedProcId expectedProcDef@(TxsDefs.ProcDef _ params _
       TxsDefs.Choice choices -> if choices == Set.empty
                                 then do maybeOtherSummands <- getLPESummandIterator expectedProcId expectedProcDef xs
                                         return (case maybeOtherSummands of
-                                          Just otherSummands -> Just (LPEStopSummand:otherSummands)
+                                          Just otherSummands -> Just ((LPESummand [] (cstrConst (Cbool True)) LPEStop):otherSummands)
                                           _ -> Nothing)
                                 else do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("getLPESummandIterator: invalid LPE instantiation, found " ++ (TxsShow.fshow (TxsDefs.view summand))) ]
                                         return Nothing
@@ -117,7 +124,7 @@ getLPESummandIterator expectedProcId expectedProcDef@(TxsDefs.ProcDef _ params _
                                                               case maybeChannelOffers of
                                                                 Just channelOffers -> do maybeOtherSummands <- getLPESummandIterator expectedProcId expectedProcDef xs
                                                                                          return (case maybeOtherSummands of
-                                                                                           Just otherSummands -> Just ((LPESummand channelOffers constraint (zip params paramValues)):otherSummands)
+                                                                                           Just otherSummands -> Just ((LPESummand channelOffers constraint (LPEProcInst (zip params paramValues))):otherSummands)
                                                                                            _ -> Nothing)
                                                                 _ -> do return Nothing
                                                       else do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("getLPESummandIterator: invalid LPE instantiation, found " ++ (TxsShow.fshow (TxsDefs.view procInst))) ]
@@ -173,8 +180,9 @@ fromLPEInstance (chans, paramEqs, summands) procName = do
       summandIterator [] _ = []
       summandIterator (summand:xs) lpeProcId =
           case summand of
-            LPEStopSummand -> (TxsDefs.stop):(summandIterator xs lpeProcId)
-            LPESummand channelOffers gd eqs -> let actPref = TxsDefs.ActOffer { TxsDefs.offers = Set.fromList (map fromOfferToOffer channelOffers), TxsDefs.constraint = gd, TxsDefs.hiddenvars = Set.empty } in
+            LPESummand channelOffers gd LPEStop -> let actPref = TxsDefs.ActOffer { TxsDefs.offers = Set.fromList (map fromOfferToOffer channelOffers), TxsDefs.constraint = gd, TxsDefs.hiddenvars = Set.empty } in
+                (TxsDefs.actionPref actPref TxsDefs.stop):(summandIterator xs lpeProcId)
+            LPESummand channelOffers gd (LPEProcInst eqs) -> let actPref = TxsDefs.ActOffer { TxsDefs.offers = Set.fromList (map fromOfferToOffer channelOffers), TxsDefs.constraint = gd, TxsDefs.hiddenvars = Set.empty } in
               let procInst = TxsDefs.procInst lpeProcId chans (map snd eqs) in
                 (TxsDefs.actionPref actPref procInst):(summandIterator xs lpeProcId)
       

@@ -50,12 +50,12 @@ testConstElmBasic = TestCase $ do
     summand1_1 = LPESummand -- A ? z [z==0] >-> P(1, 0)
         [(chanIdA, [varIdZ])]
         (cstrEqual vexprZ vexpr0)
-        [(varIdX, vexpr1), (varIdY, vexpr0)]
+        (LPEProcInst [(varIdX, vexpr1), (varIdY, vexpr0)])
     summand1_2 :: LPESummand
     summand1_2 = LPESummand -- A ? y [x==1 && y==0] >-> P(0, y)
         [(chanIdA, [varIdY])]
         (cstrAnd (Set.fromList [cstrEqual vexprX vexpr1, cstrEqual vexprY vexpr0]))
-        [(varIdX, vexpr0), (varIdY, vexprY)]
+        (LPEProcInst [(varIdX, vexpr0), (varIdY, vexprY)])
     lpeInstance1 :: LPEInstance
     lpeInstance1 = ([chanIdA], [(varIdX, vexpr0), (varIdY, vexpr0)], [summand1_1, summand1_2])
     
@@ -63,12 +63,12 @@ testConstElmBasic = TestCase $ do
     summand2_1 = LPESummand -- A ? z [z==0] >-> P(1)
         [(chanIdA, [varIdZ])]
         (cstrEqual vexprZ vexpr0)
-        [(varIdX, vexpr1)]
+        (LPEProcInst [(varIdX, vexpr1)])
     summand2_2 :: LPESummand
     summand2_2 = LPESummand -- A ? __FV1 [0==0 && x==1] >-> P(0)
         [(chanIdA, [varIdFV1])]
         (cstrAnd (Set.fromList [cstrEqual vexprX vexpr1, cstrEqual vexpr0 vexpr0]))
-        [(varIdX, vexpr0)]
+        (LPEProcInst [(varIdX, vexpr0)])
     lpeInstance2 :: LPEInstance
     lpeInstance2 = ([chanIdA], [(varIdX, vexpr0)], [summand2_1, summand2_2])
 -- testConstElmBasic
@@ -84,17 +84,17 @@ testConstElmXYX = TestCase $ do
     summand1_1 = LPESummand -- A ? z >-> P(x, 1, z)
         [(chanIdA, [varIdZ])]
         (vexprTrue)
-        [(varIdX, vexprX), (varIdY, vexpr1), (varIdZ, vexprZ)]
+        (LPEProcInst [(varIdX, vexprX), (varIdY, vexpr1), (varIdZ, vexprZ)])
     summand1_2 :: LPESummand
     summand1_2 = LPESummand -- A ? z >-> P(y, x, z)
         [(chanIdA, [varIdZ])]
         (vexprTrue)
-        [(varIdX, vexprY), (varIdY, vexprX), (varIdZ, vexprZ)]
+        (LPEProcInst [(varIdX, vexprY), (varIdY, vexprX), (varIdZ, vexprZ)])
     summand1_3 :: LPESummand
     summand1_3 = LPESummand -- A ? z >-> P(1, x, 2)
         [(chanIdA, [varIdZ])]
         (vexprTrue)
-        [(varIdX, vexpr1), (varIdY, vexprX), (varIdZ, vexpr2)]
+        (LPEProcInst [(varIdX, vexpr1), (varIdY, vexprX), (varIdZ, vexpr2)])
     lpeInstance1 :: LPEInstance
     lpeInstance1 = ([chanIdA], [(varIdX, vexpr1), (varIdY, vexpr1), (varIdZ, vexpr2)], [summand1_1, summand1_2, summand1_3])
     
@@ -102,17 +102,17 @@ testConstElmXYX = TestCase $ do
     summand2_1 = LPESummand -- A ? __FV1 >-> P()
         [(chanIdA, [varIdFV1])]
         (vexprTrue)
-        []
+        (LPEProcInst [])
     summand2_2 :: LPESummand
     summand2_2 = LPESummand -- A ? __FV2 >-> P()
         [(chanIdA, [varIdFV2])]
         (vexprTrue)
-        []
+        (LPEProcInst [])
     summand2_3 :: LPESummand
     summand2_3 = LPESummand -- A ? __FV3 >-> P()
         [(chanIdA, [varIdFV3])]
         (vexprTrue)
-        []
+        (LPEProcInst [])
     lpeInstance2 :: LPEInstance
     lpeInstance2 = ([chanIdA], [], [summand2_1, summand2_2, summand2_3])
 -- testConstElmXYX

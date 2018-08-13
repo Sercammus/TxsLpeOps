@@ -38,8 +38,7 @@ parElm lpeInstance@((_channels, paramEqs, summands)) = do
 
 -- Eliminate parameters from a list if they are used in the guard or channel communications of a given summand:
 filterInertParamsWithSummand :: [VarId] -> LPESummand -> [VarId]
-filterInertParamsWithSummand soFar LPEStopSummand = soFar
-filterInertParamsWithSummand soFar (LPESummand channelOffers guard _eqs) =
+filterInertParamsWithSummand soFar (LPESummand channelOffers guard _procInst) =
     let channelOfferVars = foldl (++) [] (map snd channelOffers) in
       (soFar List.\\ channelOfferVars) List.\\ (FreeVar.freeVars guard)
 -- filterInertParamsWithSummand
@@ -64,14 +63,12 @@ parElmCheck :: LPESummands                       -- Remaining summands for which
             -> [VarId]                           -- Marked parameters.
             -> IOC.IOC [VarId]                   -- New marked parameters (cannot grow in size).
 parElmCheck [] inertParams = do return inertParams
-parElmCheck (summand:xs) inertParams =
-    case summand of
-      LPEStopSummand -> do parElmCheck xs inertParams
-      LPESummand _chanOffers guard paramEqs -> do
-        unsat <- isUnsatisfiable guard
-        if unsat -- Guard is NOT satisfiable, so leave the marked parameters alone:
-        then do parElmCheck xs inertParams
-        else do parElmCheck xs (foldl filterInertParamsWithEq inertParams paramEqs)
+parElmCheck ((LPESummand _ _ LPEStop):xs) inertParams = do parElmCheck xs inertParams
+parElmCheck ((LPESummand _chanOffers guard (LPEProcInst paramEqs)):xs) inertParams = do
+    unsat <- isUnsatisfiable guard
+    if unsat -- Guard is NOT satisfiable, so leave the marked parameters alone:
+    then do parElmCheck xs inertParams
+    else do parElmCheck xs (foldl filterInertParamsWithEq inertParams paramEqs)
   where
     filterInertParamsWithEq :: [VarId] -> LPEParamEq -> [VarId]
     filterInertParamsWithEq soFar (var, expr) = if (elem var inertParams) then soFar else (soFar List.\\ (FreeVar.freeVars expr))

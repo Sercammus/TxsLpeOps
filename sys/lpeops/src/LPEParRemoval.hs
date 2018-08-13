@@ -42,15 +42,15 @@ removeParsFromLPE targetParams (channels, paramEqs, summands) = do
     rho = \e -> Subst.subst (Map.fromList [(p, v) | (p, v) <- paramEqs, p `elem` targetParams]) Map.empty (e :: TxsDefs.VExpr)
     
     -- Eliminates parameters from a series of parameter instantiations:
-    removeParsFromParamEqs :: LPEParamEqs -> LPEParamEqs
-    removeParsFromParamEqs eqs = [(p, rho v) | (p, v) <- eqs, not (p `elem` targetParams)]
+    removeParsFromProcInst :: LPEProcInst -> LPEProcInst
+    removeParsFromProcInst LPEStop = LPEStop
+    removeParsFromProcInst (LPEProcInst eqs) = LPEProcInst [(p, rho v) | (p, v) <- eqs, not (p `elem` targetParams)]
     
     -- Eliminates parameters from a summand:
     removeParsFromSummand :: LPESummands -> LPESummand -> IOC.IOC LPESummands
-    removeParsFromSummand soFar LPEStopSummand = do return (soFar ++ [LPEStopSummand])
-    removeParsFromSummand soFar (LPESummand channelOffers guard eqs) = do
+    removeParsFromSummand soFar (LPESummand channelOffers guard procInst) = do
         newChannelOffers <- Monad.foldM removeParsFromChannelOffer [] channelOffers
-        return (soFar ++ [LPESummand newChannelOffers (rho guard) (removeParsFromParamEqs eqs)])
+        return (soFar ++ [LPESummand newChannelOffers (rho guard) (removeParsFromProcInst procInst)])
     
     -- Eliminates parameters from channel offers:
     removeParsFromChannelOffer :: LPEChannelOffers -> LPEChannelOffer -> IOC.IOC LPEChannelOffers

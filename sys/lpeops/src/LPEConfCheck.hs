@@ -70,9 +70,9 @@ isConfluentTauSummand (x:xs) tauSummand = do
 -- isConfluentTauSummand
 
 checkConfluenceCondition :: LPESummand -> LPESummand -> IOC.IOC Bool
-checkConfluenceCondition LPEStopSummand _ = do return False
-checkConfluenceCondition _ LPEStopSummand = do return False
-checkConfluenceCondition (LPESummand _channelOffers1 guard1 paramEqs1) (LPESummand channelOffers2 guard2 paramEqs2) = do
+checkConfluenceCondition (LPESummand _ _ LPEStop) _ = do return False
+checkConfluenceCondition _ (LPESummand _ _ LPEStop) = do return False
+checkConfluenceCondition (LPESummand _channelOffers1 guard1 (LPEProcInst paramEqs1)) (LPESummand channelOffers2 guard2 (LPEProcInst paramEqs2)) = do
     let channelVars = Set.toList (foldl getChannelVars Set.empty channelOffers2)
     -- a1 == a1[g1] && ... && an == an[g1]
     let channelArgEqs = map (\varId -> cstrEqual (cstrVar varId) (g1 (cstrVar varId))) channelVars
@@ -102,13 +102,13 @@ confElm lpeInstance = do
       _ -> do return Nothing
   where
     mergeSummands :: LPESummand -> [LPESummand] -> LPESummand
-    mergeSummands summand@(LPESummand chans g eqs1) successors =
+    mergeSummands summand@(LPESummand _ _ LPEStop) _ = summand
+    mergeSummands summand@(LPESummand chans g (LPEProcInst eqs1)) successors =
         case [ suc | suc <- successors, isFlaggedTauSummand suc ] of
-          [LPESummand _ _ eqs2] ->
+          [LPESummand _ _ (LPEProcInst eqs2)] ->
             let substitution = \e -> Subst.subst (Map.fromList eqs1) Map.empty (e :: TxsDefs.VExpr) in
-              LPESummand chans g [ (p, substitution v) | (p, v) <- eqs2 ]
+              LPESummand chans g (LPEProcInst [ (p, substitution v) | (p, v) <- eqs2 ])
           _ -> summand
-    mergeSummands summand _ = summand
 -- confElm
 
 -- Selects all potential successors summands of a given summand from a list with all summands.
@@ -116,8 +116,8 @@ confElm lpeInstance = do
 -- whose guard can be satisfied after the guard of the current summand has been satisfied and
 -- after the substitutions of the process recursion have taken place.)
 getDefiniteSuccessors :: [LPESummand] -> LPESummand -> IOC.IOC [LPESummand]
-getDefiniteSuccessors _ LPEStopSummand = do return []
-getDefiniteSuccessors allSummands (LPESummand _channelOffers guard paramEqs) = do
+getDefiniteSuccessors _ (LPESummand _ _ LPEStop) = do return []
+getDefiniteSuccessors allSummands (LPESummand _channelOffers guard (LPEProcInst paramEqs)) = do
     immediateSuccessors <- Monad.foldM addSummandIfImmediateSuccessor [] allSummands
     return $ immediateSuccessors
   where
@@ -125,6 +125,5 @@ getDefiniteSuccessors allSummands (LPESummand _channelOffers guard paramEqs) = d
     addSummandIfImmediateSuccessor soFar summand@(LPESummand _ g _) = do
       inv <- isInvariant (cstrAnd (Set.fromList [guard, Subst.subst (Map.fromList paramEqs) Map.empty g]))
       return $ if inv then soFar ++ [summand] else soFar
-    addSummandIfImmediateSuccessor soFar _ = do return soFar
 -- getDefiniteSuccessors
 
