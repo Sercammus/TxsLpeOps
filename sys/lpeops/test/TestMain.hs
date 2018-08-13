@@ -22,6 +22,7 @@ testList = TestList
     , TestLabel "parElmBasic"              testParElmBasic
     , TestLabel "parElmXUpperBound"        testParElmXUpperBound
     , TestLabel "parResetBasic"            testParResetBasic
+    , TestLabel "confCheckBasic"           testConfCheckBasic
     , TestLabel "confElmNoChange"          testConfElmNoChange
     , TestLabel "confElmBasic"             testConfElmBasic
     ]

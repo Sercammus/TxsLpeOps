@@ -8,6 +8,7 @@ See LICENSE at root directory of this repository.
 
 module TestConfCheck
 (
+testConfCheckBasic,
 testConfElmNoChange,
 testConfElmBasic
 )
@@ -33,6 +34,46 @@ import StdTDefs (stdSortTable)
 import LPEOps
 import LPEConfCheck
 import TestUtils
+
+confCheckFunc :: LPEInstance -> IO (Maybe LPEInstance)
+confCheckFunc lpeInstance = do
+    env <- createTestEnvC
+    evalStateT (confCheck lpeInstance) env
+-- confCheckFunc
+
+testConfCheckBasic :: Test
+testConfCheckBasic = TestCase $ do
+    maybeResult <- confCheckFunc lpeInstance1
+    case maybeResult of
+      Just result -> assertBool (printInputExpectedFound lpeInstance1 lpeInstance2 result) (result==lpeInstance2)
+      _ -> assertBool "Function confElm failed to produce output!" False
+  where
+    summand1_1 :: LPESummand
+    summand1_1 = LPESummand -- A ? [x!=2] >-> P(x+1, y)
+        [(chanIdA, [])]
+        (cstrNot (cstrEqual vexprX vexpr2))
+        (LPEProcInst [(varIdX, vexprSum vexprX vexpr1), (varIdY, vexprY)])
+    summand1_2 :: LPESummand
+    summand1_2 = LPESummand -- ISTEP [y!=2] >-> P(x, y+1)
+        [(chanIdIstep, [])]
+        (cstrNot (cstrEqual vexprY vexpr2))
+        (LPEProcInst [(varIdX, vexprX), (varIdY, vexprSum vexprY vexpr1)])
+    lpeInstance1 :: LPEInstance
+    lpeInstance1 = ([chanIdA], [(varIdX, vexpr0), (varIdY, vexpr0)], [summand1_1, summand1_2])
+    
+    summand2_1 :: LPESummand
+    summand2_1 = LPESummand -- A ? [x!=2] >-> P(x+1, y)
+        [(chanIdA, [])]
+        (cstrNot (cstrEqual vexprX vexpr2))
+        (LPEProcInst [(varIdX, vexprSum vexprX vexpr1), (varIdY, vexprY)])
+    summand2_2 :: LPESummand
+    summand2_2 = LPESummand -- CISTEP [y!=2] >-> P(x, y+1)
+        [(chanIdConfluentIstep, [])]
+        (cstrNot (cstrEqual vexprY vexpr2))
+        (LPEProcInst [(varIdX, vexprX), (varIdY, vexprSum vexprY vexpr1)])
+    lpeInstance2 :: LPEInstance
+    lpeInstance2 = ([chanIdA], [(varIdX, vexpr0), (varIdY, vexpr0)], [summand2_1, summand2_2])
+-- testConfCheckBasic
 
 confElmFunc :: LPEInstance -> IO (Maybe LPEInstance)
 confElmFunc lpeInstance = do
@@ -66,8 +107,8 @@ testConfElmNoChange = TestCase $ do
         (cstrNot (cstrEqual vexprX vexpr2))
         (LPEProcInst [(varIdX, vexprSum vexprX vexpr1), (varIdY, vexprY)])
     summand2_2 :: LPESummand
-    summand2_2 = LPESummand -- ISTEP [y!=2] >-> P(2, y)
-        [(chanIdIstep, [])]
+    summand2_2 = LPESummand -- CISTEP [y!=2] >-> P(2, y)
+        [(chanIdConfluentIstep, [])]
         (cstrNot (cstrEqual vexprY vexpr2))
         (LPEProcInst [(varIdX, vexprX), (varIdY, vexprSum vexprY vexpr1)])
     lpeInstance2 :: LPEInstance

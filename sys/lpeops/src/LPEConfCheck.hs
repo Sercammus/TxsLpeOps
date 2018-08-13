@@ -72,18 +72,21 @@ isConfluentTauSummand (x:xs) tauSummand = do
 checkConfluenceCondition :: LPESummand -> LPESummand -> IOC.IOC Bool
 checkConfluenceCondition (LPESummand _ _ LPEStop) _ = do return False
 checkConfluenceCondition _ (LPESummand _ _ LPEStop) = do return False
-checkConfluenceCondition (LPESummand _channelOffers1 guard1 (LPEProcInst paramEqs1)) (LPESummand channelOffers2 guard2 (LPEProcInst paramEqs2)) = do
-    let channelVars = Set.toList (foldl getChannelVars Set.empty channelOffers2)
-    -- a1 == a1[g1] && ... && an == an[g1]
-    let channelArgEqs = map (\varId -> cstrEqual (cstrVar varId) (g1 (cstrVar varId))) channelVars
-    -- x1[g1][g2] == x1[g2][g1] && ... && xn[g1][g2] == xn[g2][g1]
-    let instantiationEqs = map (\(p, _) -> cstrEqual (g1 (g2 (cstrVar p))) (g2 (g1 (cstrVar p)))) paramEqs2
-    -- c1 && c2
-    let premise = cstrAnd (Set.fromList [guard1, guard2])
-    let conclusion = cstrAnd (Set.fromList ([g2 guard1, g1 guard2] ++ channelArgEqs ++ instantiationEqs))
-    let confluenceCondition = cstrITE premise conclusion (cstrConst (Cbool True))
-    inv <- isInvariant confluenceCondition
-    return inv
+checkConfluenceCondition (summand1@(LPESummand _channelOffers1 guard1 (LPEProcInst paramEqs1))) (summand2@(LPESummand channelOffers2 guard2 (LPEProcInst paramEqs2))) = do
+    if summand1 == summand2
+    then do return True
+    else do let channelVars = Set.toList (foldl getChannelVars Set.empty channelOffers2)
+            -- a1 == a1[g1] && ... && an == an[g1]
+            let channelArgEqs = map (\varId -> cstrEqual (cstrVar varId) (g1 (cstrVar varId))) channelVars
+            -- x1[g1][g2] == x1[g2][g1] && ... && xn[g1][g2] == xn[g2][g1]
+            let instantiationEqs = map (\(p, _) -> cstrEqual (g1 (g2 (cstrVar p))) (g2 (g1 (cstrVar p)))) paramEqs2
+            -- c1 && c2
+            let premise = cstrAnd (Set.fromList [guard1, guard2])
+            -- c1[g2] && c2[g1] && ...
+            let conclusion = cstrAnd (Set.fromList ([g2 guard1, g1 guard2] ++ channelArgEqs ++ instantiationEqs))
+            let confluenceCondition = cstrITE premise conclusion (cstrConst (Cbool { cBool=True }))
+            inv <- isInvariant confluenceCondition
+            return inv
   where
     getChannelVars :: Set.Set VarId -> LPEChannelOffer -> Set.Set VarId
     getChannelVars soFar (_chanId, commVars) = Set.union soFar (Set.fromList commVars)
