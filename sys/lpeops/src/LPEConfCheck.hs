@@ -21,6 +21,7 @@ confElm
 ) where
 
 import qualified Control.Monad       as Monad
+import qualified Data.List           as List
 import qualified Data.Map            as Map
 import qualified Data.Set            as Set
 import qualified Data.Text           as Text
@@ -36,11 +37,15 @@ import           ConstDefs
 chanIdConfluentIstep :: ChanId
 chanIdConfluentIstep = ChanId (Text.pack "CISTEP") 969 []
 
+getConfluentTauSummands :: LPESummands -> IOC.IOC LPESummands
+getConfluentTauSummands summands = do
+    Monad.filterM (isConfluentTauSummand summands) (filter isTauSummand summands)
+-- getConfluentTauSummands
+
 -- LPE rewrite method.
 confCheck :: LPEOperation
 confCheck (channels, paramEqs, summands) = do
-    let tauSummands = filter isTauSummand summands
-    confluentTauSummands <- Monad.filterM (isConfluentTauSummand summands) tauSummands
+    confluentTauSummands <- getConfluentTauSummands summands
     let noConfluentTauSummands = (Set.fromList summands) Set.\\ (Set.fromList confluentTauSummands)
     let newSummands = Set.union noConfluentTauSummands (Set.fromList (map flagTauSummand confluentTauSummands))
     do return $ Just (channels, paramEqs, Set.toList newSummands)
@@ -55,9 +60,9 @@ flagTauSummand :: LPESummand -> LPESummand
 flagTauSummand (LPESummand [(_chanId, commVars)] guard paramEqs) = (LPESummand [(chanIdConfluentIstep, commVars)] guard paramEqs)
 flagTauSummand tauSummand = tauSummand
 
-isFlaggedTauSummand :: LPESummand -> Bool
-isFlaggedTauSummand (LPESummand [(chanId, _)] _ _) = chanId == chanIdConfluentIstep
-isFlaggedTauSummand _ = False
+-- isFlaggedTauSummand :: LPESummand -> Bool
+-- isFlaggedTauSummand (LPESummand [(chanId, _)] _ _) = chanId == chanIdConfluentIstep
+-- isFlaggedTauSummand _ = False
 -- isFlaggedTauSummand
 
 isConfluentTauSummand :: [LPESummand] -> LPESummand -> IOC.IOC Bool
@@ -97,21 +102,21 @@ checkConfluenceCondition (summand1@(LPESummand _channelOffers1 guard1 (LPEProcIn
 
 -- LPE rewrite method.
 confElm :: LPEOperation
-confElm lpeInstance = do
-    maybeLpeInstance <- confCheck lpeInstance
-    case maybeLpeInstance of
-      Just (channels, paramEqs, summands) -> do definiteSuccessors <- Monad.mapM (getDefiniteSuccessors summands) summands
-                                                return $ Just (channels, paramEqs, zipWith mergeSummands summands definiteSuccessors)
-      _ -> do return Nothing
+confElm (channels, paramEqs, summands) = do
+    confluentTauSummands <- getConfluentTauSummands summands
+    definiteSuccessors <- Monad.mapM (getDefiniteSuccessors summands) summands
+    let confluentTauSuccessors = map (List.intersect confluentTauSummands) definiteSuccessors
+    return $ Just (channels, paramEqs, zipWith mergeSummands summands confluentTauSuccessors)
   where
     mergeSummands :: LPESummand -> [LPESummand] -> LPESummand
+    mergeSummands summand [] = summand
     mergeSummands summand@(LPESummand _ _ LPEStop) _ = summand
-    mergeSummands summand@(LPESummand chans g (LPEProcInst eqs1)) successors =
-        case [ suc | suc <- successors, isFlaggedTauSummand suc ] of
-          [LPESummand _ _ (LPEProcInst eqs2)] ->
+    mergeSummands summand@(LPESummand chans g1 (LPEProcInst eqs1)) (confluentTauSuccessor:_) =
+        case confluentTauSuccessor of
+          LPESummand _ g2 (LPEProcInst eqs2) ->
             let substitution = \e -> Subst.subst (Map.fromList eqs1) Map.empty (e :: TxsDefs.VExpr) in
-              LPESummand chans g (LPEProcInst [ (p, substitution v) | (p, v) <- eqs2 ])
-          _ -> summand
+              LPESummand chans g1 (LPEProcInst [ (p, cstrITE g2 (substitution v) v) | (p, v) <- eqs2 ])
+          LPESummand _ _ LPEStop -> summand
 -- confElm
 
 -- Selects all summands from a given list that are definitely successors of a given summand.

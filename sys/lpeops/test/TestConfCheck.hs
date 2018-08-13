@@ -107,8 +107,8 @@ testConfElmNoChange = TestCase $ do
         (cstrNot (cstrEqual vexprX vexpr2))
         (LPEProcInst [(varIdX, vexprSum vexprX vexpr1), (varIdY, vexprY)])
     summand2_2 :: LPESummand
-    summand2_2 = LPESummand -- CISTEP [y!=2] >-> P(2, y)
-        [(chanIdConfluentIstep, [])]
+    summand2_2 = LPESummand -- ISTEP [y!=2] >-> P(2, y)
+        [(chanIdIstep, [])]
         (cstrNot (cstrEqual vexprY vexpr2))
         (LPEProcInst [(varIdX, vexprX), (varIdY, vexprSum vexprY vexpr1)])
     lpeInstance2 :: LPEInstance
@@ -141,8 +141,8 @@ testConfElmBasic = TestCase $ do
         vexprTrue
         (LPEProcInst [(varIdX, vexprSum vexprX vexpr1), (varIdY, vexprSum vexprY vexpr1)])
     summand2_2 :: LPESummand
-    summand2_2 = LPESummand -- CISTEP >-> P(2, y)
-        [(chanIdConfluentIstep, [])]
+    summand2_2 = LPESummand -- ISTEP >-> P(2, y)
+        [(chanIdIstep, [])]
         vexprTrue
         (LPEProcInst [(varIdX, vexprX), (varIdY, vexprSum vexprY vexpr2)])
     lpeInstance2 :: LPEInstance
