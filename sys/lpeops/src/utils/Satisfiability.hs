@@ -18,7 +18,8 @@ See LICENSE at root directory of this repository.
 module Satisfiability (
 isInvariant,
 isSatisfiable,
-isUnsatisfiable
+isUnsatisfiable,
+getSomeSolution
 ) where
 
 import Control.Monad.State
@@ -80,6 +81,30 @@ getSat expression = do
                              IOC.putMsgs [ EnvData.TXS_CORE_ANY ("Expression: " ++ (show expr)) ]
                              return sat
 -- getSat
+
+-- Frequently used method; code is modified code from TxsCore.
+-- Attempts to find a solution for the given expression.
+getSomeSolution :: TxsDefs.VExpr -> IOC.IOC SolveDefs.SolveProblem
+getSomeSolution expression = do
+    envc <- get
+    case IOC.state envc of
+      IOC.Noning -> do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR "No 'solve' without model" ]
+                       return SolveDefs.Unknown
+      _ -> if SortOf.sortOf expression /= SortId.sortIdBool
+           then do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR "Value expression shall be Bool" ]
+                   return SolveDefs.Unknown
+           else do expr <- anyElm expression
+                   let frees = FreeVar.freeVars expr
+                   let assertions = Solve.add expr Solve.empty
+                   smtEnv <- IOC.getSMT "current"
+                   case smtEnv of
+                     SMTData.SmtEnvError -> do IOC.putMsgs [ EnvData.TXS_CORE_ANY "Could not locate SMT solver" ]
+                                               return SolveDefs.Unknown
+                     _ -> do (solution, smtEnv') <- lift $ runStateT (Solve.solve frees assertions) smtEnv
+                             IOC.putSMT "current" smtEnv'
+                             IOC.putMsgs [ EnvData.TXS_CORE_ANY ("Expression: " ++ (show expr)) ]
+                             return solution
+-- getSomeSolution
 
 -- Eliminates occurrences of ANY by substituting them for fresh, free variables.
 anyElm :: ValExpr VarId -> IOC.IOC (ValExpr VarId)
