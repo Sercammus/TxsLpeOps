@@ -58,6 +58,7 @@ test-suite lpeops-test
                       , LPEParRemoval
                       , LPEParReset
                       , LPETypes
+                      , LPEConfCheck
                       , Satisfiability
                       , ValExprVisitor
                       , VarFactory
@@ -65,6 +66,7 @@ test-suite lpeops-test
                       , TestConstElm
                       , TestParElm
                       , TestParReset
+                      , TestConfCheck
 
   ghc-options:       -Werror -Wall -O2 -optc-O3 -optc-ffast-math -threaded -rtsopts -with-rtsopts=-N -fmax-pmcheck-iterations=100000000
 

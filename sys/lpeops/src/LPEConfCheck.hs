@@ -111,18 +111,16 @@ confElm lpeInstance = do
           _ -> summand
 -- confElm
 
--- Selects all potential successors summands of a given summand from a list with all summands.
--- (In actuality, an overapproximation of all potential successors is selected, namely those
--- whose guard can be satisfied after the guard of the current summand has been satisfied and
--- after the substitutions of the process recursion have taken place.)
+-- Selects all summands from a given list that are definitely successors of a given summand.
+-- The result is an underapproximation!
 getDefiniteSuccessors :: [LPESummand] -> LPESummand -> IOC.IOC [LPESummand]
 getDefiniteSuccessors _ (LPESummand _ _ LPEStop) = do return []
 getDefiniteSuccessors allSummands (LPESummand _channelOffers guard (LPEProcInst paramEqs)) = do
-    immediateSuccessors <- Monad.foldM addSummandIfImmediateSuccessor [] allSummands
+    immediateSuccessors <- Monad.foldM addSummandIfDefiniteSuccessor [] allSummands
     return $ immediateSuccessors
   where
-    addSummandIfImmediateSuccessor :: [LPESummand] -> LPESummand -> IOC.IOC [LPESummand]
-    addSummandIfImmediateSuccessor soFar summand@(LPESummand _ g _) = do
+    addSummandIfDefiniteSuccessor :: [LPESummand] -> LPESummand -> IOC.IOC [LPESummand]
+    addSummandIfDefiniteSuccessor soFar summand@(LPESummand _ g _) = do
       inv <- isInvariant (cstrAnd (Set.fromList [guard, Subst.subst (Map.fromList paramEqs) Map.empty g]))
       return $ if inv then soFar ++ [summand] else soFar
 -- getDefiniteSuccessors
