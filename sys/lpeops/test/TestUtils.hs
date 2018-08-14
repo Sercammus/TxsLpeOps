@@ -21,6 +21,7 @@ import TxsDefs
 import qualified SMT
 import Sigs
 
+import TxsShow
 import qualified Config
 import qualified EnvCore as IOC
 import qualified ParamCore
@@ -53,7 +54,7 @@ putMsgs msgs = do printMsg msgs
   where
     printMsg :: [EnvData.Msg] -> IOC.IOC ()
     printMsg [] = do return ()
-    printMsg (x:xs) = do liftIO $ putStrLn (show x)
+    printMsg (x:xs) = do liftIO $ putStrLn (pshow x)
                          printMsg xs
                          return ()
 -- putMsgs

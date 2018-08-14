@@ -20,6 +20,7 @@ removeParsFromLPE
 
 import qualified Control.Monad       as Monad
 import qualified Data.Map            as Map
+import qualified Data.Text           as Text
 import qualified EnvCore             as IOC
 import qualified EnvData
 import qualified TxsDefs
@@ -33,7 +34,7 @@ import           VarFactory
 -- Occurrences of the parameters in expressions are substituted by their initial values.
 removeParsFromLPE :: [VarId] -> LPEInstance -> IOC.IOC LPEInstance
 removeParsFromLPE targetParams (channels, paramEqs, summands) = do
-    IOC.putMsgs [ EnvData.TXS_CORE_ANY ("Eliminating parameter(s): " ++ (show targetParams)) ]
+    Monad.mapM_ (\p -> IOC.putMsgs [ EnvData.TXS_CORE_ANY ("Eliminating " ++ (Text.unpack (VarId.name p))) ]) targetParams
     let newParamEqs = [(p, v) | (p, v) <- paramEqs, not (p `elem` targetParams)]
     newSummands <- Monad.foldM removeParsFromSummand [] summands
     return (channels, newParamEqs, newSummands)

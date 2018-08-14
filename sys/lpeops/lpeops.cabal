@@ -24,6 +24,7 @@ library
                     , LPETypes
                     , Satisfiability
                     , ValExprVisitor
+                    , ValExprPrettyPrint
                     , VarFactory
 
   other-modules:      
@@ -61,6 +62,7 @@ test-suite lpeops-test
                       , LPEConfCheck
                       , Satisfiability
                       , ValExprVisitor
+                      , ValExprPrettyPrint
                       , VarFactory
                       , TestUtils
                       , TestConstElm

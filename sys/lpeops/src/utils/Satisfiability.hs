@@ -27,6 +27,7 @@ import qualified EnvCore as IOC
 import qualified EnvData
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import qualified TxsDefs
 import qualified FreeVar
 import qualified Solve
@@ -38,6 +39,7 @@ import ConstDefs hiding (sort)
 import VarId
 import ValExpr
 import ValExprVisitor
+import ValExprPrettyPrint
 import VarFactory
 
 -- Checks if the specified expression cannot be false.
@@ -79,8 +81,8 @@ getSat expression = do
                      SMTData.SmtEnvError -> do IOC.putMsgs [ EnvData.TXS_CORE_ANY "Could not locate SMT solver" ]
                                                return SolveDefs.Unknown
                      _ -> do (sat, smtEnv') <- lift $ runStateT (Solve.satSolve frees assertions) smtEnv
+                             IOC.putMsgs [ EnvData.TXS_CORE_ANY ("SMT log: " ++ (showValExpr expr) ++ " ==> " ++ (show sat)) ]
                              IOC.putSMT "current" smtEnv'
-                             IOC.putMsgs [ EnvData.TXS_CORE_ANY ("Expression: " ++ (show expr)) ]
                              return sat
 -- getSat
 
@@ -103,12 +105,25 @@ getSomeSolution expression variables = do
                      SMTData.SmtEnvError -> do IOC.putMsgs [ EnvData.TXS_CORE_ANY "Could not locate SMT solver" ]
                                                return Nothing
                      _ -> do (sol, smtEnv') <- lift $ runStateT (Solve.solve frees assertions) smtEnv
+                             IOC.putMsgs [ EnvData.TXS_CORE_ANY ("SMT log: " ++ (showValExpr expr) ++ " ==> " ++ (showSolution sol)) ]
                              IOC.putSMT "current" smtEnv'
-                             IOC.putMsgs [ EnvData.TXS_CORE_ANY ("Expression: " ++ (show expr)) ]
                              case sol of
                                SolveDefs.Solved solMap -> return (Just (Map.map cstrConst solMap))
                                _ -> return Nothing
 -- getSomeSolution
+
+showSolution :: SolveDefs.SolveProblem VarId -> String
+showSolution SolveDefs.Unsolvable = "Unsolvable"
+showSolution SolveDefs.UnableToSolve = "UnableToSolve"
+showSolution (SolveDefs.Solved solMap) =
+    let f = \(p, v) -> (Text.unpack (VarId.name p)) ++ " := " ++ (showValExpr (cstrConst v)) in
+      "Solved [" ++ (separatedList (map f (Map.toList solMap)) ", ") ++ "]"
+  where
+    separatedList :: [String] -> String -> String
+    separatedList [] _ = ""
+    separatedList [x] _ = x
+    separatedList (x1:x2:xs) separator = x1 ++ separator ++ (separatedList (x2:xs) separator)
+-- showSolution
 
 -- Eliminates occurrences of ANY by substituting them for fresh, free variables.
 anyElm :: ValExpr VarId -> IOC.IOC (ValExpr VarId)

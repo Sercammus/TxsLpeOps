@@ -21,6 +21,7 @@ constElm
 
 import qualified Data.Map            as Map
 import qualified Data.List           as List
+import qualified Data.Text           as Text
 import qualified EnvCore             as IOC
 import qualified EnvData
 import qualified TxsDefs
@@ -86,9 +87,9 @@ constElmParamEqsCheck paramEqs rho (markedParam:xs) =
                   if invariant -- Parameter appears to be constant (so far), so keep it around:
                   then do otherParamInstCheck <- constElmParamEqsCheck paramEqs rho xs
                           return (markedParam:otherParamInstCheck)
-                  else do IOC.putMsgs [ EnvData.TXS_CORE_ANY ("Parameter " ++ (show markedParam) ++ " is no longer marked.") ]
+                  else do IOC.putMsgs [ EnvData.TXS_CORE_ANY ("Parameter " ++ (Text.unpack (VarId.name markedParam)) ++ " is no longer marked.") ]
                           constElmParamEqsCheck paramEqs rho xs
-      _ -> do IOC.putMsgs [ EnvData.TXS_CORE_SYSTEM_ERROR ("[Internal error] Parameter has an invalid number of initial values: " ++ (show markedParam)) ]
+      _ -> do IOC.putMsgs [ EnvData.TXS_CORE_SYSTEM_ERROR ("[Internal error] Parameter has an invalid number of initial values: " ++ (Text.unpack (VarId.name markedParam))) ]
               constElmParamEqsCheck paramEqs rho xs
 -- constElmParamEqsCheck
 
