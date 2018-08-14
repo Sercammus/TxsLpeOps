@@ -302,7 +302,7 @@ cmdIntpr cmdname args  =
          ; "map"           -> cmdMap        args
          ; "ncomp"         -> cmdNComp      args
          ; "lpe"           -> cmdLPE        args
-         ; "cstelm"        -> cmdLPECstElm  args
+         ; "lpeop"         -> cmdLPEOp      args
 -- ---------------------------------------------------------------------------------- system --
          ; "systart"       -> cmdSyStart    args
          ; "systop"        -> cmdSyStop     args
@@ -585,9 +585,9 @@ cmdLPE args  =  do
 
 -- ----------------------------------------------------------------------------------------- --
 
-cmdLPECstElm :: String -> UIO ()
-cmdLPECstElm args  =  do
-     doCmd "cstelm" args
+cmdLPEOp :: String -> UIO ()
+cmdLPEOp args  =  do
+     doCmd "LPEOP" args
      cmdsIntpr
 
 -- ----------------------------------------------------------------------------------------- --

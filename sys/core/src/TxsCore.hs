@@ -116,7 +116,8 @@ module TxsCore
   -- * LPE transformation
 , txsLPE
 
-, txsLPECstElm
+  -- * LPE manipulation
+, txsLPEOp
 )
 
 -- ----------------------------------------------------------------------------------------- --
@@ -183,6 +184,9 @@ import qualified Eval
 import qualified LPE
 import qualified LPEOps
 import qualified LPEConstElm
+import qualified LPEParElm
+import qualified LPEParReset
+import qualified LPEConfCheck
 
 -- import from valexpr
 import qualified SortId
@@ -1119,19 +1123,14 @@ txsLPE (Left bexpr)  =  do
     IOC.Initing {IOC.tdefs = tdefs}
       -> do lpe <- LPE.lpeTransform bexpr (TxsDefs.procDefs tdefs)
             case lpe of
-              Just (procinst'@(TxsDefs.view -> TxsDefs.ProcInst procid' _ _), procdef')
+              Just (procInst'@(TxsDefs.view -> TxsDefs.ProcInst procid' _ _), procdef')
                 -> case Map.lookup procid' (TxsDefs.procDefs tdefs) of
                      Nothing
                        -> do let tdefs' = tdefs { TxsDefs.procDefs = Map.insert
                                                     procid' procdef' (TxsDefs.procDefs tdefs)
                                                 }
                              IOC.modifyCS $ \st -> st { IOC.tdefs = tdefs' }
-                             mlpe <- LPEOps.lpeOperation LPEConstElm.constElm procinst' "LPE_cstelm"
-                             case mlpe of
-                               Just (prin'@(TxsDefs.view -> TxsDefs.ProcInst prid' _ _), prdf') -> do IOC.putMsgs [ EnvData.TXS_CORE_ANY ("LPE: constelm result => " ++ (TxsShow.fshow (TxsDefs.IdProc prid', TxsDefs.DefProc prdf'))) ]
-                                                                                                      return $ Just (Left prin')
-                               _ -> do IOC.putMsgs [ EnvData.TXS_CORE_SYSTEM_ERROR "LPE: constelm failed!" ]
-                                       return Nothing
+                             return $ Just (Left procInst')
                      _ -> do IOC.putMsgs [ EnvData.TXS_CORE_SYSTEM_ERROR "LPE: generated process id already exists" ]
                              return Nothing
               _ -> do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR "LPE: transformation failed" ]
@@ -1169,64 +1168,33 @@ txsLPE (Right modelid@(TxsDefs.ModelId modname _moduid))  =  do
 
 -- ----------------------------------------------------------------------------------------- --
 
--- | LPE transformation by Carsten Ruetz
-txsLPECstElm :: Either TxsDefs.BExpr TxsDefs.ModelId   -- ^ either a behaviour expression (that shall
-                                                       --   be a process instantiation), or a model
-                                                       --   definition (that shall contain a process
-                                                       --   instantiation), to be tranformed
-       -> IOC.IOC (Maybe (Either TxsDefs.BExpr TxsDefs.ModelId))
-                                                       -- ^ transformed process instantiation
-                                                       --   or model definition
-
-txsLPECstElm (Left bexpr)  =  do
-  envc <- get
-  case IOC.state envc of
-    IOC.Initing {IOC.tdefs = tdefs}
-      -> do lpe <- LPEOps.lpeOperation LPEOps.dummyOp bexpr "LPE_cstelm"
-            case lpe of
-              Just (procinst'@(TxsDefs.view -> TxsDefs.ProcInst procid' _ _), procdef')
-                -> case Map.lookup procid' (TxsDefs.procDefs tdefs) of
-                     Nothing
-                       -> do let tdefs' = tdefs { TxsDefs.procDefs = Map.insert
-                                                    procid' procdef' (TxsDefs.procDefs tdefs)
-                                                }
-                             IOC.modifyCS $ \st -> st { IOC.tdefs = tdefs' }
-                             return $ Just (Left procinst')
-                     _ -> do IOC.putMsgs [ EnvData.TXS_CORE_SYSTEM_ERROR
-                                           "LPE: generated process id already exists" ]
-                             return Nothing
-              _ -> do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR "LPE: transformation failed" ]
-                      return Nothing
-    _ -> do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR "LPE: only allowed if initialized" ]
-            return Nothing
-
-txsLPECstElm (Right modelid@(TxsDefs.ModelId modname _moduid))  =  do
-  envc <- get
-  case IOC.state envc of
-    IOC.Initing {IOC.tdefs = tdefs}
-      -> case Map.lookup modelid (TxsDefs.modelDefs tdefs) of
-           Just (TxsDefs.ModelDef insyncs outsyncs splsyncs bexpr)
-             -> do lpe' <- txsLPECstElm (Left bexpr)
-                   lift $ hPrint stderr lpe'
-                   case lpe' of
-                     Just (Left (procinst'@(TxsDefs.view -> TxsDefs.ProcInst{})))
-                       -> do uid'   <- IOC.newUnid
-                             tdefs' <- gets (IOC.tdefs . IOC.state)
-                             let modelid' = TxsDefs.ModelId ("LPE_"<>modname) uid'
-                                 modeldef'= TxsDefs.ModelDef insyncs outsyncs splsyncs procinst'
-                                 tdefs''  = tdefs'
-                                   { TxsDefs.modelDefs = Map.insert modelid' modeldef'
-                                                                    (TxsDefs.modelDefs tdefs')
-                                   }
-                             IOC.modifyCS $ \st -> st { IOC.tdefs = tdefs'' }
-                             return $ Just (Right modelid')
-                     _ -> do IOC.putMsgs [ EnvData.TXS_CORE_SYSTEM_ERROR $ "LPE: " ++
-                                           "transformation on behaviour of modeldef failed" ]
-                             return Nothing
-           _ -> do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR "LPE: model not defined" ]
-                   return Nothing
-    _ -> do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR "LPE: only allowed if initialized" ]
-            return Nothing
+txsLPEOp :: String -> TxsDefs.ModelId -> IOC.IOC (Maybe TxsDefs.ModelId)
+txsLPEOp opName (modelid@(TxsDefs.ModelId _modname _moduid)) = do
+    envc <- get
+    case IOC.state envc of
+      IOC.Initing {IOC.tdefs = tdefs} ->
+        case Map.lookup modelid (TxsDefs.modelDefs tdefs) of
+          Just (TxsDefs.ModelDef _insyncs _outsyncs _splsyncs bexpr)
+            -> do opFunc <- getLPEOperation
+                  manipulatedLPE <- LPEOps.lpeOperation opFunc bexpr ""
+                  case manipulatedLPE of
+                    Just (_bexpr', _procdef') -> do IOC.putMsgs [ EnvData.TXS_CORE_SYSTEM_ERROR "Did something!" ]
+                                                    return Nothing
+                    Nothing -> do return Nothing
+          _ -> do IOC.putMsgs [ EnvData.TXS_CORE_SYSTEM_ERROR "LPE: model not defined" ]
+                  return Nothing
+      _ -> do IOC.putMsgs [ EnvData.TXS_CORE_SYSTEM_ERROR "LPE: only allowed if initialized" ]
+              return Nothing
+  where
+    getLPEOperation :: IOC.IOC LPEOps.LPEOperation
+    getLPEOperation = case opName of
+                        "cstelm" -> do return LPEConstElm.constElm
+                        "parelm" -> do return LPEParElm.parElm
+                        "parreset" -> do return LPEParReset.parReset
+                        "confelm" -> do return LPEConfCheck.confElm
+                        _ -> do IOC.putMsgs [ EnvData.TXS_CORE_SYSTEM_ERROR ("Unknown LPE operation (" ++ opName ++ ")!") ]
+                                return LPEOps.dummyOp
+--txsLPEOp
 
 -- ----------------------------------------------------------------------------------------- --
 --                                                                                           --
