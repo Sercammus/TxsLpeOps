@@ -166,7 +166,7 @@ fromLPEInstance :: LPEInstance -> Name -> IOC.IOC (TxsDefs.BExpr, TxsDefs.ProcId
 fromLPEInstance (chans, paramEqs, summands) procName = do
     let newProcParams = map fst paramEqs
     newProcUnid <- IOC.newUnid
-    let newProcId = TxsDefs.ProcId { ProcId.name = Text.pack ((Text.unpack procName) ++ "$" ++ (show newProcUnid))
+    let newProcId = TxsDefs.ProcId { ProcId.name = Text.pack (Text.unpack procName)
                                    , ProcId.unid = newProcUnid
                                    , ProcId.procchans = chans
                                    , ProcId.procvars = newProcParams

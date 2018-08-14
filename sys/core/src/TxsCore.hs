@@ -1176,7 +1176,7 @@ txsLPEOp opName (modelId1@(TxsDefs.ModelId _modname _moduid)) modelId2 = do
         case Map.lookup modelId1 (TxsDefs.modelDefs tdefs) of
           Just (TxsDefs.ModelDef insyncs outsyncs splsyncs bexpr)
             -> do opFunc <- getLPEOperation
-                  manipulatedLPE <- LPEOps.lpeOperation opFunc bexpr ""
+                  manipulatedLPE <- LPEOps.lpeOperation opFunc bexpr (T.pack ("LPE_" ++ modelId2))
                   case manipulatedLPE of
                     Just (newProcInst, newProcId, newProcDef) ->
                       do newModelUid <- IOC.newUnid
@@ -1195,6 +1195,7 @@ txsLPEOp opName (modelId1@(TxsDefs.ModelId _modname _moduid)) modelId2 = do
   where
     getLPEOperation :: IOC.IOC LPEOps.LPEOperation
     getLPEOperation = case opName of
+                        "dummy" -> do return LPEOps.dummyOp
                         "cstelm" -> do return LPEConstElm.constElm
                         "parelm" -> do return LPEParElm.parElm
                         "parreset" -> do return LPEParReset.parReset

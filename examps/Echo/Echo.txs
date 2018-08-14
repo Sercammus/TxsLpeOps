@@ -15,9 +15,9 @@ ENDDEF
 -- inputs and outputs
 
 PROCDEF  proc  [ In, Out :: Int ]  ( a :: Int ) ::=
-        In ? x
-    >-> Out ! x
-    >-> proc [ In, Out ] ( a )
+       In ? x >-> proc [ In, Out ] ( a+1 )
+    ## Out ? x >-> proc [ In, Out ] ( a-1 )
+    ## In ? x | Out ? y [[x==y]] >-> proc [ In, Out ] ( a )
 ENDDEF
 
 -- ----------------------------------------------------------------------------------------- --
