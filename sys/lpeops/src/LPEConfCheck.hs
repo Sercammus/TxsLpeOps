@@ -43,6 +43,7 @@ getConfluentTauSummands summands = do
 -- getConfluentTauSummands
 
 -- LPE rewrite method.
+-- Flags confluent ISTEPs by renaming them to CISTEPs.
 confCheck :: LPEOperation
 confCheck (channels, paramEqs, summands) = do
     confluentTauSummands <- getConfluentTauSummands summands
@@ -101,6 +102,7 @@ checkConfluenceCondition (summand1@(LPESummand _channelOffers1 guard1 (LPEProcIn
 -- checkConfluenceCondition
 
 -- LPE rewrite method.
+-- Appends confluent ISTEPs to predecessor summands.
 confElm :: LPEOperation
 confElm (channels, paramEqs, summands) = do
     confluentTauSummands <- getConfluentTauSummands summands
@@ -113,9 +115,9 @@ confElm (channels, paramEqs, summands) = do
     mergeSummands summand@(LPESummand _ _ LPEStop) _ = summand
     mergeSummands summand@(LPESummand chans g1 (LPEProcInst eqs1)) (confluentTauSuccessor:_) =
         case confluentTauSuccessor of
-          LPESummand _ g2 (LPEProcInst eqs2) ->
+          LPESummand _ _ (LPEProcInst eqs2) ->
             let substitution = \e -> Subst.subst (Map.fromList eqs1) Map.empty (e :: TxsDefs.VExpr) in
-              LPESummand chans g1 (LPEProcInst [ (p, cstrITE g2 (substitution v) v) | (p, v) <- eqs2 ])
+              LPESummand chans g1 (LPEProcInst [ (p, substitution v) | (p, v) <- eqs2 ])
           LPESummand _ _ LPEStop -> summand
 -- confElm
 
