@@ -10,7 +10,8 @@ module TestConfCheck
 (
 testConfCheckBasic,
 testConfElmNoChange,
-testConfElmBasic
+testConfElmBasic,
+testConfElmModulo
 )
 where
  
@@ -128,7 +129,7 @@ testConfElmBasic = TestCase $ do
         vexprTrue
         (LPEProcInst [(varIdX, vexprSum vexprX vexpr1), (varIdY, vexprY)])
     summand1_2 :: LPESummand
-    summand1_2 = LPESummand -- ISTEP >-> P(2, y)
+    summand1_2 = LPESummand -- ISTEP >-> P(x, y+1)
         [(chanIdIstep, [])]
         vexprTrue
         (LPEProcInst [(varIdX, vexprX), (varIdY, vexprSum vexprY vexpr1)])
@@ -136,18 +137,52 @@ testConfElmBasic = TestCase $ do
     lpeInstance1 = ([chanIdA], [(varIdX, vexpr0), (varIdY, vexpr0)], [summand1_1, summand1_2])
     
     summand2_1 :: LPESummand
-    summand2_1 = LPESummand -- A >-> P(x+1, y)
+    summand2_1 = LPESummand -- A >-> P(x+1, y+1)
         [(chanIdA, [])]
         vexprTrue
         (LPEProcInst [(varIdX, vexprSum vexprX vexpr1), (varIdY, vexprSum vexprY vexpr1)])
     summand2_2 :: LPESummand
-    summand2_2 = LPESummand -- ISTEP >-> P(2, y)
+    summand2_2 = LPESummand -- ISTEP >-> P(x, y+2)
         [(chanIdIstep, [])]
         vexprTrue
         (LPEProcInst [(varIdX, vexprX), (varIdY, vexprSum vexprY vexpr2)])
     lpeInstance2 :: LPEInstance
     lpeInstance2 = ([chanIdA], [(varIdX, vexpr0), (varIdY, vexpr0)], [summand2_1, summand2_2])
--- testConfCheckBasic
+-- testConfElmBasic
+
+testConfElmModulo :: Test
+testConfElmModulo = TestCase $ do
+    maybeResult <- confElmFunc lpeInstance1
+    case maybeResult of
+      Just result -> assertBool (printInputExpectedFound lpeInstance1 lpeInstance2 result) (result==lpeInstance2)
+      _ -> assertBool "Function confElm failed to produce output!" False
+  where
+    summand1_1 :: LPESummand
+    summand1_1 = LPESummand -- A >-> P((x+1) % 3, y)
+        [(chanIdA, [])]
+        vexprTrue
+        (LPEProcInst [(varIdX, cstrModulo (vexprSum vexprX vexpr1) vexpr3), (varIdY, vexprY)])
+    summand1_2 :: LPESummand
+    summand1_2 = LPESummand -- ISTEP >-> P(x, (y+1) % 3)
+        [(chanIdIstep, [])]
+        vexprTrue
+        (LPEProcInst [(varIdX, vexprX), (varIdY, cstrModulo (vexprSum vexprY vexpr1) vexpr3)])
+    lpeInstance1 :: LPEInstance
+    lpeInstance1 = ([chanIdA], [(varIdX, vexpr0), (varIdY, vexpr0)], [summand1_1, summand1_2])
+    
+    summand2_1 :: LPESummand
+    summand2_1 = LPESummand -- A >-> P((x+1) % 3, y)
+        [(chanIdA, [])]
+        vexprTrue
+        (LPEProcInst [(varIdX, cstrModulo (vexprSum vexprX vexpr1) vexpr3), (varIdY, cstrModulo (vexprSum vexprY vexpr1) vexpr3)])
+    summand2_2 :: LPESummand
+    summand2_2 = LPESummand -- ISTEP >-> P(x, (y+1) % 3)
+        [(chanIdIstep, [])]
+        vexprTrue
+        (LPEProcInst [(varIdX, vexprX), (varIdY, cstrModulo (vexprSum (cstrModulo (vexprSum vexprY vexpr1) vexpr3) vexpr1) vexpr3)])
+    lpeInstance2 :: LPEInstance
+    lpeInstance2 = ([chanIdA], [(varIdX, vexpr0), (varIdY, vexpr0)], [summand2_1, summand2_2])
+-- testConfElmModulo
 
 ---------------------------------------------------------------------------
 -- Helper functions

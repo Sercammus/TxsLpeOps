@@ -25,6 +25,7 @@ testList = TestList
     , TestLabel "confCheckBasic"           testConfCheckBasic
     , TestLabel "confElmNoChange"          testConfElmNoChange
     , TestLabel "confElmBasic"             testConfElmBasic
+    , TestLabel "confElmModulo"            testConfElmModulo
     ]
 
 main :: IO ()
