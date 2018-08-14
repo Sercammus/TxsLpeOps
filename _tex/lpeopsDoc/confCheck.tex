@@ -1,4 +1,4 @@
-\chapter{confCheck}
+\chapter{confCheck} \label{confcheck}
 
 \section{Introduction}
 
@@ -10,7 +10,7 @@ Note that this means that confluence checking does not bring benefits on its own
 
 \section{Algorithm}
 
-Consider all possible pairs of summands $(s, t)$ of the LPE where $s$ is a summand that communicates exclusively over the channel ISTEP.
+Consider all possible pairs of summands $(s, t)$ of the LPE where $s$ is a summand that communicates exclusively over the channel ISTEP and does a recursive process instantiation.
 Then
 
 \begin{lstlisting}[mathescape]
@@ -65,4 +65,19 @@ y[\rho_s][\rho_t] = y[\rho_t][\rho_s] = y+1
 \end{align*}
 
 and therefore the confluence condition holds.
+
+So yes, the second summand is confluent.
+
+To store the new information about the second summand, the channel is renamed to CISTEP:
+
+\begin{lstlisting}
+//Process definition:
+PROCDEF example[A :: Int](x, y :: Int)
+  = A ? i [[x<=9 && x==i]] >-> example[A](x+1, y)
+  + CISTEP [[y<=9]] >-> example[A](x, y+1)
+  ;
+
+//Initialization:
+example[A](0, 0);
+\end{lstlisting}
 
