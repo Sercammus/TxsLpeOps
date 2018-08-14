@@ -162,7 +162,7 @@ getChannelOffers (TxsDefs.Offer { TxsDefs.chanid = chanid, TxsDefs.chanoffers = 
 -- Exposed method.
 -- Constructs a process expression and a process definition from an LPEInstance (unless there is a problem).
 -- The process expression creates an instance of the process definition.
-fromLPEInstance :: LPEInstance -> Name -> IOC.IOC (TxsDefs.BExpr, TxsDefs.ProcDef)
+fromLPEInstance :: LPEInstance -> Name -> IOC.IOC (TxsDefs.BExpr, TxsDefs.ProcId, TxsDefs.ProcDef)
 fromLPEInstance (chans, paramEqs, summands) procName = do
     let newProcParams = map fst paramEqs
     newProcUnid <- IOC.newUnid
@@ -173,7 +173,7 @@ fromLPEInstance (chans, paramEqs, summands) procName = do
                                    , ProcId.procexit = ProcId.NoExit }
     let newProcInit = TxsDefs.procInst newProcId chans (map snd paramEqs)
     let newProcDef = TxsDefs.ProcDef chans newProcParams (TxsDefs.choice (Set.fromList (summandIterator summands newProcId)))
-    return (newProcInit, newProcDef)
+    return (newProcInit, newProcId, newProcDef)
     where
       -- Constructs a process expression from a summand:
       summandIterator :: [LPESummand] -> TxsDefs.ProcId -> [TxsDefs.BExpr]

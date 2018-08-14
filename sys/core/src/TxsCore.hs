@@ -1168,18 +1168,25 @@ txsLPE (Right modelid@(TxsDefs.ModelId modname _moduid))  =  do
 
 -- ----------------------------------------------------------------------------------------- --
 
-txsLPEOp :: String -> TxsDefs.ModelId -> IOC.IOC (Maybe TxsDefs.ModelId)
-txsLPEOp opName (modelid@(TxsDefs.ModelId _modname _moduid)) = do
+txsLPEOp :: String -> TxsDefs.ModelId -> String -> IOC.IOC (Maybe TxsDefs.ModelId)
+txsLPEOp opName (modelId1@(TxsDefs.ModelId _modname _moduid)) modelId2 = do
     envc <- get
     case IOC.state envc of
       IOC.Initing {IOC.tdefs = tdefs} ->
-        case Map.lookup modelid (TxsDefs.modelDefs tdefs) of
-          Just (TxsDefs.ModelDef _insyncs _outsyncs _splsyncs bexpr)
+        case Map.lookup modelId1 (TxsDefs.modelDefs tdefs) of
+          Just (TxsDefs.ModelDef insyncs outsyncs splsyncs bexpr)
             -> do opFunc <- getLPEOperation
                   manipulatedLPE <- LPEOps.lpeOperation opFunc bexpr ""
                   case manipulatedLPE of
-                    Just (_bexpr', _procdef') -> do IOC.putMsgs [ EnvData.TXS_CORE_SYSTEM_ERROR "Did something!" ]
-                                                    return Nothing
+                    Just (newProcInst, newProcId, newProcDef) ->
+                      do newModelUid <- IOC.newUnid
+                         let newModelId = TxsDefs.ModelId (T.pack modelId2) newModelUid
+                         let newModelDef = TxsDefs.ModelDef insyncs outsyncs splsyncs newProcInst
+                         tdefs' <- gets (IOC.tdefs . IOC.state)
+                         let tdefs'' = tdefs' { TxsDefs.procDefs = Map.insert newProcId newProcDef (TxsDefs.procDefs tdefs') }
+                         let tdefs''' = tdefs'' { TxsDefs.modelDefs = Map.insert newModelId newModelDef (TxsDefs.modelDefs tdefs'') }
+                         IOC.modifyCS $ \st -> st { IOC.tdefs = tdefs''' }
+                         return (Just newModelId)
                     Nothing -> do return Nothing
           _ -> do IOC.putMsgs [ EnvData.TXS_CORE_SYSTEM_ERROR "LPE: model not defined" ]
                   return Nothing

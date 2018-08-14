@@ -91,7 +91,8 @@ helptxt  =
   "--------------------------------\n"++
   "ncomp                                 : test purpose generation via `N-Complete'-algorithm\n"++
   "lpe                                   : lpe transformation (Linear Process Equation)\n"++
-  "lpeop <op> <mod>                      : apply lpe operation (cstelm/parelm/parreset/confelm) to model <mod> \n"++
+  "lpeop <op> <mod1> <mod2>              : apply lpe operation (cstelm/parelm/parreset/confelm) to\n"++
+  "                                        model <mod1> and save the output model as <mod2>\n"++
   "--------------------------------\n"++
   "systart <name> <command>              : start external system <command> with internal <name>\n"++
   "systop  <name>                        : stop external command with internal <name>\n"++
