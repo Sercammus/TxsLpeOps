@@ -49,7 +49,6 @@ filterInertParamsWithSummand soFar (LPESummand channelOffers guard _procInst) =
 parElmLoop :: LPEInstance          -- LPE from which inert parameters should be eliminated.
            -> [VarId]              -- 'Marked' parameters; that is, process parameters that (for now) are assumed to be inert.
            -> IOC.IOC LPEInstance  -- Resulting LPE.
-parElmLoop lpeInstance [] = do return lpeInstance
 parElmLoop lpeInstance@(_channels, _paramEqs, summands) inertParams = do
     newInertParams <- parElmCheck summands inertParams
     if newInertParams == inertParams

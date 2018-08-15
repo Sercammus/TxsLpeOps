@@ -47,7 +47,6 @@ constElm lpeInstance@((_channels, paramEqs, _summands)) = do
 constElmLoop :: LPEInstance          -- LPE from which constants should be eliminated.
              -> [VarId]              -- 'Marked' parameters; that is, process parameters that (for now) are assumed to be constant.
              -> IOC.IOC LPEInstance  -- Resulting LPE.
-constElmLoop lpeInstance [] = do return lpeInstance
 constElmLoop lpeInstance@(_channels, paramEqs, summands) markedParams =
     let rho = \e -> Subst.subst (Map.fromList [(p, v) | p <- markedParams, (q, v) <- paramEqs, p == q]) Map.empty (e :: TxsDefs.VExpr) in
       do newMarkedParams <- constElmGuardCheck summands rho markedParams
@@ -87,7 +86,7 @@ constElmParamEqsCheck paramEqs rho (markedParam:xs) =
                   if invariant -- Parameter appears to be constant (so far), so keep it around:
                   then do otherParamInstCheck <- constElmParamEqsCheck paramEqs rho xs
                           return (markedParam:otherParamInstCheck)
-                  else do IOC.putMsgs [ EnvData.TXS_CORE_ANY ("Parameter " ++ (Text.unpack (VarId.name markedParam)) ++ " is no longer marked.") ]
+                  else do --IOC.putMsgs [ EnvData.TXS_CORE_ANY ("Parameter " ++ (Text.unpack (VarId.name markedParam)) ++ " is no longer marked.") ]
                           constElmParamEqsCheck paramEqs rho xs
       _ -> do IOC.putMsgs [ EnvData.TXS_CORE_SYSTEM_ERROR ("[Internal error] Parameter has an invalid number of initial values: " ++ (Text.unpack (VarId.name markedParam))) ]
               constElmParamEqsCheck paramEqs rho xs

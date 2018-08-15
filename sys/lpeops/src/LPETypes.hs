@@ -83,7 +83,7 @@ toLPEInstance procInst = do
           TxsDefs.ProcInst procId _chans paramValues -> case Map.lookup procId procDefs of
             Just procDef@(TxsDefs.ProcDef chans params _) -> do maybeSummands <- getLPESummands procId procDef
                                                                 return (case maybeSummands of
-                                                                  Just summands -> Just (chans, zip params paramValues, summands)
+                                                                  Just summands -> Just (chans, zip params paramValues, Set.toList (Set.fromList summands))
                                                                   _ -> Nothing)
             _ -> do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("toLPEInstance: undefined process definition " ++ (show procId)) ]
                     return Nothing

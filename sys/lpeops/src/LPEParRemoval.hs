@@ -33,8 +33,12 @@ import           VarFactory
 -- Removes the specified parameters an LPE.
 -- Occurrences of the parameters in expressions are substituted by their initial values.
 removeParsFromLPE :: [VarId] -> LPEInstance -> IOC.IOC LPEInstance
+removeParsFromLPE [] lpeInstance = do
+    IOC.putMsgs [ EnvData.TXS_CORE_ANY "No LPE parameters to be removed!" ]
+    return lpeInstance
 removeParsFromLPE targetParams (channels, paramEqs, summands) = do
-    Monad.mapM_ (\p -> IOC.putMsgs [ EnvData.TXS_CORE_ANY ("Eliminating " ++ (Text.unpack (VarId.name p))) ]) targetParams
+    IOC.putMsgs [ EnvData.TXS_CORE_ANY "Removing the following LPE parameters:" ]
+    Monad.mapM_ (\p -> IOC.putMsgs [ EnvData.TXS_CORE_ANY ("\t" ++ (Text.unpack (VarId.name p))) ]) targetParams
     let newParamEqs = [(p, v) | (p, v) <- paramEqs, not (p `elem` targetParams)]
     newSummands <- Monad.foldM removeParsFromSummand [] summands
     return (channels, newParamEqs, newSummands)

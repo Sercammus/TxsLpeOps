@@ -26,6 +26,7 @@ import qualified Data.Map            as Map
 import qualified Data.Set            as Set
 import qualified Data.Text           as Text
 import qualified EnvCore             as IOC
+import qualified EnvData
 import qualified Subst
 import           TxsDefs hiding (guard)
 import           LPEOps
@@ -39,7 +40,9 @@ chanIdConfluentIstep = ChanId (Text.pack "CISTEP") 969 []
 
 getConfluentTauSummands :: LPESummands -> IOC.IOC LPESummands
 getConfluentTauSummands summands = do
-    Monad.filterM (isConfluentTauSummand summands) (filter isTauSummand summands)
+    confluentTauSummands <- Monad.filterM (isConfluentTauSummand summands) (filter isTauSummand summands)
+    IOC.putMsgs [ EnvData.TXS_CORE_ANY ("Detected " ++ (show (length confluentTauSummands)) ++ " confluent ISTEP summand(s)!") ]
+    return confluentTauSummands
 -- getConfluentTauSummands
 
 -- LPE rewrite method.

@@ -19,13 +19,17 @@ parReset
 ) where
 
 import qualified Control.Monad       as Monad
+import qualified Data.List           as List
 import qualified Data.Map            as Map
 import qualified Data.Set            as Set
+import qualified Data.Text           as Text
 import qualified EnvCore             as IOC
 import qualified FreeVar
+import qualified EnvData
 import qualified Subst
 import           LPEOps
 import           Satisfiability
+import           ValExprPrettyPrint
 import           VarId
 import           ValExpr
 
@@ -34,8 +38,10 @@ import           ValExpr
 -- State spaces before and after are strongly bisimilar.
 parReset :: LPEOperation
 parReset lpeInstance@((_channels, paramEqs, summands)) = do
+    IOC.putMsgs [ EnvData.TXS_CORE_ANY "Identifying successors..." ]
     immediateSuccessors <- Monad.mapM (getImmediateSuccessors summands) summands
     let successorsPerSummand = zipWith (\s i -> (s, i, map fst paramEqs)) summands immediateSuccessors
+    IOC.putMsgs [ EnvData.TXS_CORE_ANY "Analyzing control flow..." ]
     newLPEInstance <- parResetLoop lpeInstance successorsPerSummand
     return (Just newLPEInstance)
 -- parReset
@@ -63,23 +69,36 @@ parResetLoop :: LPEInstance -> [(LPESummand, [LPESummand], [VarId])] -> IOC.IOC 
 parResetLoop lpeInstance@(channels, initParamEqs, summands) successorsPerSummand = do
     let newSuccessorsPerSummand = parResetUpdate successorsPerSummand
     if newSuccessorsPerSummand == successorsPerSummand
-    then do newSummands <- Monad.mapM (resetParamsInSummand lpeInstance successorsPerSummand) summands
+    then do IOC.putMsgs [ EnvData.TXS_CORE_ANY "Resetting the following parameters:" ]
+            newSummands <- Monad.mapM (resetParamsInSummand lpeInstance successorsPerSummand) summands
             return (channels, initParamEqs, newSummands)
     else parResetLoop lpeInstance newSuccessorsPerSummand
 -- parResetLoop
 
 resetParamsInSummand :: LPEInstance -> [(LPESummand, [LPESummand], [VarId])] -> LPESummand -> IOC.IOC LPESummand
 resetParamsInSummand _ _ (summand@(LPESummand _ _ LPEStop)) = do return summand
-resetParamsInSummand (_, initParamEqs, _) successorsPerSummand summand@(LPESummand channelOffers guard (LPEProcInst paramEqs)) =
+resetParamsInSummand (_, initParamEqs, summands) successorsPerSummand summand@(LPESummand channelOffers guard (LPEProcInst paramEqs)) =
     case [ uvars | (smd, _sucs, uvars) <- successorsPerSummand, smd == summand ] of
       [uvars] -> if (length uvars) == (length initParamEqs)
                  then do return summand
                  else do sol <- getSomeSolution guard (map fst initParamEqs)
                          case sol of
                            Just solMap -> do let newParamEqs = [ (p, if p `elem` uvars then v else (Map.findWithDefault v p solMap)) | (p, v) <- paramEqs ]
+                                             let zippedEqs = filter (\(eq1, _) -> not ((fst eq1) `elem` uvars)) (zip paramEqs newParamEqs)
+                                             let Just summandNumber = (List.elemIndex summand summands)
+                                             Monad.mapM_ (\((p, v), (_, w)) -> IOC.putMsgs [ EnvData.TXS_CORE_ANY ("\t" ++ (Text.unpack (VarId.name p)) ++ " := " ++ (showValExpr w) ++ " instead of " ++ (showValExpr v) ++ " in " ++ (numberToString (summandNumber + 1)) ++ " summand") ]) zippedEqs
                                              return (LPESummand channelOffers guard (LPEProcInst newParamEqs))
                            Nothing -> do return summand
       _ -> do return summand
+  where
+    numberToString :: Int -> String
+    numberToString number =
+        (show number) ++
+        (case number `mod` 10 of
+          1 -> "st"
+          2 -> "nd"
+          3 -> "rd"
+          _ -> "th")
 -- resetParamsInSummand
 
 -- Updates the information collected about summands, in particular their lists of unused variables:

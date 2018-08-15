@@ -19,7 +19,8 @@ module Satisfiability (
 isInvariant,
 isSatisfiable,
 isUnsatisfiable,
-getSomeSolution
+getSomeSolution,
+showSolution
 ) where
 
 import Control.Monad.State
@@ -81,7 +82,7 @@ getSat expression = do
                      SMTData.SmtEnvError -> do IOC.putMsgs [ EnvData.TXS_CORE_ANY "Could not locate SMT solver" ]
                                                return SolveDefs.Unknown
                      _ -> do (sat, smtEnv') <- lift $ runStateT (Solve.satSolve frees assertions) smtEnv
-                             IOC.putMsgs [ EnvData.TXS_CORE_ANY ("SMT log: " ++ (showValExpr expr) ++ " ==> " ++ (show sat)) ]
+                             --IOC.putMsgs [ EnvData.TXS_CORE_ANY ("SMT log: " ++ (showValExpr expr) ++ " ==> " ++ (show sat)) ]
                              IOC.putSMT "current" smtEnv'
                              return sat
 -- getSat
@@ -105,7 +106,7 @@ getSomeSolution expression variables = do
                      SMTData.SmtEnvError -> do IOC.putMsgs [ EnvData.TXS_CORE_ANY "Could not locate SMT solver" ]
                                                return Nothing
                      _ -> do (sol, smtEnv') <- lift $ runStateT (Solve.solve frees assertions) smtEnv
-                             IOC.putMsgs [ EnvData.TXS_CORE_ANY ("SMT log: " ++ (showValExpr expr) ++ " ==> " ++ (showSolution sol)) ]
+                             --IOC.putMsgs [ EnvData.TXS_CORE_ANY ("SMT log: " ++ (showValExpr expr) ++ " ==> " ++ (showSolution sol)) ]
                              IOC.putSMT "current" smtEnv'
                              case sol of
                                SolveDefs.Solved solMap -> return (Just (Map.map cstrConst solMap))
