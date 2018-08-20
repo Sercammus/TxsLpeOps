@@ -26,12 +26,12 @@ import qualified Data.Text           as Text
 import qualified EnvCore             as IOC
 import qualified FreeVar
 import qualified EnvData
-import qualified Subst
 import           LPEOps
 import           Satisfiability
 import           ValExprPrettyPrint
 import           VarId
 import           ValExpr
+import           VarFactory
 
 -- LPE rewrite method.
 -- Eliminates parameters that do not contribute to the behavior of a process from an LPE.
@@ -52,13 +52,14 @@ parReset lpeInstance@((_channels, paramEqs, summands)) = do
 -- after the substitutions of the process recursion have taken place.)
 getImmediateSuccessors :: [LPESummand] -> LPESummand -> IOC.IOC [LPESummand]
 getImmediateSuccessors _ (LPESummand _ _ LPEStop) = do return []
-getImmediateSuccessors allSummands (LPESummand _channelOffers guard (LPEProcInst paramEqs)) = do
+getImmediateSuccessors allSummands (LPESummand _channelOffers guard (LPEProcInst _paramEqs)) = do
     immediateSuccessors <- Monad.foldM addSummandIfImmediateSuccessor [] allSummands
     return $ immediateSuccessors
   where
     addSummandIfImmediateSuccessor :: [LPESummand] -> LPESummand -> IOC.IOC [LPESummand]
     addSummandIfImmediateSuccessor soFar summand@(LPESummand _ g _) = do
-      sat <- isSatisfiable (cstrAnd (Set.fromList [guard, Subst.subst (Map.fromList paramEqs) Map.empty g]))
+      g' <- varSubst _paramEqs g
+      sat <- isSatisfiable (cstrAnd (Set.fromList [guard, g']))
       return $ if sat then soFar ++ [summand] else soFar
 -- getImmediateSuccessors
 

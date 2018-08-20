@@ -47,7 +47,7 @@ showValExpr      (view -> Vcstr cid vexps)        = let newVExps = map showValEx
 showValExpr      (view -> Viscstr cid vexp)       = let newVExp = showValExpr vexp in
                                                       "(" ++ newVExp ++ " is " ++ (Text.unpack (CstrId.name cid)) ++ ")"
 showValExpr      (view -> Vaccess cid p vexp)     = let newVExp = showValExpr vexp in
-                                                       (Text.unpack (CstrId.name cid)) ++ "[" ++ (show p) ++ "](" ++ newVExp ++ ")"
+                                                       (Text.unpack (CstrId.name cid)) ++ "(" ++ newVExp ++ ")[" ++ (show p) ++ "]"
 showValExpr      (view -> Vite cond vexp1 vexp2)  = "if " ++ (showValExpr cond) ++ " then " ++ (showValExpr vexp1) ++ " else " ++ (showValExpr vexp2) ++ " end"
 showValExpr      (view -> Vdivide t n)            = "(" ++ (showValExpr t) ++ "/" ++ (showValExpr n) ++ ")"
 showValExpr      (view -> Vmodulo t n)            = "(" ++ (showValExpr t) ++ "%" ++ (showValExpr n) ++ ")"

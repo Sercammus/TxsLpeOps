@@ -81,10 +81,15 @@ getSat expression = do
                    case smtEnv of
                      SMTData.SmtEnvError -> do IOC.putMsgs [ EnvData.TXS_CORE_ANY "Could not locate SMT solver" ]
                                                return SolveDefs.Unknown
-                     _ -> do (sat, smtEnv') <- lift $ runStateT (Solve.satSolve frees assertions) smtEnv
-                             --IOC.putMsgs [ EnvData.TXS_CORE_ANY ("SMT log: " ++ (showValExpr expr) ++ " ==> " ++ (show sat)) ]
-                             IOC.putSMT "current" smtEnv'
-                             return sat
+                     _ -> if Solve.isEasySolve frees assertions
+                          then do (sat, smtEnv') <- lift $ runStateT (Solve.satSolve frees assertions) smtEnv
+                                  IOC.putSMT "current" smtEnv'
+                                  return sat
+                          else do IOC.putMsgs [ EnvData.TXS_CORE_ANY ("SMT log: " ++ (showValExpr expr) ++ " ==> ?") ]
+                                  (sat, smtEnv') <- lift $ runStateT (Solve.satSolve frees assertions) smtEnv
+                                  IOC.putMsgs [ EnvData.TXS_CORE_ANY ("SMT log: " ++ (showValExpr expr) ++ " ==> " ++ (show sat)) ]
+                                  IOC.putSMT "current" smtEnv'
+                                  return sat
 -- getSat
 
 -- Frequently used method; code is modified code from TxsCore.
@@ -105,12 +110,20 @@ getSomeSolution expression variables = do
                    case smtEnv of
                      SMTData.SmtEnvError -> do IOC.putMsgs [ EnvData.TXS_CORE_ANY "Could not locate SMT solver" ]
                                                return Nothing
-                     _ -> do (sol, smtEnv') <- lift $ runStateT (Solve.solve frees assertions) smtEnv
-                             --IOC.putMsgs [ EnvData.TXS_CORE_ANY ("SMT log: " ++ (showValExpr expr) ++ " ==> " ++ (showSolution sol)) ]
-                             IOC.putSMT "current" smtEnv'
-                             case sol of
-                               SolveDefs.Solved solMap -> return (Just (Map.map cstrConst solMap))
-                               _ -> return Nothing
+                     _ -> if True -- Solve.isEasySolve frees assertions
+                          then do (sol, smtEnv') <- lift $ runStateT (Solve.solve frees assertions) smtEnv
+                                  IOC.putSMT "current" smtEnv'
+                                  case sol of
+                                    SolveDefs.Solved solMap -> return (Just (Map.map cstrConst solMap))
+                                    _ -> return Nothing
+                          else do IOC.putMsgs [ EnvData.TXS_CORE_ANY ("SMT log: " ++ (showValExpr expr) ++ " ==> ?") ]
+                                  (sol, _smtEnv') <- lift $ runStateT (Solve.solve frees assertions) smtEnv
+                                  IOC.putMsgs [ EnvData.TXS_CORE_ANY ("SMT log: " ++ (showValExpr expr) ++ " ==> " ++ (showSolution sol)) ]
+                                  -- IOC.putSMT "current" smtEnv'
+                                  IOC.putMsgs [ EnvData.TXS_CORE_ANY ("SMT log: Lazy 2") ]
+                                  case sol of
+                                    SolveDefs.Solved solMap -> return (Just (Map.map cstrConst solMap))
+                                    _ -> return Nothing
 -- getSomeSolution
 
 showSolution :: SolveDefs.SolveProblem VarId -> String

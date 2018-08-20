@@ -24,6 +24,7 @@ module Solve
 , add 
 , SolveRandParam(..)
 , toRandParam
+, isEasySolve
 )
 
 -- ----------------------------------------------------------------------------------------- --
@@ -73,6 +74,12 @@ add e a                           |  sortOf e == sortIdBool  && (view e == Vcons
 add e _                           |  sortOf e == sortIdBool  && (view e == Vconst (Cbool False))       = Assertions AssertFalse
 add e (Assertions (AssertSet s) ) |  sortOf e == sortIdBool                                            = Assertions ( AssertSet (Set.insert e s) )
 add e _                                                                                                 = error ("Add - Can not add non-boolean expression " ++ show e)
+
+-- Checks if the external SMT solver is actually required:
+isEasySolve :: (Variable v) => [v] -> Assertions v -> Bool
+isEasySolve _ (Assertions AssertFalse)                = True
+isEasySolve _ (Assertions (AssertSet s)) | Set.null s = True
+isEasySolve _ _                                       = False
 
 -- ----------------------------------------------------------------------------------------- --
 -- satSolve :  is set of constraints solvable?

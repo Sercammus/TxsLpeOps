@@ -1175,33 +1175,36 @@ txsLPEOp opName (modelId1@(TxsDefs.ModelId _modname _moduid)) modelId2 = do
       IOC.Initing {IOC.tdefs = tdefs} ->
         case Map.lookup modelId1 (TxsDefs.modelDefs tdefs) of
           Just (TxsDefs.ModelDef insyncs outsyncs splsyncs bexpr)
-            -> do opFunc <- getLPEOperation
-                  manipulatedLPE <- LPEOps.lpeOperation opFunc bexpr (T.pack ("LPE_" ++ modelId2))
-                  case manipulatedLPE of
-                    Just (newProcInst, newProcId, newProcDef) ->
-                      do newModelUid <- IOC.newUnid
-                         let newModelId = TxsDefs.ModelId (T.pack modelId2) newModelUid
-                         let newModelDef = TxsDefs.ModelDef insyncs outsyncs splsyncs newProcInst
-                         tdefs' <- gets (IOC.tdefs . IOC.state)
-                         let tdefs'' = tdefs' { TxsDefs.procDefs = Map.insert newProcId newProcDef (TxsDefs.procDefs tdefs') }
-                         let tdefs''' = tdefs'' { TxsDefs.modelDefs = Map.insert newModelId newModelDef (TxsDefs.modelDefs tdefs'') }
-                         IOC.modifyCS $ \st -> st { IOC.tdefs = tdefs''' }
-                         return (Just newModelId)
+            -> do maybeOpFunc <- getLPEOperation
+                  case maybeOpFunc of
+                    Just opFunc -> do
+                      manipulatedLPE <- LPEOps.lpeOperation opFunc bexpr (T.pack ("LPE_" ++ modelId2))
+                      case manipulatedLPE of
+                        Just (newProcInst, newProcId, newProcDef) ->
+                          do newModelUid <- IOC.newUnid
+                             let newModelId = TxsDefs.ModelId (T.pack modelId2) newModelUid
+                             let newModelDef = TxsDefs.ModelDef insyncs outsyncs splsyncs newProcInst
+                             tdefs' <- gets (IOC.tdefs . IOC.state)
+                             let tdefs'' = tdefs' { TxsDefs.procDefs = Map.insert newProcId newProcDef (TxsDefs.procDefs tdefs') }
+                             let tdefs''' = tdefs'' { TxsDefs.modelDefs = Map.insert newModelId newModelDef (TxsDefs.modelDefs tdefs'') }
+                             IOC.modifyCS $ \st -> st { IOC.tdefs = tdefs''' }
+                             return (Just newModelId)
+                        Nothing -> do return Nothing
                     Nothing -> do return Nothing
           _ -> do IOC.putMsgs [ EnvData.TXS_CORE_SYSTEM_ERROR "LPE: model not defined" ]
                   return Nothing
       _ -> do IOC.putMsgs [ EnvData.TXS_CORE_SYSTEM_ERROR "LPE: only allowed if initialized" ]
               return Nothing
   where
-    getLPEOperation :: IOC.IOC LPEOps.LPEOperation
+    getLPEOperation :: IOC.IOC (Maybe LPEOps.LPEOperation)
     getLPEOperation = case opName of
-                        "dummy" -> do return LPEOps.dummyOp
-                        "cstelm" -> do return LPEConstElm.constElm
-                        "parelm" -> do return LPEParElm.parElm
-                        "parreset" -> do return LPEParReset.parReset
-                        "confelm" -> do return LPEConfCheck.confElm
+                        "dummy" -> do return $ Just LPEOps.dummyOp
+                        "cstelm" -> do return $ Just LPEConstElm.constElm
+                        "parelm" -> do return $ Just LPEParElm.parElm
+                        "parreset" -> do return $ Just LPEParReset.parReset
+                        "confelm" -> do return $ Just LPEConfCheck.confElm
                         _ -> do IOC.putMsgs [ EnvData.TXS_CORE_SYSTEM_ERROR ("Unknown LPE operation (" ++ opName ++ ")!") ]
-                                return LPEOps.dummyOp
+                                return Nothing
 --txsLPEOp
 
 -- ----------------------------------------------------------------------------------------- --

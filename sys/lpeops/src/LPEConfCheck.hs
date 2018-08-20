@@ -34,6 +34,7 @@ import           Satisfiability
 import           VarId
 import           ValExpr
 import           ConstDefs
+import           VarFactory
 
 chanIdConfluentIstep :: ChanId
 chanIdConfluentIstep = ChanId (Text.pack "CISTEP") 969 []
@@ -84,24 +85,31 @@ checkConfluenceCondition _ (LPESummand _ _ LPEStop) = do return False
 checkConfluenceCondition (summand1@(LPESummand _channelOffers1 guard1 (LPEProcInst paramEqs1))) (summand2@(LPESummand channelOffers2 guard2 (LPEProcInst paramEqs2))) = do
     if summand1 == summand2
     then do return True
-    else do let channelVars = Set.toList (foldl getChannelVars Set.empty channelOffers2)
+    else do let g1 = \e -> varSubst paramEqs1 (e :: TxsDefs.VExpr)
+            let g2 = \e -> varSubst paramEqs2 (e :: TxsDefs.VExpr)
+            -- Obtain all (fresh) variables used by the summand to communicate over a channel:
+            let channelVars = Set.toList (foldl getChannelVars Set.empty channelOffers2)
             -- a1 == a1[g1] && ... && an == an[g1]
-            let channelArgEqs = map (\varId -> cstrEqual (cstrVar varId) (g1 (cstrVar varId))) channelVars
+            g1_channelVars <- Monad.mapM g1 (map cstrVar channelVars)
+            let channelArgEqs = map (\(channelVar, g1_channelVar) -> cstrEqual (cstrVar channelVar) g1_channelVar) (zip channelVars g1_channelVars)
             -- x1[g1][g2] == x1[g2][g1] && ... && xn[g1][g2] == xn[g2][g1]
-            let instantiationEqs = map (\(p, _) -> cstrEqual (g1 (g2 (cstrVar p))) (g2 (g1 (cstrVar p)))) paramEqs2
+            g1_params <- Monad.mapM g1 (map (cstrVar . fst) paramEqs2)
+            g2_params <- Monad.mapM g2 (map (cstrVar . fst) paramEqs2)
+            g2_g1_params <- Monad.mapM g2 g1_params
+            g1_g2_params <- Monad.mapM g1 g2_params
+            let instantiationEqs = map (\(x, y) -> cstrEqual x y) (zip g2_g1_params g1_g2_params)
             -- c1 && c2
             let premise = cstrAnd (Set.fromList [guard1, guard2])
             -- c1[g2] && c2[g1] && ...
-            let conclusion = cstrAnd (Set.fromList ([g2 guard1, g1 guard2] ++ channelArgEqs ++ instantiationEqs))
-            let confluenceCondition = cstrITE premise conclusion (cstrConst (Cbool { cBool=True }))
+            g2_guard1 <- g2 guard1
+            g1_guard2 <- g1 guard2
+            let conclusion = cstrAnd (Set.fromList ([g2_guard1, g1_guard2] ++ channelArgEqs ++ instantiationEqs))
+            let confluenceCondition = cstrITE premise conclusion (cstrConst (Cbool True))
             inv <- isInvariant confluenceCondition
             return inv
   where
     getChannelVars :: Set.Set VarId -> LPEChannelOffer -> Set.Set VarId
     getChannelVars soFar (_chanId, commVars) = Set.union soFar (Set.fromList commVars)
-    
-    g1 = \e -> Subst.subst (Map.fromList paramEqs1) Map.empty (e :: TxsDefs.VExpr)
-    g2 = \e -> Subst.subst (Map.fromList paramEqs2) Map.empty (e :: TxsDefs.VExpr)
 -- checkConfluenceCondition
 
 -- LPE rewrite method.
@@ -109,9 +117,11 @@ checkConfluenceCondition (summand1@(LPESummand _channelOffers1 guard1 (LPEProcIn
 confElm :: LPEOperation
 confElm (channels, paramEqs, summands) = do
     confluentTauSummands <- getConfluentTauSummands summands
-    definiteSuccessors <- Monad.mapM (getDefiniteSuccessors summands) summands
-    let confluentTauSuccessors = map (List.intersect confluentTauSummands) definiteSuccessors
-    return $ Just (channels, paramEqs, zipWith mergeSummands summands confluentTauSuccessors)
+    if confluentTauSummands == []
+    then do return $ Just (channels, paramEqs, summands)
+    else do definiteSuccessors <- Monad.mapM (getDefiniteSuccessors summands) summands
+            let confluentTauSuccessors = map (List.intersect confluentTauSummands) definiteSuccessors
+            return $ Just (channels, paramEqs, zipWith mergeSummands summands confluentTauSuccessors)
   where
     mergeSummands :: LPESummand -> [LPESummand] -> LPESummand
     mergeSummands summand [] = summand
@@ -134,7 +144,8 @@ getDefiniteSuccessors allSummands (LPESummand _channelOffers guard (LPEProcInst 
   where
     addSummandIfDefiniteSuccessor :: [LPESummand] -> LPESummand -> IOC.IOC [LPESummand]
     addSummandIfDefiniteSuccessor soFar summand@(LPESummand _ g _) = do
-      inv <- isInvariant (cstrAnd (Set.fromList [guard, Subst.subst (Map.fromList paramEqs) Map.empty g]))
+      g' <- varSubst paramEqs g
+      inv <- isInvariant (cstrAnd (Set.fromList [guard, g']))
       return $ if inv then soFar ++ [summand] else soFar
 -- getDefiniteSuccessors
 
