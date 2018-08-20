@@ -37,11 +37,11 @@ import qualified SortId
 import qualified SortOf
 import qualified SMTData
 import ConstDefs hiding (sort)
-import VarId
-import ValExpr
 import ValExprVisitor
 import ValExprPrettyPrint
 import VarFactory
+import VarId
+import ValExpr
 
 -- Checks if the specified expression cannot be false.
 isInvariant :: TxsDefs.VExpr -> IOC.IOC Bool
@@ -140,12 +140,12 @@ showSolution (SolveDefs.Solved solMap) =
 -- showSolution
 
 -- Eliminates occurrences of ANY by substituting them for fresh, free variables.
-anyElm :: ValExpr VarId -> IOC.IOC (ValExpr VarId)
-anyElm expr = visitValExpr anyElmVisitor expr
-
--- Visitor for anyElm:
-anyElmVisitor :: ValExpr VarId -> IOC.IOC (ValExpr VarId)
-anyElmVisitor (view -> Vconst (Cany sort)) = do varId <- createFreshVar sort
-                                                return $ cstrVar varId
-anyElmVisitor expr                         = do return $ expr
+anyElm :: TxsDefs.VExpr -> IOC.IOC TxsDefs.VExpr
+anyElm expr = visitValExprM anyElmVisitorM expr
+  where
+    anyElmVisitorM :: TxsDefs.VExpr -> IOC.IOC (Maybe TxsDefs.VExpr)
+    anyElmVisitorM (view -> Vconst (Cany sort)) = do varId <- createFreshVar sort
+                                                     return $ Just (cstrVar varId)
+    anyElmVisitorM _                            = do return $ Nothing
+-- anyElm
 
