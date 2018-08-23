@@ -46,25 +46,24 @@ constElm lpeInstance@((_channels, paramEqs, _summands)) = do
 constElmLoop :: LPEInstance          -- LPE from which constants should be eliminated.
              -> [VarId]              -- 'Marked' parameters; that is, process parameters that (for now) are assumed to be constant.
              -> IOC.IOC LPEInstance  -- Resulting LPE.
-constElmLoop lpeInstance@(_channels, paramEqs, summands) markedParams =
-    let rho = \e -> varSubst [(p, v) | p <- markedParams, (q, v) <- paramEqs, p == q] (e :: TxsDefs.VExpr) in
-      do newMarkedParams <- constElmGuardCheck summands rho markedParams
-         if newMarkedParams == markedParams
-         then removeParsFromLPE markedParams lpeInstance
-         else constElmLoop lpeInstance newMarkedParams
+constElmLoop lpeInstance@(_channels, paramEqs, summands) markedParams = do
+    let rho = createVarSubst [(p, v) | p <- markedParams, (q, v) <- paramEqs, p == q]
+    newMarkedParams <- constElmGuardCheck summands rho markedParams
+    if newMarkedParams == markedParams
+    then removeParsFromLPE markedParams lpeInstance
+    else constElmLoop lpeInstance newMarkedParams
 -- constElmLoop
 
 -- Checks whether the guard is satisfiable.
 -- If it is, the parameter instantiations will never be evaluated anyway and can be ignored!
-constElmGuardCheck :: LPESummands                               -- Remaining summands for which the guard must be checked.
-                   -> (TxsDefs.VExpr -> IOC.IOC TxsDefs.VExpr)  -- Substitution (from marked parameters to their initial values).
-                   -> [VarId]                                   -- Marked parameters.
-                   -> IOC.IOC [VarId]                           -- New marked parameters (cannot grow in size).
+constElmGuardCheck :: LPESummands                       -- Remaining summands for which the guard must be checked.
+                   -> (TxsDefs.VExpr -> TxsDefs.VExpr)  -- Substitution (from marked parameters to their initial values).
+                   -> [VarId]                           -- Marked parameters.
+                   -> IOC.IOC [VarId]                   -- New marked parameters (cannot grow in size).
 constElmGuardCheck [] _ markedParams = do return markedParams
 constElmGuardCheck ((LPESummand _ _ LPEStop):xs) rho markedParams = do constElmGuardCheck xs rho markedParams
 constElmGuardCheck ((LPESummand _chanOffers guard (LPEProcInst paramEqs)):xs) rho markedParams = do
-    guard' <- rho guard
-    unsat <- isUnsatisfiable guard'
+    unsat <- isUnsatisfiable (rho guard)
     if unsat -- Guard is NOT satisfiable, so leave the marked parameters alone:
     then do constElmGuardCheck xs rho markedParams 
     else do paramInstCheck <- constElmParamEqsCheck paramEqs rho markedParams -- Otherwise, check the parameter equations.
@@ -73,17 +72,16 @@ constElmGuardCheck ((LPESummand _chanOffers guard (LPEProcInst paramEqs)):xs) rh
 -- constElmGuardCheck
 
 -- Checks whether a certain parameter instantiation satisfies the invariant where the parameter equals its initial value.
-constElmParamEqsCheck :: LPEParamEqs                               -- Initial values of parameters.
-                      -> (TxsDefs.VExpr -> IOC.IOC TxsDefs.VExpr)  -- Substitution (from marked parameters to their initial values).
-                      -> [VarId]                                   -- Marked parameters.
-                      -> IOC.IOC [VarId]                           -- New marked parameters (cannot grow in size).
+constElmParamEqsCheck :: LPEParamEqs                       -- Initial values of parameters.
+                      -> (TxsDefs.VExpr -> TxsDefs.VExpr)  -- Substitution (from marked parameters to their initial values).
+                      -> [VarId]                           -- Marked parameters.
+                      -> IOC.IOC [VarId]                   -- New marked parameters (cannot grow in size).
 constElmParamEqsCheck _ _ [] = do return []
 constElmParamEqsCheck paramEqs rho (markedParam:xs) =
     case [v | (p, v) <- paramEqs, p == markedParam] of
       [expr] -> do
                   -- Check if rho expr = rho markedParam is an invariant:
-                  inv <- rho (cstrEqual expr (cstrVar markedParam))
-                  invariant <- isInvariant inv
+                  invariant <- isInvariant (rho (cstrEqual expr (cstrVar markedParam)))
                   if invariant -- Parameter appears to be constant (so far), so keep it around:
                   then do otherParamInstCheck <- constElmParamEqsCheck paramEqs rho xs
                           return (markedParam:otherParamInstCheck)

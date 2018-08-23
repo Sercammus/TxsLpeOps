@@ -52,14 +52,13 @@ parReset lpeInstance@((_channels, paramEqs, summands)) = do
 -- after the substitutions of the process recursion have taken place.)
 getImmediateSuccessors :: [LPESummand] -> LPESummand -> IOC.IOC [LPESummand]
 getImmediateSuccessors _ (LPESummand _ _ LPEStop) = do return []
-getImmediateSuccessors allSummands (LPESummand _channelOffers guard (LPEProcInst _paramEqs)) = do
+getImmediateSuccessors allSummands (LPESummand _channelOffers guard (LPEProcInst paramEqs)) = do
     immediateSuccessors <- Monad.foldM addSummandIfImmediateSuccessor [] allSummands
     return $ immediateSuccessors
   where
     addSummandIfImmediateSuccessor :: [LPESummand] -> LPESummand -> IOC.IOC [LPESummand]
     addSummandIfImmediateSuccessor soFar summand@(LPESummand _ g _) = do
-      g' <- varSubst _paramEqs g
-      sat <- isSatisfiable (cstrAnd (Set.fromList [guard, g']))
+      sat <- isSatisfiable (cstrAnd (Set.fromList [guard, varSubst paramEqs g]))
       return $ if sat then soFar ++ [summand] else soFar
 -- getImmediateSuccessors
 

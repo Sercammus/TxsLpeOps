@@ -141,11 +141,11 @@ showSolution (SolveDefs.Solved solMap) =
 
 -- Eliminates occurrences of ANY by substituting them for fresh, free variables.
 anyElm :: TxsDefs.VExpr -> IOC.IOC TxsDefs.VExpr
-anyElm expr = visitValExprM anyElmVisitorM expr
+anyElm expr = visitValExpr anyElmVisitorM expr
   where
-    anyElmVisitorM :: TxsDefs.VExpr -> IOC.IOC (Maybe TxsDefs.VExpr)
-    anyElmVisitorM (view -> Vconst (Cany sort)) = do varId <- createFreshVar sort
-                                                     return $ Just (cstrVar varId)
-    anyElmVisitorM _                            = do return $ Nothing
+    anyElmVisitorM :: [IOC.IOC TxsDefs.VExpr] -> TxsDefs.VExpr -> IOC.IOC TxsDefs.VExpr
+    anyElmVisitorM _ (view -> Vconst (Cany sort)) = do varId <- createFreshVar sort
+                                                       return (cstrVar varId)
+    anyElmVisitorM vexps parentExpr = defaultValExprVisitorM vexps parentExpr
 -- anyElm
 

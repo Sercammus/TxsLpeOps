@@ -65,11 +65,6 @@ flagTauSummand :: LPESummand -> LPESummand
 flagTauSummand (LPESummand [(_chanId, commVars)] guard paramEqs) = (LPESummand [(chanIdConfluentIstep, commVars)] guard paramEqs)
 flagTauSummand tauSummand = tauSummand
 
--- isFlaggedTauSummand :: LPESummand -> Bool
--- isFlaggedTauSummand (LPESummand [(chanId, _)] _ _) = chanId == chanIdConfluentIstep
--- isFlaggedTauSummand _ = False
--- isFlaggedTauSummand
-
 isConfluentTauSummand :: [LPESummand] -> LPESummand -> IOC.IOC Bool
 isConfluentTauSummand [] _ = do return True
 isConfluentTauSummand (x:xs) tauSummand = do
@@ -85,26 +80,28 @@ checkConfluenceCondition _ (LPESummand _ _ LPEStop) = do return False
 checkConfluenceCondition (summand1@(LPESummand _channelOffers1 guard1 (LPEProcInst paramEqs1))) (summand2@(LPESummand channelOffers2 guard2 (LPEProcInst paramEqs2))) = do
     if summand1 == summand2
     then do return True
-    else do let g1 = \e -> varSubst paramEqs1 (e :: TxsDefs.VExpr)
-            let g2 = \e -> varSubst paramEqs2 (e :: TxsDefs.VExpr)
+    else do -- Create functions that can do the required substitutions in a convenient manner.
+            -- For the entire condition, these functions should only be computed once! (However that is accomplished in Haskell...)
+            let g1 = createVarSubst paramEqs1
+            let g2 = createVarSubst paramEqs2
+            
             -- Obtain all (fresh) variables used by the summand to communicate over a channel:
             let channelVars = Set.toList (foldl getChannelVars Set.empty channelOffers2)
             -- a1 == a1[g1] && ... && an == an[g1]
-            g1_channelVars <- Monad.mapM g1 (map cstrVar channelVars)
-            let channelArgEqs = map (\(channelVar, g1_channelVar) -> cstrEqual (cstrVar channelVar) g1_channelVar) (zip channelVars g1_channelVars)
+            let channelArgEqs = map (\channelVar -> cstrEqual channelVar (g1 channelVar)) (map cstrVar channelVars)
+            
             -- x1[g1][g2] == x1[g2][g1] && ... && xn[g1][g2] == xn[g2][g1]
-            g1_params <- Monad.mapM g1 (map (cstrVar . fst) paramEqs2)
-            g2_params <- Monad.mapM g2 (map (cstrVar . fst) paramEqs2)
-            g2_g1_params <- Monad.mapM g2 g1_params
-            g1_g2_params <- Monad.mapM g1 g2_params
-            let instantiationEqs = map (\(x, y) -> cstrEqual x y) (zip g2_g1_params g1_g2_params)
+            let instantiationEqs = map (\p -> cstrEqual (g1 (g2 p)) (g2 (g1 p))) (map (cstrVar . fst) paramEqs2)
+            
             -- c1 && c2
             let premise = cstrAnd (Set.fromList [guard1, guard2])
             -- c1[g2] && c2[g1] && ...
-            g2_guard1 <- g2 guard1
-            g1_guard2 <- g1 guard2
-            let conclusion = cstrAnd (Set.fromList ([g2_guard1, g1_guard2] ++ channelArgEqs ++ instantiationEqs))
+            let conclusion = cstrAnd (Set.fromList ([g2 guard1, g1 guard2] ++ channelArgEqs ++ instantiationEqs))
+            
+            -- Combine them all:
             let confluenceCondition = cstrITE premise conclusion (cstrConst (Cbool True))
+            
+            -- Is the confluence condition an invariant?
             inv <- isInvariant confluenceCondition
             return inv
   where
@@ -144,8 +141,7 @@ getDefiniteSuccessors allSummands (LPESummand _channelOffers guard (LPEProcInst 
   where
     addSummandIfDefiniteSuccessor :: [LPESummand] -> LPESummand -> IOC.IOC [LPESummand]
     addSummandIfDefiniteSuccessor soFar summand@(LPESummand _ g _) = do
-      g' <- varSubst paramEqs g
-      inv <- isInvariant (cstrAnd (Set.fromList [guard, g']))
+      inv <- isInvariant (cstrAnd (Set.fromList [guard, varSubst paramEqs g]))
       return $ if inv then soFar ++ [summand] else soFar
 -- getDefiniteSuccessors
 
