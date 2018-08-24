@@ -196,9 +196,8 @@ toFSSafeStr str = repl <$> str
 --
 -- Throws an exception on failure.
 checkSMTSolvers :: IO ()
-checkSMTSolvers = do
+checkSMTSolvers = 
   traverse_ checkCommand txsSupportedSolvers
-  return ()
   where
     txsSupportedSolvers = Prelude.map addExeSuffix ["z3","cvc4"]
 
@@ -272,7 +271,7 @@ getCPOptsIO :: Maybe FilePath -> IO [Text]
 getCPOptsIO Nothing         = return []
 getCPOptsIO (Just filePath) = case toText filePath of
                                 Left apprPath ->
-                                  throw $ FilePathError $
+                                  throwIO $ FilePathError $
                                   "Cannot decode " <> apprPath <> " properly"
                                 Right path ->
                                   return ["-cp", path]

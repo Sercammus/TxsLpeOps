@@ -191,7 +191,7 @@ import qualified LPEConfCheck
 -- import from valexpr
 import qualified SortId
 import qualified SortOf
-import ConstDefs
+import Constant
 import VarId
 
 -- | TorXakis core main api -- start
@@ -345,7 +345,7 @@ txsSetSeed seed  =  do
 --
 --   Only possible when txscore is initialized.
 txsEval :: TxsDefs.VExpr                    -- ^ value expression to be evaluated.
-        -> IOC.IOC (Either String Const)
+        -> IOC.IOC (Either String Constant)
 txsEval vexp  =  do
      envc <- get
      case IOC.state envc of
@@ -1147,7 +1147,7 @@ txsLPE (Right modelid@(TxsDefs.ModelId modname _moduid))  =  do
              -> do lpe' <- txsLPE (Left bexpr)
                    lift $ hPrint stderr lpe'
                    case lpe' of
-                     Just (Left (procinst'@(TxsDefs.view -> TxsDefs.ProcInst{})))
+                     Just (Left procinst'@(TxsDefs.view -> TxsDefs.ProcInst{}))
                        -> do uid'   <- IOC.newUnid
                              tdefs' <- gets (IOC.tdefs . IOC.state)
                              let modelid' = TxsDefs.ModelId ("LPE_"<>modname) uid'

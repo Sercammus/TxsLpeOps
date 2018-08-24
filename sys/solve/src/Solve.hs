@@ -35,7 +35,7 @@ import qualified Data.List as List
 import qualified Data.Set  as Set
 import qualified Data.Map  as Map
 
-import ConstDefs
+import Constant
 
 import FreeVar
 
@@ -46,6 +46,7 @@ import SMTData
 import RandPartition
 import RandTrueBins
 import RandIncrementChoice
+import RandIncrementBins
 
 import SolveRandParam
 import SortId
@@ -138,6 +139,7 @@ randSolve p vs (Assertions (AssertSet s))                =
                         RandPartition r         -> randValExprsSolvePartition r vs' vexps
                         RandTrueBins r          -> randValExprsSolveTrueBins r vs' vexps
                         RandIncrementChoice r   -> randValExprsSolveIncrementChoice r vs' vexps
+                        RandIncrementBins r     -> randValExprsSolveIncrementBins r vs' vexps
             return $ case sp of 
                     Solved sol    -> Solved $ Map.filterWithKey (\k _ -> k `elem` vs) sol
                     Unsolvable    -> Unsolvable

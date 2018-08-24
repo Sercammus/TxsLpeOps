@@ -16,6 +16,7 @@ See LICENSE at root directory of this repository.
 -----------------------------------------------------------------------------
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ViewPatterns        #-}
+
 module LPE
 ( ProcDefs
 , preGNF
@@ -30,18 +31,17 @@ where
 
 import Control.Monad.State
 
+import qualified Data.List           as List
 import qualified Data.Map            as Map
 import qualified Data.Set            as Set
 import qualified Data.Text           as T
 import           Data.Maybe
 import qualified Control.Arrow
--- import qualified TxsShow
-import ShowBExpr
 
 import TranslatedProcDefs
 
 import TxsDefs
-import ConstDefs
+import Constant
 import StdTDefs (stdSortTable)
 
 import ChanId
@@ -51,15 +51,12 @@ import VarId
 
 import ValExpr
 
-
 import qualified EnvData
 import qualified EnvBasic            as EnvB
 
 import Relabel (relabel)
 import Subst
 import SortOf
-
--- import Debug.Trace 
 
 -- ----------------------------------------------------------------------------------------- --
 -- Types :
@@ -112,7 +109,7 @@ extractSteps bexpr = [bexpr]
 preGNF :: (EnvB.EnvB envb) => ProcId -> TranslatedProcDefs -> ProcDefs -> envb ProcDefs
 preGNF procId translatedProcDefs procDefs' = do
     let -- decompose the ProcDef of ProcId
-        ProcDef chansDef paramsDef bexpr = fromMaybe (error "called preGNF with a non-existing procId") (Map.lookup procId procDefs')
+        ProcDef chansDef paramsDef bexpr = fromMaybe (error $ "called preGNF with a non-existing procId" ++ show procId ++ "\n\n" ++ show procDefs') (Map.lookup procId procDefs')
         -- remember the current ProcId to avoid recursive loops translating the same ProcId again
         translatedProcDefs' = translatedProcDefs { lPreGNF = lPreGNF translatedProcDefs ++ [procId]}
         -- translate each choice separately
@@ -161,7 +158,7 @@ preGNFBExpr bexpr@(TxsDefs.view -> ProcInst procIdInst _ _) _choiceCnt _freeVars
 
 preGNFBExpr bexpr@(TxsDefs.view -> Choice{}) choiceCnt freeVarsInScope procId translatedProcDefs procDefs' = do
     -- choice at lower level not allowed
-    (procInst'@(TxsDefs.view -> ProcInst procId' _ _), procDefs'') <- preGNFBExprCreateProcDef bexpr choiceCnt freeVarsInScope procId procDefs'
+    (procInst'@(TxsDefs.view -> ProcInst procId' _ _), procDefs'') <- preGNFBExprCreateProcDefWithUniqueness bexpr choiceCnt freeVarsInScope procId procDefs'
     -- recursively translate the created ProcDef
     procDefs''' <- preGNF procId' translatedProcDefs procDefs''
     return (procInst', procDefs''')
@@ -204,7 +201,7 @@ preGNFBExprCreateProcDef bexpr choiceCnt freeVarsInScope procId procDefs' = do
         name' = T.append (ProcId.name procId) (T.pack ("$pre" ++ show choiceCnt))
         procId' = procId { ProcId.name = name',
                             ProcId.unid = unid',
-                            ProcId.procvars = paramsDef ++ freeVarsInScope}
+                            ProcId.procvars = varsort <$> paramsDef ++ freeVarsInScope}
         -- create ProcInst, translate params to VExprs
         paramsDef' = map cstrVar paramsDef
         paramsFreeVars = map cstrVar freeVarsInScope
@@ -213,120 +210,211 @@ preGNFBExprCreateProcDef bexpr choiceCnt freeVarsInScope procId procDefs' = do
         procDefs'' = Map.insert procId' procDef' procDefs'
     return (procInst', procDefs'')
 
+
+preGNFBExprCreateProcDefWithUniqueness :: (EnvB.EnvB envb) => BExpr -> Int -> [VarId] -> ProcId -> ProcDefs -> envb(BExpr, ProcDefs)
+preGNFBExprCreateProcDefWithUniqueness bexpr choiceCnt extraParams procId procDefs' = do
+    unid' <- EnvB.newUnid
+    let 
+        -- decompose original ProcDef
+        ProcDef chansDef paramsDef _ = fromMaybe (error "called preGNFBExpr with a non-existing procId") (Map.lookup procId procDefs')
+
+        -- create new ProcDef
+        prefix = T.unpack (ProcId.name procId) ++ ("$pre" ++ show choiceCnt ++ "$")
+        -- prefix = "pre" ++ show choiceCnt ++ "$"
+        params = paramsDef ++ extraParams
+    paramsPrefixed <- mapM (prefixVarId prefix) params
+
+    -- substitute original varIds in bexpr with prefixed (unique) versions
+    let varMap = zip params paramsPrefixed
+        varMap' = Map.fromList $ map (Control.Arrow.second cstrVar) varMap
+        bexpr_substituted = Subst.subst varMap' (Map.fromList []) bexpr
+
+        -- -- need to substitute the standard chanoffer variables with the newly unique variables
+        -- --  in constraints and the ProcInst (bepxr)
+        procDef = ProcDef chansDef paramsPrefixed bexpr_substituted
+        
+        -- create ProcInst calling that ProcDef
+        name' = T.append (ProcId.name procId) (T.pack ("$pre" ++ show choiceCnt))
+        procId' = procId { ProcId.name = name'
+                         , ProcId.unid = unid'
+                         , ProcId.procvars = varsort <$> paramsPrefixed
+                         }
+        -- create ProcInst, translate params to VExprs
+        paramsDef' = map cstrVar paramsDef
+        paramsFreeVars = map cstrVar extraParams
+        procInst' = procInst procId' chansDef (paramsDef' ++ paramsFreeVars)
+
+        -- put created ProcDef in the ProcDefs
+        procDefs'' = Map.insert procId' procDef procDefs'
+
+    return (procInst', procDefs'')
+
+
+
 -- ----------------------------------------------------------------------------------------- --
 -- GNF :
 -- ----------------------------------------------------------------------------------------- --
 
-gnf :: (EnvB.EnvB envb) => ProcId -> TranslatedProcDefs -> ProcDefs -> envb ProcDefs
-gnf procId translatedProcDefs procDefs' = do
-    -- first translate to preGNF
-    procDefs'' <- preGNF procId emptyTranslatedProcDefs procDefs'
-    
+gnf :: (EnvB.EnvB envb) => ProcId -> Map.Map ProcId [ProcId] -> TranslatedProcDefs -> ProcDefs -> envb (ProcDefs, Map.Map ProcId [ProcId])
+gnf procId gnfTodo translatedProcDefs procDefs' = do
     -- remember the current ProcId to avoid recursive loops translating the same ProcId again
-    -- also remember a chain of direct calls (without progress, i.e. no ActionPref) to detect loops
-    let translatedProcDefs' = translatedProcDefs { lGNF = lGNF translatedProcDefs ++ [procId]
-                                                 , lGNFdirectcalls = lGNFdirectcalls translatedProcDefs ++ [procId]}
-        ProcDef chansDef paramsDef bexpr = fromMaybe (error "GNF: could not find given procId (should be impossible)") (Map.lookup procId procDefs'')
+    -- remember the chain of direct calls (without progress, i.e. no ActionPref) to detect loops
+    -- remember the ProcIds currently being in GNF translation (also up the tree) to avoid premature substitutions
+    let translatedProcDefs' = translatedProcDefs { lGNFdirectcalls = lGNFdirectcalls translatedProcDefs ++ [procId]
+                                                 , lGNFinTranslation = lGNFinTranslation translatedProcDefs ++ [procId]}
+    -- first translate to preGNF
+    procDefs'' <- preGNF procId translatedProcDefs' procDefs'
+    
+    let ProcDef _chansDef _paramsDef bexpr = fromMaybe (error "GNF: could not find given procId (should be impossible)") (Map.lookup procId procDefs'')
 
-    -- first translate each step to GNF 
-    (bexpr', procDefs''') <- case TxsDefs.view bexpr of
-                                    (Choice bexprs) -> do   (steps, procDefs''') <- applyGNFBexpr (Set.toList bexprs) 1 [] translatedProcDefs' procDefs''
-                                                            return (choice (Set.fromList steps), procDefs''')
-                                    _               -> do   (steps, procDefs''') <- gnfBExpr bexpr 1 procId translatedProcDefs' procDefs''
-                                                            return (wrapSteps steps, procDefs''')    
-
-    -- then repack into procDefs
-    return $ Map.insert procId (ProcDef chansDef paramsDef bexpr') procDefs'''
+    -- translate steps to GNF 
+    applyGNFBexpr (extractSteps bexpr) 1 [] gnfTodo translatedProcDefs' procDefs''                                  
       where
-        -- apply gnfBExpr to each choice and collect all intermediate results (single bexprs)
-        applyGNFBexpr :: (EnvB.EnvB envb) => [BExpr] -> Int -> [BExpr] -> TranslatedProcDefs -> ProcDefs -> envb ([BExpr], ProcDefs)
-        applyGNFBexpr [] _cnt results _translatedProcDefs procDefs'' = return (results, procDefs'')
-        applyGNFBexpr (bexpr:bexprs) cnt results translatedProcDefs' procDefs'' = do
-                (steps, procDefs''') <- gnfBExpr bexpr cnt procId translatedProcDefs' procDefs''
-                applyGNFBexpr bexprs (cnt+1) (results ++ steps) translatedProcDefs' procDefs'''
+        -- apply gnfBExpr to each step
+        applyGNFBexpr :: (EnvB.EnvB envb) => [BExpr] -> Int -> [BExpr] -> Map.Map ProcId [ProcId] -> TranslatedProcDefs -> ProcDefs -> envb (ProcDefs, Map.Map ProcId [ProcId])
+        applyGNFBexpr [] _cnt results gnfTodo' translatedProcDefs'' procDefs'' = do
+            -- base case: translated all steps of the current ProcId
+            -- decompose original ProcDef
+            let ProcDef chansDef paramsDef _bexpr = fromMaybe (error "GNF: could not find given procId (should be impossible)") (Map.lookup procId procDefs'')
+
+                -- create new ProcDef and insert into ProcDefs
+                procDefs''' = Map.insert procId (ProcDef chansDef paramsDef (wrapSteps results)) procDefs''
+            
+            -- remember that the current ProcId is now translated to GNF
+            -- remove current ProcId from ProcIds that are currently being translated
+            let translatedProcDefs''' = translatedProcDefs {  lGNF = lGNF translatedProcDefs'' ++ [procId]
+                                                            , lGNFinTranslation = List.delete procId (lGNFinTranslation translatedProcDefs'')}
+            -- translate to GNF all ProcIds that were waiting for the current ProcId to be finished with GNF translation
+            (procDefs'''', gnfTodo'') <- case Map.lookup procId gnfTodo' of
+                                            (Just procIdsTodo) -> applyGNF procIdsTodo gnfTodo' translatedProcDefs''' procDefs'''
+                                            Nothing -> return (procDefs''', gnfTodo')
+
+            -- remove the current procId from the todo list
+            return (procDefs'''', Map.delete procId gnfTodo'')
+
+        applyGNFBexpr (bexpr:bexprs) cnt results gnfTodo' translatedProcDefs'' procDefs'' = do
+            -- recursive case: translate one ProcId, use results in the recursion
+            (steps, procDefs''', gnfTodo'') <- gnfBExpr bexpr cnt procId gnfTodo' translatedProcDefs'' procDefs''
+            -- recursion: translate all other steps
+            (procDefs'''', gnfTodo''') <- applyGNFBexpr bexprs (cnt+1) (results ++ steps) gnfTodo'' translatedProcDefs'' procDefs'''
+            return (procDefs'''', gnfTodo''')
+            
+
+        -- apply GNF sequentially to all given ProcIds
+        applyGNF :: (EnvB.EnvB envb) => [ProcId] -> Map.Map ProcId [ProcId] -> TranslatedProcDefs -> ProcDefs -> envb (ProcDefs, Map.Map ProcId [ProcId])
+        applyGNF [] gnfTodo' _translatedProcDefs procDefs'' = return (procDefs'', gnfTodo')
+        applyGNF (procId':procIds) gnfTodo' translatedProcDefs'' procDefs'' = do 
+            -- translate one procDef
+            --  reset the gnf loop detection
+            let translatedProcDefs''' = translatedProcDefs'' { lGNFdirectcalls = []}
+            (procDefs''', gnfTodo'') <- gnf procId' gnfTodo' translatedProcDefs''' procDefs''
+            
+            -- recursion
+            --  put the translated procDef/Id in the translated list: so it doesn't get translated again
+            let translatedProcDefs'''' = translatedProcDefs''' { lGNF = lGNF translatedProcDefs ++ [procId']}
+            applyGNF procIds gnfTodo'' translatedProcDefs'''' procDefs'''
 
 
-gnfBExpr :: (EnvB.EnvB envb) => BExpr -> Int -> ProcId -> TranslatedProcDefs -> ProcDefs -> envb([BExpr], ProcDefs)
+
+gnfBExpr :: (EnvB.EnvB envb) => BExpr -> Int -> ProcId -> Map.Map ProcId [ProcId] -> TranslatedProcDefs -> ProcDefs -> envb([BExpr], ProcDefs, Map.Map ProcId [ProcId])
 
 -- guard: first translate the Bexpr, then prefix the result with the guard again
-gnfBExpr (TxsDefs.view -> Guard vexpr' bexpr) choiceCnt procId translatedProcDefs procDefs' = do
-    (bexprs, procDefs'') <- gnfBExpr bexpr choiceCnt procId translatedProcDefs procDefs'
+gnfBExpr (TxsDefs.view -> Guard vexpr' bexpr) choiceCnt procId gnfTodo translatedProcDefs procDefs' = do
+    (bexprs, procDefs'', gnfTodo') <- gnfBExpr bexpr choiceCnt procId gnfTodo translatedProcDefs procDefs'
     let bexprs_guarded = map (TxsDefs.guard vexpr') bexprs
-    return (bexprs_guarded, procDefs'')
+    return (bexprs_guarded, procDefs'', gnfTodo')
 
+-- case STOP
+gnfBExpr bexpr _choiceCnt _procId gnfTodo _translatedProcDefs procDefs' | isStop bexpr =
+      return ([bexpr], procDefs', gnfTodo)
 
-gnfBExpr bexpr _choiceCnt _procId _translatedProcDefs procDefs' | isStop bexpr =
-      return ([bexpr], procDefs')
+-- case ActionPref -> STOP
+gnfBExpr bexpr@(TxsDefs.view -> ActionPref _actOffer bexpr1) _choiceCnt _procId gnfTodo _translatedProcDefs procDefs' | isStop bexpr1 =
+      return ([bexpr], procDefs', gnfTodo)
 
-gnfBExpr bexpr@(TxsDefs.view -> ActionPref _actOffer bexpr1) _choiceCnt _procId _translatedProcDefs procDefs' | isStop bexpr1 =
-      return ([bexpr], procDefs')
-
-gnfBExpr bexpr@(TxsDefs.view -> ActionPref _actOffer (TxsDefs.view -> ProcInst procIdInst _ _)) _choiceCnt _procId translatedProcDefs procDefs' =
-  if procIdInst `notElem` lGNF translatedProcDefs
+-- case ActionPref -> ProcInst
+gnfBExpr bexpr@(TxsDefs.view -> ActionPref _actOffer (TxsDefs.view -> ProcInst procIdInst _ _)) _choiceCnt _procId gnfTodo translatedProcDefs procDefs' =
+  if (procIdInst `notElem` lGNF translatedProcDefs) && (procIdInst `notElem` lGNFinTranslation translatedProcDefs)
       then    do  -- recursively translate the called ProcDef
                   -- reset GNF loop detection: we made progress, thus we are breaking a possible chain of direct calls (ProcInsts)
                   let translatedProcDefs' = translatedProcDefs { lGNFdirectcalls = []}
-                  procDefs'' <- gnf procIdInst translatedProcDefs' procDefs'
-                  return ([bexpr], procDefs'')
-      else    return ([bexpr], procDefs')
+                  (procDefs'', gnfTodo') <- gnf procIdInst gnfTodo translatedProcDefs' procDefs'
+                  return ([bexpr], procDefs'', gnfTodo')
+      else    return ([bexpr], procDefs', gnfTodo)
 
-gnfBExpr (TxsDefs.view -> ActionPref actOffer bexpr') choiceCnt procId translatedProcDefs procDefs' = do
-    unidProcInst <- EnvB.newUnid
-    let -- multi-action not allowed: split it
-        -- decompose original ProcDef
-        ProcDef chansDef paramsDef _ = fromMaybe (error "GNF: called with a non-existing procId") (Map.lookup procId procDefs')
+-- case ActionPref -> Guard ProcInst
+gnfBExpr (TxsDefs.view -> ActionPref actOffer 
+                                        bexpr'@(TxsDefs.view -> Guard _vexpr' 
+                                                (TxsDefs.view -> ProcInst procIdInst _ _))) choiceCnt procId gnfTodo translatedProcDefs procDefs' = do
 
-        -- create new ProcDef
-        varsInOffer = extractVars actOffer
-        procDef = ProcDef chansDef (paramsDef ++ varsInOffer) bexpr'
+    -- create new ProcDef of bexpr'
+    (procInst'@(TxsDefs.view -> ProcInst procId' _ _ ), procDefs'') <- gnfBExprCreateProcDefWithUniqueness bexpr' choiceCnt (extractVars actOffer) procId procDefs'
 
-        -- create ProcInst calling that ProcDef
-        name' = T.append (ProcId.name procId) (T.pack ("$gnf" ++ show choiceCnt))
-        procId' = procId { ProcId.name = name',
-                            ProcId.unid = unidProcInst,
-                            ProcId.procvars = paramsDef ++ varsInOffer}
-        -- create ProcInst, translate params to VExprs
-        paramsDef' = map cstrVar paramsDef
-        paramsFreeVars = map cstrVar varsInOffer
-        procInst' = procInst procId' chansDef (paramsDef' ++ paramsFreeVars)
+    -- if the ProcId that is being called is still in GNF translation (current GNF translation or up the tree)
+    --  then postpone the GNF translation of the newly generated ProcDef
+    --      until the ProcId being called has been translated to GNF 
+    --      (the newly created ProcDef is of the form [[condition]] -> P() and thus for a GNF translation 
+    --          we first need to unfold P() for which we need P() to be translated to GNF already.
+    if procIdInst `elem` lGNFinTranslation translatedProcDefs
+        then do -- remember the newly created ProcId for later GNF translation
+                let procIds = fromMaybe [] (Map.lookup procIdInst gnfTodo)         -- look up the ProcIds already collected
+                    gnfTodo' = Map.insert procIdInst (procId':procIds) gnfTodo
+                return ([actionPref actOffer procInst'], procDefs'', gnfTodo')                                                    
+        else do -- recursively translate the called ProcDef
+                -- reset GNF loop detection: we made progress, thus we are breaking a possible chain of direct calls (ProcInsts)
+                let translatedProcDefs' = translatedProcDefs { lGNFdirectcalls = []}
+                (procDefs''', gnfTodo') <- gnf procIdInst gnfTodo translatedProcDefs' procDefs''
+                return ([actionPref actOffer procInst'], procDefs''', gnfTodo')
 
-        -- put created ProcDefs in the ProcDefs
-        procDefs'' = Map.insert procId' procDef procDefs'
+-- case ActionPref -> "something else"
+--  multi-action not allowed: split it
+gnfBExpr (TxsDefs.view -> ActionPref actOffer bexpr') choiceCnt procId gnfTodo translatedProcDefs procDefs' = do 
+    -- create new ProcDef of bexpr'
+    (procInst'@(TxsDefs.view -> ProcInst procId' _ _ ), procDefs'') <- gnfBExprCreateProcDefWithUniqueness bexpr' choiceCnt (extractVars actOffer) procId procDefs'
 
-        -- reset GNF loop detection: we made progress, thus we are breaking a possible chain of direct calls (ProcInsts)
-        translatedProcDefs' = translatedProcDefs { lGNFdirectcalls = []}
-        
-    -- recursively translate the created ProcDef
-    procDefs''' <- gnf procId' translatedProcDefs' procDefs''
-    -- return bexpr with the original bexpr' replaced with the new ProcInst
-    return ([actionPref actOffer procInst'], procDefs''')
-
-
-gnfBExpr (TxsDefs.view -> ProcInst procIdInst chansInst paramsInst) _choiceCnt _procId translatedProcDefs procDefs' =
-    -- direct calls are not in GNF: need to instantiate
-    -- translate procIdInst to GNF first            
-    --   -- we made progress (i.e. we have an ActionPref), thus reset no-progress-loop detection
-            --   translatedProcDefs' = translatedProcDefs { lGNFnoprogress = []}
+    -- reset GNF loop detection: we made progress, thus we are breaking a possible chain of direct calls (ProcInsts)
+    let translatedProcDefs' = translatedProcDefs { lGNFdirectcalls = []}
     
-        
+    -- recursively translate the created ProcDef
+    (procDefs''', gnfTodo') <- gnf procId' gnfTodo translatedProcDefs' procDefs''
+    -- return bexpr with the original bexpr' replaced with the new ProcInst
+    return ([actionPref actOffer procInst'], procDefs''', gnfTodo')
+
+
+gnfBExpr bexpr@(TxsDefs.view -> ProcInst procIdInst chansInst paramsInst) _choiceCnt procId gnfTodo translatedProcDefs procDefs'
+    -- direct calls are not in GNF: need to instantiate
+
     -- check if we encounter a loop of direct calls
     --  i.e. a chain of procInsts without any ActionPref, thus we would make no progress
     --  this endless loop cannot be translated to GNF
-    if procIdInst `elem` lGNFdirectcalls translatedProcDefs
-        then do -- found a loop
+    | procIdInst `elem` lGNFdirectcalls translatedProcDefs =
+          do -- found a loop
                 let loop = map ProcId.name $ lGNFdirectcalls translatedProcDefs ++ [procIdInst]
                 error ("found GNF loop of direct calls without progress: " ++ show loop)
-        else do -- no loop
-                -- check if the called ProcDef has been translated to GNF already
-                procDefs'' <- if procIdInst `notElem` lGNF translatedProcDefs
-                                    then    -- recursively translate the called ProcDef
-                                            gnf procIdInst translatedProcDefs procDefs'
-                                    else    -- if it has been translated already, leave procDefs as is
-                                            return procDefs'
-
+    | procIdInst `elem` lGNFinTranslation translatedProcDefs =
+                -- no loop
+                -- if the called ProcId is still being translated to GNF: have to come back later
+                --      just return the unchanged bexpr
+          do -- add enclosing procId to gnfTodo - if not already present 
+                let procIds = fromMaybe [] (Map.lookup procIdInst gnfTodo)         -- look up the ProcIds already collected
+                if procId `elem` procIds 
+                    then -- procId is already listed for later GNF translation: leave it 
+                            return ([bexpr], procDefs', gnfTodo)
+                    else do -- add procId for later GNF translation 
+                            let gnfTodo' = Map.insert procIdInst (procId:procIds) gnfTodo
+                            return ([bexpr], procDefs', gnfTodo')
+    | otherwise = 
+          do -- ProcId is at least not being translated to GNF still
+             -- check if the called ProcDef has been translated to GNF already
+                (procDefs'', gnfTodo') <- if (procIdInst `notElem` lGNF translatedProcDefs) && (procIdInst `notElem` lGNFinTranslation translatedProcDefs)
+                                                then    -- recursively translate the called ProcDef
+                                                        gnf procIdInst gnfTodo translatedProcDefs procDefs'
+                                                else    -- if it has been translated already, leave procDefs as is
+                                                        return (procDefs', gnfTodo)
+    
                 let -- decompose translated ProcDef
                     ProcDef chansDef paramsDef bexprDef = fromMaybe (error "GNF: called with a non-existing procId") (Map.lookup procIdInst procDefs'')
-
+    
                     -- instantiate
                     -- substitute channels
                     chanmap = Map.fromList (zip chansDef chansInst)
@@ -335,12 +423,86 @@ gnfBExpr (TxsDefs.view -> ProcInst procIdInst chansInst paramsInst) _choiceCnt _
                     parammap = Map.fromList (zip paramsDef paramsInst)
                     -- TODO: initialise funcDefs param properly
                     bexprSubstituted = Subst.subst parammap (Map.fromList []) bexprRelabeled
-                return (extractSteps bexprSubstituted, procDefs'')
+                return (extractSteps bexprSubstituted, procDefs'', gnfTodo')
 
 
-gnfBExpr (TxsDefs.view -> bexpr')  _ _ _ _ =
+gnfBExpr (TxsDefs.view -> bexpr')  _ _ _ _ _ =
     error $ "not implemented for this bexpr: " ++ show bexpr'
 
+
+
+-- gnfBExprCreateProcDef :: (EnvB.EnvB envb) => BExpr -> Int -> [VarId] -> ProcId -> ProcDefs -> envb(BExpr, ProcDefs)
+-- gnfBExprCreateProcDef bexpr choiceCnt extraParams procId procDefs' = do
+--     unid' <- EnvB.newUnid
+--     let 
+--         -- decompose original ProcDef
+--         ProcDef chansDef paramsDef _ = fromMaybe (error "GNF: called with a non-existing procId") (Map.lookup procId procDefs')
+
+--         -- create new ProcDef
+--         procDef = ProcDef chansDef (paramsDef ++ extraParams) bexpr
+        
+--         -- create ProcInst calling that ProcDef
+--         name' = T.append (ProcId.name procId) (T.pack ("$gnf" ++ show choiceCnt))
+--         procId' = procId { ProcId.name = name',
+--                             ProcId.unid = unid',
+--                             ProcId.procvars = paramsDef ++ extraParams}
+--         -- create ProcInst, translate params to VExprs
+--         paramsDef' = map cstrVar paramsDef
+--         paramsFreeVars = map cstrVar extraParams
+--         procInst' = procInst procId' chansDef (paramsDef' ++ paramsFreeVars)
+
+--         -- put created ProcDef in the ProcDefs
+--         procDefs'' = Map.insert procId' procDef procDefs'
+
+--     return (procInst', procDefs'')
+
+
+gnfBExprCreateProcDefWithUniqueness :: (EnvB.EnvB envb) => BExpr -> Int -> [VarId] -> ProcId -> ProcDefs -> envb(BExpr, ProcDefs)
+gnfBExprCreateProcDefWithUniqueness bexpr choiceCnt extraParams procId procDefs' = do
+    unid' <- EnvB.newUnid
+    let 
+        -- decompose original ProcDef
+        ProcDef chansDef paramsDef _ = fromMaybe (error "GNF: called with a non-existing procId") (Map.lookup procId procDefs')
+
+        -- create new ProcDef
+        prefix = T.unpack (ProcId.name procId) ++ ("$gnf" ++ show choiceCnt ++ "$")
+        -- prefix = "gnf" ++ show choiceCnt ++ "$"
+        params = paramsDef ++ extraParams
+    paramsPrefixed <- mapM (prefixVarId prefix) params
+
+    -- substitute original varIds in bexpr with prefixed (unique) versions
+    let varMap = zip params paramsPrefixed
+        varMap' = Map.fromList $ map (Control.Arrow.second cstrVar) varMap
+        bexpr_substituted = Subst.subst varMap' (Map.fromList []) bexpr
+
+        -- -- need to substitute the standard chanoffer variables with the newly unique variables
+        -- --  in constraints and the ProcInst (bepxr)
+        -- let varMap' = Map.fromList $ map (Control.Arrow.second cstrVar) varMap
+        --     constraint_substituted = Subst.subst varMap' (Map.fromList []) $ constraint actOffer
+        --     bexpr_substituted = Subst.subst varMap' (Map.fromList []) bexpr
+        -- return $ actionPref 
+        --             actOffer{ offers = Set.fromList os'
+        --                     , constraint = constraint_substituted
+        --                     , hiddenvars = hidvars} 
+        --             bexpr_substituted
+
+        procDef = ProcDef chansDef paramsPrefixed bexpr_substituted
+        
+        -- create ProcInst calling that ProcDef
+        name' = T.append (ProcId.name procId) (T.pack ("$gnf" ++ show choiceCnt))
+        procId' = procId { ProcId.name = name'
+                         , ProcId.unid = unid'
+                         , ProcId.procvars = varsort <$> paramsPrefixed
+                         }
+        -- create ProcInst, translate params to VExprs
+        paramsDef' = map cstrVar paramsDef
+        paramsFreeVars = map cstrVar extraParams
+        procInst' = procInst procId' chansDef (paramsDef' ++ paramsFreeVars)
+
+        -- put created ProcDef in the ProcDefs
+        procDefs'' = Map.insert procId' procDef procDefs'
+
+    return (procInst', procDefs'')
 
 
 -- ----------------------------------------------------------------------------------------- --
@@ -363,9 +525,9 @@ lpePar (TxsDefs.view -> ProcInst procIdInst chansInst _paramsInst) translatedPro
     let -- create a new ProcId
         chansDefPAR = chansDef
         paramsDefPAR = concatMap snd stepsOpParams
-        procIdPAR = procIdInst { ProcId.procchans = chansDefPAR,
+        procIdPAR = procIdInst { ProcId.procchans = toChanSort <$> chansDefPAR,
                                   ProcId.unid = unid',
-                                  ProcId.procvars = paramsDefPAR}
+                                  ProcId.procvars = varsort <$> paramsDefPAR}
 
         -- combine the steps of all operands according to parallel semantics
         -- stepOpParams is a list of pairs, one pair for each operand:
@@ -479,13 +641,7 @@ lpePar (TxsDefs.view -> ProcInst procIdInst chansInst _paramsInst) translatedPro
             -- TODO: properly initialise funcDefs param of subst
             bexpr'' = Subst.subst paramMap (Map.fromList []) bexpr'
         return (opNr+1, stepsOpParams ++ [(extractSteps bexpr'', paramsDefPrefixed)], paramsInsts ++ paramsInstLPE, procDefs'''')
-          where
-            prefixVarId :: (EnvB.EnvB envb) => String -> VarId -> envb VarId
-            prefixVarId prefix (VarId name' _ sort') = do
-                unid' <- EnvB.newUnid
-                let name'' = T.pack $ prefix ++ T.unpack name'
-                return $ VarId name'' unid' sort'
-
+          where 
             transformToProcInst :: (EnvB.EnvB envb) => BExpr -> ProcId -> ProcDefs -> envb(BExpr, ProcDefs)
             -- if operand is already a ProcInst: no need to change anything
             transformToProcInst bexpr@(TxsDefs.view -> ProcInst{}) _procIdParent procDefs''' = return (bexpr, procDefs''')
@@ -504,6 +660,12 @@ lpePar (TxsDefs.view -> ProcInst procIdInst chansInst _paramsInst) translatedPro
                   procInst' = procInst procIdNew chansDef (map cstrVar paramsDef)
               return (procInst', procDefs'''')
 lpePar _ _ _ = error "only allowed with ProcInst"
+
+prefixVarId :: (EnvB.EnvB envb) => String -> VarId -> envb VarId
+prefixVarId prefix (VarId name' _ sort') = do
+    unid' <- EnvB.newUnid
+    let name'' = T.pack $ prefix ++ T.unpack name'
+    return $ VarId name'' unid' sort'
 
 
 -- ----------------------------------------------------------------------------------------- --
@@ -609,7 +771,7 @@ preGNFEnable procInst'@(TxsDefs.view -> ProcInst procIdInst _chansInst _paramsIn
         procIdR = procIdInst {  ProcId.name = name',
                                 ProcId.unid = unidR,
                                 -- concatenate the original params with the varIds passed via ACCEPT to extend their scope into the RHS of ENABLE
-                                ProcId.procvars = paramsDef ++ paramsAccept} 
+                                ProcId.procvars = varsort <$> paramsDef ++ paramsAccept} 
         -- create ProcInst, translate params to VExprs
         paramsDef' = map cstrVar paramsDef
         procInstR = procInst procIdR chansDef paramsDef'
@@ -622,17 +784,8 @@ preGNFEnable procInst'@(TxsDefs.view -> ProcInst procIdInst _chansInst _paramsIn
         procDefNew = ProcDef chansDef_lpe paramsDef_lpe (wrapSteps steps')
         procDefs5 = Map.insert procId_lpe procDefNew procDefs''''
 
-    -- translate to LPE again!
-    -- (procInst_lpe2@(TxsDefs.view -> ProcInst procId_lpe2 _chansInst_lpe2 _paramsInst_lpe2), procDefs6) <- trace ("\n\n preGNFEnable: given to lpe round2: \n" ++ show procInst_lpe ++ "\n" ++ show procDefs5) $ lpe procInst_lpe translatedProcDefs procDefs5
-    -- (procInst_lpe2@(TxsDefs.view -> ProcInst procId_lpe2 _chansInst_lpe2 _paramsInst_lpe2), procDefs6) <- trace ("\n\n preGNFEnable: given to lpe round2: \n" ++ show procInst_lpe ++ "\n" ++ show procDefs5) 
-    --  preGNF procId translatedProcDefs procDefs' = do
     procDefs6 <- preGNF procId_lpe translatedProcDefs procDefs5
       
-    -- let -- decompose translated ProcDef
-    --     procDef_final = fromMaybe (error "preGNFEnable: could not find the given procId") (Map.lookup procId_lpe2 procDefs6)
-    
-
-    -- trace ("\n\npreGNFEnable: final procInst/ProcDef: \n" ++ show procInst_lpe2 ++ "\n" ++ show procDef_final) $ 
     return (procInst_lpe, procDefs6)
     where   
         -- just for the steps with EXIT -> <>  replace with the ProcInst
@@ -675,8 +828,9 @@ lpeTransform procInst' procDefs'  =
                                      "LPE Transformation: undefined process instantiation" ]
                       return Nothing
        _ -> do EnvB.putMsgs [ EnvData.TXS_CORE_USER_ERROR
-                              ("LPE Transformation: only defined for process instantiation (" ++ (showBExpr procInst') ++ " found)") ]
+                              "LPE Transformation: only defined for process instantiation" ]
                return Nothing
+
 
 -- carsten original function for lpe
 lpeTransform' :: (EnvB.EnvB envb )   -- Monad for unique identifiers and error messages
@@ -706,9 +860,19 @@ lpeTransform' procInst''' procDefs' = do    (procInst', procDefs'') <- lpe procI
         substituteProcId _orig _new bexpr | isStop bexpr = stop
         substituteProcId orig new (TxsDefs.view -> ActionPref actOffer (TxsDefs.view -> ProcInst procId chansInst paramsInst)) =
           if procId == orig
-              then actionPref actOffer (procInst new chansInst paramsInst)
-              else error "Found a different ProcId, thus the given BExpr is probably not in LPE format"
-        substituteProcId _ _ _ = error "Only allowed with Stop or (ActionPref >-> ProcInst)"
+            then actionPref actOffer (procInst new chansInst paramsInst)
+            else error "Found a different ProcId, thus the given BExpr is probably not in LPE format"
+        substituteProcId orig new  (TxsDefs.view -> ActionPref actOffer 
+                                        (TxsDefs.view -> Guard vexpr' 
+                                            bexpr'@(TxsDefs.view -> ProcInst procId chansInst paramsInst))) =
+            if procId == orig
+                then TxsDefs.guard vexpr' $ actionPref actOffer (procInst new chansInst paramsInst)
+                else error $ "Found a different ProcId, thus the given BExpr is probably not in LPE format. \n\norig: " ++ show orig  ++
+                                            "\nnew: " ++ show new ++
+                                            "\nbexpr': " ++ show bexpr' 
+        substituteProcId orig new bexpr = error $ "Only allowed with Stop or (ActionPref >-> ProcInst)\n orig: " ++ show orig  ++
+                                                            "\nnew: " ++ show new ++
+                                                            "\nbexpr: " ++ show bexpr 
         
 lpe :: (EnvB.EnvB envb ) => BExpr -> TranslatedProcDefs -> ProcDefs -> envb (BExpr, ProcDefs)
 lpe bexprProcInst@(TxsDefs.view -> ProcInst procIdInst _chansInst _paramsInst) translatedProcDefs procDefs' = do
@@ -716,7 +880,7 @@ lpe bexprProcInst@(TxsDefs.view -> ProcInst procIdInst _chansInst _paramsInst) t
       let translatedProcDefs' = translatedProcDefs { lLPE = lLPE translatedProcDefs ++ [procIdInst]}
       
       -- first translate to GNF
-      procDefsGnf <- gnf procIdInst translatedProcDefs' procDefs'
+      (procDefsGnf, _gnfTodo) <- gnf procIdInst Map.empty translatedProcDefs' procDefs'
 
       -- decompose translated ProcDef
       let ProcDef chansDef _paramsDef bexpr = fromMaybe (error "LPE: could not find given procId (should be impossible)") (Map.lookup procIdInst procDefsGnf)
@@ -739,11 +903,11 @@ lpe bexprProcInst@(TxsDefs.view -> ProcInst procIdInst _chansInst _paramsInst) t
           paramsNew = varIdPC : params
           procIdNew = procIdInst { ProcId.name = T.pack nameNew
                                    , ProcId.unid = procIdUnid
-                                   , ProcId.procchans = chansDef
-                                   , ProcId.procvars = paramsNew}
+                                   , ProcId.procchans = toChanSort <$> chansDef
+                                   , ProcId.procvars = varsort <$> paramsNew}
 
           -- update the ProcInsts in the steps
-          steps' = map (stepsUpdateProcInsts calledProcs procToParams pcMapping procIdNew) steps
+          steps' = map (stepsUpdateProcInsts calledProcs procToParams pcMapping procIdNew chansDef) steps
 
           procDefLpe = ProcDef chansDef paramsNew (wrapSteps steps')
           procDefs'' = Map.insert procIdNew procDefLpe procDefsGnf
@@ -782,7 +946,8 @@ lpe bexprProcInst@(TxsDefs.view -> ProcInst procIdInst _chansInst _paramsInst) t
         translateProcs (currentProc@(procId, chans):procss) varIdPC pcMapping procDefs'' = do
             let   -- decompose translated ProcDef
                   ProcDef chansDef paramsDef bexprDef = fromMaybe (error $ "\ntranslateProcs: could not find given procId (should be impossible)" ++ show procId ++
-                                             "\nprocDefs: " ++ show procDefs'') (Map.lookup procId procDefs'')
+                                                                            "\nprocDefs: " ++ show procDefs'') (Map.lookup procId procDefs'')
+                  
                   steps = extractSteps bexprDef
 
                   -- prepare channel instantiation
@@ -816,31 +981,28 @@ lpe bexprProcInst@(TxsDefs.view -> ProcInst procIdInst _chansInst _paramsInst) t
                 -- get the params, but leave out the first ones (those of procIdInst itself)
                 -- plus an extra one (that of the program counter)
                 params = snd $ splitAt (length paramsInst+1) (ProcId.procvars procIdNew)
-                paramsSorts = map varIdToSort params
-                paramsANYs = map (cstrConst . Cany) paramsSorts
+                paramsANYs = map (cstrConst . Cany) params
                 paramsNew = (pcValue : paramsInst) ++ paramsANYs in
             procInst procIdNew chansInst paramsNew
         updateProcInst _ _ _ = error "Only allowed with ProcInst"
         
         -- update the ProcInsts in the steps to the new ProcId
-        stepsUpdateProcInsts :: [Proc] -> ProcToParams -> PCMapping -> ProcId -> BExpr -> BExpr
-        stepsUpdateProcInsts _procs _procToParams _pcMap procIdNew (TxsDefs.view -> ActionPref actOffer bexpr) | isStop bexpr =
+        stepsUpdateProcInsts :: [Proc] -> ProcToParams -> PCMapping -> ProcId -> [ChanId] -> BExpr -> BExpr
+        stepsUpdateProcInsts _procs _procToParams _pcMap procIdNew chansInst (TxsDefs.view -> ActionPref actOffer bexpr) | isStop bexpr =
             let -- get the params, but leave out the first one because it's the program counter
                 (_:params) = ProcId.procvars procIdNew
-                paramsSorts = map varIdToSort params
-                paramsANYs = map (cstrConst . Cany) paramsSorts
+                paramsANYs = map (cstrConst . Cany) params
                 paramsInst = (cstrConst (Cint (-1)) : paramsANYs)
-                chansInst = ProcId.procchans procIdNew
                 procInst' = procInst procIdNew chansInst paramsInst in
             actionPref actOffer procInst'
 
-        stepsUpdateProcInsts procs procToParams pcMap procIdNew (TxsDefs.view -> ActionPref actOffer procInst''@(TxsDefs.view -> ProcInst procIdInst' chansInst _paramsInst)) =
+        stepsUpdateProcInsts procs procToParams pcMap procIdNew chansInst2 (TxsDefs.view -> ActionPref actOffer procInst''@(TxsDefs.view -> ProcInst procIdInst' chansInst _paramsInst)) =
             let -- collect params AND channels from procs in the order they appear in procs
                 paramsNew = createParams procs procInst''
 
                 pcValue = fromMaybe (error "stepsUpdateProcInsts: no pc value found for given (ProcId, [ChanId]) (should be impossible)") (Map.lookup (procIdInst', chansInst) pcMap)
 
-                procInst' = procInst procIdNew (ProcId.procchans procIdNew) ( cstrConst (Cint pcValue) : paramsNew) in
+                procInst' = procInst procIdNew chansInst2 ( cstrConst (Cint pcValue) : paramsNew) in
             actionPref actOffer procInst'
             where
                 createParams :: [Proc] -> BExpr -> [VExpr]
@@ -856,24 +1018,14 @@ lpe bexprProcInst@(TxsDefs.view -> ProcInst procIdInst _chansInst _paramsInst) t
                     params ++ paramsRec
                 createParams _ _ = error "Only allowed with list of tuples and ProcInst"
                 
-        stepsUpdateProcInsts _ _ _ _ bexpr = bexpr
+        stepsUpdateProcInsts _ _ _ _ _ bexpr = bexpr
 
 
-        varIdToSort :: VarId -> SortId
-        varIdToSort (VarId _ _ sort') = sort'
-
-
-        prefixVarId ::  (EnvB.EnvB envb ) => String -> VarId -> envb VarId
-        prefixVarId prefix (VarId name'' _ sort') = do
-            unid' <- EnvB.newUnid
-            let name' = T.pack $ prefix ++ T.unpack name''
-            return $ VarId name' unid' sort'
 lpe _ _ _ = error "Only allowed with ProcInst"
 
 lpeBExpr :: (EnvB.EnvB envb ) => ChanMapping -> ParamMapping -> VarId -> Integer -> BExpr -> envb BExpr
-lpeBExpr chanMap paramMap varIdPC pcValue (TxsDefs.view -> Guard vexpr' bexpr)  = do
-    bexpr' <- lpeBExpr chanMap paramMap varIdPC pcValue bexpr
-    return (TxsDefs.guard vexpr' bexpr') 
+lpeBExpr chanMap paramMap varIdPC pcValue (TxsDefs.view -> Guard vexpr' bexpr) =
+    TxsDefs.guard vexpr' <$> lpeBExpr chanMap paramMap varIdPC pcValue bexpr
 
 lpeBExpr _chanMap _paramMap _varIdPC _pcValue bexpr | isStop bexpr = return stop
 
