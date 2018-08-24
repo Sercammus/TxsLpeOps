@@ -15,7 +15,7 @@ import qualified Data.Text         as T
 import           Data.Tuple        (fst, snd)
 
 import           ChanId
-import           ConstDefs
+import           Constant
 import           CstrDef
 import           CstrId
 import           FreeMonoidX
@@ -27,9 +27,8 @@ import           Sigs
 import           SortDef
 import           SortId
 import           StdTDefs
-import           TxsAlex
+import           TorXakis.Compiler (compileLegacy)
 import           TxsDefs           hiding (vexpr)
-import           TxsHappy
 import           TxsShow
 import           ValExpr
 import           VarId
@@ -77,11 +76,15 @@ identicalChanId (ChanId name1 _ chansorts1) (ChanId name2 _ chansorts2) =
        name1 == name2
     && identicalLists identicalSortId chansorts1 chansorts2
 
+identicalChanSort :: ChanSort -> ChanSort -> Bool
+identicalChanSort (ChanSort s1) (ChanSort s2) =
+    identicalLists identicalSortId s1 s2
+
 identicalProcId :: ProcId -> ProcId -> Bool
 identicalProcId (ProcId name1 _ chanids1 varids1 exitSort1) (ProcId name2 _ chanids2 varids2 exitSort2) =
        name1 == name2
-    && identicalLists identicalChanId chanids1 chanids2
-    && identicalLists identicalVarId varids1 varids2
+    && identicalLists identicalChanSort chanids1 chanids2
+    && identicalLists identicalSortId varids1 varids2
     && identicalExitSort exitSort1 exitSort2
 
 identicalFuncId :: FuncId -> FuncId -> Bool
@@ -192,7 +195,7 @@ toTorXakisDefs (_, b, _) = b
 
 parseTorXakis :: String -> TxsDefs
 parseTorXakis txt = -- Trace.trace ("txt = " ++ txt)
-                    let parserOutput = txsParser (txsLexer txt) in
+                    let parserOutput = compileLegacy txt in
                         -- Trace.trace ("parser output = " ++ show(parserOutput)) $
                             toTorXakisDefs parserOutput
 
@@ -293,8 +296,8 @@ expectProcDef nm chans vars' exits content = TxsDefs.fromList [(  IdProc  (expec
 expectProcId :: String -> TypedElements -> TypedElements -> Maybe [String] -> ProcId
 expectProcId nm chans vars' exits = ProcId (T.pack nm)
                                      dontCareUnid
-                                     (fromTypedElementsToChanIds chans)
-                                     (fromTypedElementsToVarIds vars')
+                                     (toChanSort <$> fromTypedElementsToChanIds chans)
+                                     (varsort <$> fromTypedElementsToVarIds vars')
                                      (fromMaybeTypeToMaybeSortIds exits)
 
 

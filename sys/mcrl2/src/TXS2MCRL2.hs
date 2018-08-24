@@ -40,7 +40,7 @@ import qualified ModelId
 import qualified ChanId
 import qualified CstrId
 import qualified CstrDef
-import qualified ConstDefs
+import qualified Constant
 
 txs2mcrl2 :: TxsDefs.TxsDefs -> T2MMonad ()
 txs2mcrl2 tdefs = do
@@ -303,7 +303,7 @@ behaviorExpr2procExpr (TxsDefs.view -> TxsDefs.ProcInst procId chanValues paramV
     translatedParamValues <- Monad.mapM valExpr2dataExpr paramValues
     let instantiation = MCRL2Defs.PInst processName (zip paramDefs translatedParamValues)
     -- Create the renaming operator:
-    chanDefs <- Monad.mapM getRegisteredAction (ProcId.procchans procId)
+    chanDefs <- Monad.mapM getRegisteredAction [] -- TODO fix this or remove this (ProcId.procchans procId)
     translatedChanValues <- Monad.mapM getRegisteredAction chanValues
     let renaming = MCRL2Defs.PRename (zip (map fst chanDefs) (map fst translatedChanValues)) instantiation
     -- Return the combination:
@@ -322,17 +322,17 @@ behaviorExpr2procExpr _ = do
 
 -- Translates a TXS value expression to an mCRL2 data expression:
 valExpr2dataExpr :: ValExpr.ValExpr VarId.VarId -> T2MMonad MCRL2Defs.DExpr
-valExpr2dataExpr (ValExpr.view -> ValExpr.Vconst (ConstDefs.Cbool value)) = do
+valExpr2dataExpr (ValExpr.view -> ValExpr.Vconst (Constant.Cbool value)) = do
     return $ MCRL2Defs.DBool value
-valExpr2dataExpr (ValExpr.view -> ValExpr.Vconst (ConstDefs.Cint value)) = do
+valExpr2dataExpr (ValExpr.view -> ValExpr.Vconst (Constant.Cint value)) = do
     return $ MCRL2Defs.DInt value
-valExpr2dataExpr (ValExpr.view -> ValExpr.Vconst (ConstDefs.Cstring string)) = do
+valExpr2dataExpr (ValExpr.view -> ValExpr.Vconst (Constant.Cstring string)) = do
     return $ MCRL2Defs.DList (map (MCRL2Defs.DInt . toInteger . Char.ord) (Text.unpack string))
-valExpr2dataExpr (ValExpr.view -> ValExpr.Vconst (ConstDefs.Cregex _value)) = do
+valExpr2dataExpr (ValExpr.view -> ValExpr.Vconst (Constant.Cregex _value)) = do
     return $ MCRL2Defs.DList [] -- WARNING! Regular expressions are considered to be out of scope!
-valExpr2dataExpr (ValExpr.view -> ValExpr.Vconst (ConstDefs.Cstr cstrId fieldValues)) = do
+valExpr2dataExpr (ValExpr.view -> ValExpr.Vconst (Constant.Ccstr cstrId fieldValues)) = do
     valExpr2dataExpr (ValExpr.cstrCstr cstrId (map ValExpr.cstrConst fieldValues)) -- Delegate!
-valExpr2dataExpr (ValExpr.view -> ValExpr.Vconst (ConstDefs.Cany sortId)) = do
+valExpr2dataExpr (ValExpr.view -> ValExpr.Vconst (Constant.Cany sortId)) = do
     newGlobalName <- getFreshName (Text.pack ("g" ++ (Text.unpack (SortId.name sortId))))
     newGlobalSort <- sort2sort sortId
     let newGlobal = MCRL2Defs.Variable { MCRL2Defs.varName = newGlobalName, MCRL2Defs.varSort = newGlobalSort }

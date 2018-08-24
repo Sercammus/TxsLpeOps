@@ -25,7 +25,7 @@ import ChanId
 import SortId
 import qualified Data.Text         as T
 import VarId
-import ConstDefs
+import Constant
 import ValExpr
 
 import StdTDefs (stdSortTable)
@@ -115,8 +115,8 @@ testParElmXUpperBound = TestCase $ do
 procIdGen :: String -> [ChanId] -> [VarId] -> ProcId
 procIdGen name' chans vars' = ProcId   {  ProcId.name       = T.pack name'
                                         , ProcId.unid       = 111
-                                        , ProcId.procchans  = chans
-                                        , ProcId.procvars   = vars'
+                                        , ProcId.procchans  = toChanSort <$> chans
+                                        , ProcId.procvars   = varsort <$> vars'
                                         , ProcId.procexit   = NoExit
                                     }
 

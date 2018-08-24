@@ -37,9 +37,10 @@ import qualified EnvData
 import qualified TxsDefs
 import qualified TxsShow
 import           VarId
+import           ChanId
 import           Name
 import qualified ProcId
-import           ConstDefs
+import           Constant
 import           ValExpr
 
 -- Type around which this module revolves.
@@ -168,8 +169,8 @@ fromLPEInstance (chans, paramEqs, summands) procName = do
     newProcUnid <- IOC.newUnid
     let newProcId = TxsDefs.ProcId { ProcId.name = Text.pack (Text.unpack procName)
                                    , ProcId.unid = newProcUnid
-                                   , ProcId.procchans = chans
-                                   , ProcId.procvars = newProcParams
+                                   , ProcId.procchans = map (ProcId.ChanSort . ChanId.chansorts) chans
+                                   , ProcId.procvars = map (VarId.varsort) newProcParams
                                    , ProcId.procexit = ProcId.NoExit }
     let newProcInit = TxsDefs.procInst newProcId chans (map snd paramEqs)
     let newProcDef = TxsDefs.ProcDef chans newProcParams (TxsDefs.choice (Set.fromList (summandIterator summands newProcId)))

@@ -38,7 +38,7 @@ import qualified SolveDefs
 import qualified SortId
 import qualified SortOf
 import qualified SMTData
-import ConstDefs hiding (sort)
+import Constant hiding (sort)
 import ValExprVisitor
 import ValExprPrettyPrint
 import VarFactory
@@ -171,7 +171,7 @@ varSubst substEqs expr =
         case [v | (p, v) <- substEqs, p == varId] of
           [v] -> (True, v)
           _ -> (True, cstrVar varId)
-    validityVisitor [(valid, cstrExpr@(view -> Vconst (Cstr c2 _fields)))] (view -> Vaccess c1 p _vexp) =
+    validityVisitor [(valid, cstrExpr@(view -> Vconst (Ccstr c2 _fields)))] (view -> Vaccess c1 p _vexp) =
         -- If a non-existent field is accessed, the value becomes undefined + unsatisfiable:
         if c1 == c2
         then (valid, cstrAccess c1 p cstrExpr)
