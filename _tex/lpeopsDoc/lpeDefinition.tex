@@ -26,15 +26,14 @@ To give another example, \inlinecode{INPUT ? x | OUTPUT ? y}.
 
 The variables that are used to communicate over a channel must be \emph{fresh}.
 
-\item A guard.
-Given the variables that are used by this summand to communicate over channels, the guard should be a closed expression that yields a boolean value.
-The guard must also be \emph{satisfiable} (otherwise the summand would not have any effect anyway).
+\item A guard, yielding a boolean value.
 The guard is not always explicitly written if it is semantically equivalent to \inlinecode{true}.
 
 \item A sequence operator, \inlinecode{>->}.
 
-\item The expression for deadlock, \inlinecode{STOP}, \emph{or} a recursive process instantiation.
-The instantiated process must use the process definition given by the LPE, and the channel parameters of the instantiated process must be assigned their current values of the instantiating process.
+\item The expression for deadlock (\inlinecode{STOP}) \emph{or} a recursive process instantiation.
+The instantiated process must use the process definition given by the LPE, which satisfies the requirements of a \txs{} process signature.
+This includes channel parameters: these must be assigned their current values of the instantiating process.
 There are no requirements for the values assigned to the data parameters beyond the usual requirements of \txs{} (such as type compatibility).
 
 \end{itemize}

@@ -44,7 +44,7 @@ This means that, initially, we assume that all process parameters are used by on
 
 \item For each summand $s$, set the value of $R_s$ to $\bigcup\limits_{t \in S_s}^{} r(t)$ where $S_s$ is the set of all successors of $s$ (as determined during the previous phase) and where $r$ is the function
 \begin{align*}
-r(t) = \left( \text{vars}(c_t) \cup \bigcup\limits_{x \in R_t}^{} v_t(x) \right) \setminus C_t
+r(t) = \left( \text{vars}(c_t) \cup \bigcup\limits_{x \in R_t}^{} \text{vars}(v_t(x)) \right) \setminus C_t
 \end{align*}
 
 where
@@ -52,12 +52,13 @@ where
 \begin{itemize}
 \item $\text{vars}(c_t)$ gives the free variables in $c_t$, the guard of summand $t$;
 \item $v_t$ is a function that yields the expression that summand $t$ assigns to a given process parameter in its recursive process instantiation;
+\item $\text{vars}(v_t)$ gives the free variables in $v_t$;
 \item $C_t$ is the set of the communication variables used by summand $t$.
 \end{itemize}
 
 \item Repeat the previous step until the new value of $R_s$ is the same as before for all summands $s$.
 
-\item For each summand $s$ with $R_s \subset P$, choose some $\rho = [x \rightarrow h_x \;|\; x \in P \cup C_s]$ so that ${c_s}[\rho]$ is satisfiable, where
+\item For each summand $s$ with $R_s \subset P$, choose some $\rho = [x \rightarrow h_x \;|\; x \in P \cup C_s]$ so that ${c_s}[\rho]$ is satisfiable and $c_t[\rho]$ is unsatisfiable for all $t \notin S_s$, where
 
 \begin{itemize}
 \item $P$ is the set of all process parameters of the LPE;
@@ -66,8 +67,8 @@ where
 \item $c_s$ is the guard of summand $s$.
 \end{itemize}
 
-For each process parameter $x \in P \setminus R_s$, change the recursive process instantiation of $s$ so that $x$ is assigned ${v_s}(x)[\rho]$.
-Note that this ensures that the set of summands that are successors of $s$ can only decrease.
+For each process parameter $x \in P \setminus R_s$, change the recursive process instantiation of $s$ so that $x$ is assigned $x[\rho]$.
+Note that the choice of the value ensures that the set of summands that are successors of $s$ can only decrease.
 
 Also note that it may be possible to merge summands in specific cases if the default values of process parameters are chosen cleverly and reused for multiple summands.
 To find the optimal solution, however, a combinatorial problem must be solved, which is not expected to have a payoff that is proportional to the required effort.
