@@ -34,7 +34,6 @@ import           Satisfiability
 import           VarId
 import           ValExpr
 import           ConstDefs
-import           VarFactory
 
 chanIdConfluentIstep :: ChanId
 chanIdConfluentIstep = ChanId (Text.pack "CISTEP") 969 []

@@ -20,7 +20,9 @@ isInvariant,
 isSatisfiable,
 isUnsatisfiable,
 getSomeSolution,
-showSolution
+showSolution,
+createVarSubst,
+varSubst
 ) where
 
 import Control.Monad.State
@@ -42,6 +44,7 @@ import ValExprPrettyPrint
 import VarFactory
 import VarId
 import ValExpr
+import CstrId
 
 -- Checks if the specified expression cannot be false.
 isInvariant :: TxsDefs.VExpr -> IOC.IOC Bool
@@ -147,4 +150,46 @@ anyElm expr = visitValExpr anyElmVisitorM expr
                                                        return (cstrVar varId)
     anyElmVisitorM vexps parentExpr = defaultValExprVisitorM vexps parentExpr
 -- anyElm
+
+createVarSubst :: [(VarId, TxsDefs.VExpr)] -> (TxsDefs.VExpr -> TxsDefs.VExpr)
+createVarSubst substEqs = (\e -> varSubst substEqs (e :: TxsDefs.VExpr))
+
+-- Substitutes variables in a boolean expression while avoiding invalid subexpressions.
+-- This is useful when substituting into expressions that will be SAT-checked:
+varSubst :: [(VarId, TxsDefs.VExpr)] -> TxsDefs.VExpr -> TxsDefs.VExpr
+varSubst substEqs expr =
+    let (valid, result) = visitValExpr validityVisitor expr in
+      if valid
+      then result
+      else cstrConst (Cbool False)
+  where
+    -- The first element of the pair is the condition under which the second element is a DEFINED value.
+    -- We abbreviate this with dc, for 'defined condition'.
+    validityVisitor :: [(Bool, TxsDefs.VExpr)] -> TxsDefs.VExpr -> (Bool, TxsDefs.VExpr)
+    validityVisitor _ (view -> Vvar varId) =
+         -- Perform the substitution:
+        case [v | (p, v) <- substEqs, p == varId] of
+          [v] -> (True, v)
+          _ -> (True, cstrVar varId)
+    validityVisitor [(valid, cstrExpr@(view -> Vconst (Cstr c2 _fields)))] (view -> Vaccess c1 p _vexp) =
+        -- If a non-existent field is accessed, the value becomes undefined + unsatisfiable:
+        if c1 == c2
+        then (valid, cstrAccess c1 p cstrExpr)
+        else (False, cstrConst (Cany (CstrId.cstrsort c1)))
+    validityVisitor [(valid, cstrExpr@(view -> Vcstr c2 _fields))] (view -> Vaccess c1 p _vexp) =
+        -- If a non-existent field is accessed, the value becomes undefined + unsatisfiable:
+        if (c1 == c2)
+        then (valid, cstrAccess c1 p cstrExpr)
+        else (False, cstrConst (Cany (CstrId.cstrsort c1)))
+    validityVisitor vexps parentExpr =
+        -- Usually, the parent expression is unsatisfiable if the children are unsatisfiable:
+        (combineValidity vexps, defaultValExprVisitor (map snd vexps) parentExpr)
+    -- validityVisitor
+    
+    combineValidity :: [(Bool, TxsDefs.VExpr)] -> Bool
+    combineValidity [] = True
+    combineValidity [(valid, _)] = valid
+    combineValidity ((valid, _):xs) = valid && (combineValidity xs)
+-- varSubst
+
 

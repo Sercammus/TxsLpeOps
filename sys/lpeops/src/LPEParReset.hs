@@ -31,7 +31,6 @@ import           Satisfiability
 import           ValExprPrettyPrint
 import           VarId
 import           ValExpr
-import           VarFactory
 
 -- LPE rewrite method.
 -- Eliminates parameters that do not contribute to the behavior of a process from an LPE.

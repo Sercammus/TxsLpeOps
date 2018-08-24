@@ -29,7 +29,6 @@ import           LPEParRemoval
 import           Satisfiability
 import           VarId
 import           ValExpr
-import           VarFactory
 
 -- LPE rewrite method.
 -- Eliminates parameters that always have the same value from an LPE.
