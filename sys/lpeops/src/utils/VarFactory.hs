@@ -23,7 +23,6 @@ varSubst
 ) where
 
 import qualified EnvCore as IOC
-import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified SortId
 import qualified Id
@@ -57,56 +56,38 @@ createVarSubst substEqs = (\e -> varSubst substEqs (e :: TxsDefs.VExpr))
 
 varSubst :: [(VarId, TxsDefs.VExpr)] -> TxsDefs.VExpr -> TxsDefs.VExpr
 varSubst substEqs expr =
-    let (p, v) = visitValExpr substVisitor expr in vexpAnd p v
+    let (valid, result) = visitValExpr validityVisitor expr in
+      if valid
+      then result
+      else cstrConst (Cbool False)
   where
     -- The first element of the pair is the condition under which the second element is a DEFINED value.
     -- We abbreviate this with dc, for 'defined condition'.
-    substVisitor :: [(TxsDefs.VExpr, TxsDefs.VExpr)] -> TxsDefs.VExpr -> (TxsDefs.VExpr, TxsDefs.VExpr)
-    substVisitor _ (view -> Vvar varId) =
+    validityVisitor :: [(Bool, TxsDefs.VExpr)] -> TxsDefs.VExpr -> (Bool, TxsDefs.VExpr)
+    validityVisitor _ (view -> Vvar varId) =
          -- Perform the substitution:
         case [v | (p, v) <- substEqs, p == varId] of
-          [v] -> (vexpTrue, v)
-          _ -> (vexpTrue, cstrVar varId)
-    substVisitor [(dc, cstrExpr@(view -> Vconst (Cstr c2 _fields)))] (view -> Vaccess c1 p _vexp) =
+          [v] -> (True, v)
+          _ -> (True, cstrVar varId)
+    validityVisitor [(valid, cstrExpr@(view -> Vconst (Cstr c2 _fields)))] (view -> Vaccess c1 p _vexp) =
         -- If a non-existent field is accessed, the value becomes undefined + unsatisfiable:
         if c1 == c2
-        then (dc, cstrAccess c1 p cstrExpr)
-        else (vexpFalse, cstrConst (Cany (CstrId.cstrsort c1)))
-    substVisitor [(dc, cstrExpr@(view -> Vcstr c2 _fields))] (view -> Vaccess c1 p _vexp) =
+        then (valid, cstrAccess c1 p cstrExpr)
+        else (False, cstrConst (Cany (CstrId.cstrsort c1)))
+    validityVisitor [(valid, cstrExpr@(view -> Vcstr c2 _fields))] (view -> Vaccess c1 p _vexp) =
         -- If a non-existent field is accessed, the value becomes undefined + unsatisfiable:
         if (c1 == c2)
-        then (dc, cstrAccess c1 p cstrExpr)
-        else (vexpFalse, cstrConst (Cany (CstrId.cstrsort c1)))
-    substVisitor [(validCond, cond), (validVExp1, vexp1), (validVExp2, vexp2)] (view -> Vite _ _ _) =
-        let ifBranchCond = vexpAnd (vexpAnd validCond cond) (cstrNot validVExp1) in
-        let elseBranchCond = vexpAnd (vexpOr (cstrNot validCond) (cstrNot cond)) validVExp2 in
-          (vexpOr ifBranchCond elseBranchCond, cstrITE cond vexp1 vexp2)
-    substVisitor vexps _expr@(view -> Vand _) =
-        -- Just return false if one of the conjuncts is unsatisfiable:
-        (combineValidity vexps, cstrAnd (Set.fromList (map snd vexps)))
-    substVisitor [(dc, vexp)] _expr@(view -> Vnot _) =
-        -- Just return true if the operand is unsatisfiable:
-        (cstrNot dc, cstrNot vexp)
-    substVisitor vexps parentExpr =
+        then (valid, cstrAccess c1 p cstrExpr)
+        else (False, cstrConst (Cany (CstrId.cstrsort c1)))
+    validityVisitor vexps parentExpr =
         -- Usually, the parent expression is unsatisfiable if the children are unsatisfiable:
         (combineValidity vexps, defaultValExprVisitor (map snd vexps) parentExpr)
-    -- substVisitor
+    -- validityVisitor
     
-    combineValidity :: [(TxsDefs.VExpr, TxsDefs.VExpr)] -> TxsDefs.VExpr
-    combineValidity [] = vexpTrue
-    combineValidity vals = cstrAnd (Set.fromList (map fst vals))
-    
-    vexpAnd :: TxsDefs.VExpr -> TxsDefs.VExpr -> TxsDefs.VExpr
-    vexpAnd lhs rhs = cstrAnd (Set.fromList [lhs, rhs])
-    
-    vexpOr :: TxsDefs.VExpr -> TxsDefs.VExpr -> TxsDefs.VExpr
-    vexpOr lhs rhs = cstrNot (cstrAnd (Set.fromList [cstrNot lhs, cstrNot rhs]))
-    
-    vexpTrue :: TxsDefs.VExpr
-    vexpTrue = cstrConst (Cbool True)
-    
-    vexpFalse :: TxsDefs.VExpr
-    vexpFalse = cstrConst (Cbool False)
+    combineValidity :: [(Bool, TxsDefs.VExpr)] -> Bool
+    combineValidity [] = True
+    combineValidity [(valid, _)] = valid
+    combineValidity ((valid, _):xs) = valid && (combineValidity xs)
 -- varSubst
 
 
