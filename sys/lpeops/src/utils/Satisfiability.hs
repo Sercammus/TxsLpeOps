@@ -16,7 +16,7 @@ See LICENSE at root directory of this repository.
 
 {-# LANGUAGE ViewPatterns        #-}
 module Satisfiability (
-isInvariant,
+isTautology,
 isSatisfiable,
 isUnsatisfiable,
 getSomeSolution,
@@ -47,8 +47,8 @@ import ValExpr
 import CstrId
 
 -- Checks if the specified expression cannot be false.
-isInvariant :: TxsDefs.VExpr -> IOC.IOC Bool
-isInvariant expression = isUnsatisfiable (cstrNot expression)
+isTautology :: TxsDefs.VExpr -> IOC.IOC Bool
+isTautology expression = isUnsatisfiable (cstrNot expression)
 
 -- Checks if the specified expression can be true.
 isSatisfiable :: TxsDefs.VExpr -> IOC.IOC Bool
@@ -88,7 +88,7 @@ getSat expression = do
                           then do (sat, smtEnv') <- lift $ runStateT (Solve.satSolve frees assertions) smtEnv
                                   IOC.putSMT "current" smtEnv'
                                   return sat
-                          else do --IOC.putMsgs [ EnvData.TXS_CORE_ANY ("SMT log: " ++ (showValExpr expr) ++ " ==> ?") ]
+                          else do IOC.putMsgs [ EnvData.TXS_CORE_ANY ("SMT log: " ++ (showValExpr expr) ++ " ==> ?") ]
                                   (sat, smtEnv') <- lift $ runStateT (Solve.satSolve frees assertions) smtEnv
                                   IOC.putMsgs [ EnvData.TXS_CORE_ANY ("SMT log: " ++ (showValExpr expr) ++ " ==> " ++ (show sat)) ]
                                   IOC.putSMT "current" smtEnv'
@@ -119,7 +119,7 @@ getSomeSolution expression variables = do
                                   case sol of
                                     SolveDefs.Solved solMap -> return (Just (Map.map cstrConst solMap))
                                     _ -> return Nothing
-                          else do --IOC.putMsgs [ EnvData.TXS_CORE_ANY ("SMT log: " ++ (showValExpr expr) ++ " ==> ?") ]
+                          else do IOC.putMsgs [ EnvData.TXS_CORE_ANY ("SMT log: " ++ (showValExpr expr) ++ " ==> ?") ]
                                   (sol, smtEnv') <- lift $ runStateT (Solve.solve frees assertions) smtEnv
                                   IOC.putMsgs [ EnvData.TXS_CORE_ANY ("SMT log: " ++ (showValExpr expr) ++ " ==> " ++ (showSolution sol)) ]
                                   IOC.putSMT "current" smtEnv'

@@ -100,9 +100,9 @@ checkConfluenceCondition (summand1@(LPESummand _channelOffers1 guard1 (LPEProcIn
             -- Combine them all:
             let confluenceCondition = cstrITE premise conclusion (cstrConst (Cbool True))
             
-            -- Is the confluence condition an invariant?
-            inv <- isInvariant confluenceCondition
-            return inv
+            -- Is the confluence condition a tautology?
+            taut <- isTautology confluenceCondition
+            return taut
   where
     getChannelVars :: Set.Set VarId -> LPEChannelOffer -> Set.Set VarId
     getChannelVars soFar (_chanId, commVars) = Set.union soFar (Set.fromList commVars)
@@ -140,7 +140,7 @@ getDefiniteSuccessors allSummands (LPESummand _channelOffers guard (LPEProcInst 
   where
     addSummandIfDefiniteSuccessor :: [LPESummand] -> LPESummand -> IOC.IOC [LPESummand]
     addSummandIfDefiniteSuccessor soFar summand@(LPESummand _ g _) = do
-      inv <- isInvariant (cstrAnd (Set.fromList [guard, varSubst paramEqs g]))
-      return $ if inv then soFar ++ [summand] else soFar
+      taut <- isTautology (cstrAnd (Set.fromList [guard, varSubst paramEqs g]))
+      return $ if taut then soFar ++ [summand] else soFar
 -- getDefiniteSuccessors
 

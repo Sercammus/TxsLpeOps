@@ -79,9 +79,9 @@ constElmParamEqsCheck _ _ [] = do return []
 constElmParamEqsCheck paramEqs rho (markedParam:xs) =
     case [v | (p, v) <- paramEqs, p == markedParam] of
       [expr] -> do
-                  -- Check if rho expr = rho markedParam is an invariant:
-                  invariant <- isInvariant (rho (cstrEqual expr (cstrVar markedParam)))
-                  if invariant -- Parameter appears to be constant (so far), so keep it around:
+                  -- Check if rho expr = rho markedParam is a tautology:
+                  taut <- isTautology (rho (cstrEqual expr (cstrVar markedParam)))
+                  if taut -- Parameter appears to be constant (so far), so keep it around:
                   then do otherParamInstCheck <- constElmParamEqsCheck paramEqs rho xs
                           return (markedParam:otherParamInstCheck)
                   else do --IOC.putMsgs [ EnvData.TXS_CORE_ANY ("Parameter " ++ (Text.unpack (VarId.name markedParam)) ++ " is no longer marked.") ]

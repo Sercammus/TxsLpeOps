@@ -77,17 +77,18 @@ parResetLoop lpeInstance@(channels, initParamEqs, summands) successorsPerSummand
 resetParamsInSummand :: LPEInstance -> [(LPESummand, [LPESummand], [VarId])] -> LPESummand -> IOC.IOC LPESummand
 resetParamsInSummand _ _ (summand@(LPESummand _ _ LPEStop)) = do return summand
 resetParamsInSummand (_, initParamEqs, summands) successorsPerSummand summand@(LPESummand channelOffers guard (LPEProcInst paramEqs)) =
-    case [ uvars | (smd, _sucs, uvars) <- successorsPerSummand, smd == summand ] of
-      [uvars] -> if (length uvars) == (length initParamEqs)
-                 then do return summand
-                 else do sol <- getSomeSolution guard (map fst initParamEqs)
-                         case sol of
-                           Just solMap -> do let newParamEqs = [ (p, if p `elem` uvars then v else (Map.findWithDefault v p solMap)) | (p, v) <- paramEqs ]
-                                             let zippedEqs = filter (\(eq1, _) -> not ((fst eq1) `elem` uvars)) (zip paramEqs newParamEqs)
-                                             let Just summandNumber = (List.elemIndex summand summands)
-                                             Monad.mapM_ (\((p, v), (_, w)) -> IOC.putMsgs [ EnvData.TXS_CORE_ANY ("\t" ++ (Text.unpack (VarId.name p)) ++ " := " ++ (showValExpr w) ++ " instead of " ++ (showValExpr v) ++ " in " ++ (numberToString (summandNumber + 1)) ++ " summand") ]) zippedEqs
-                                             return (LPESummand channelOffers guard (LPEProcInst newParamEqs))
-                           Nothing -> do return summand
+    case [ (sucs, uvars) | (smd, sucs, uvars) <- successorsPerSummand, smd == summand ] of
+      [(sucs, uvars)] -> if (length uvars) == (length initParamEqs)
+                         then do return summand
+                         else do let substConstraint = cstrAnd (Set.fromList (guard:(map (\(LPESummand _ g _) -> cstrNot g) [smd | smd <- summands, not (smd `elem` sucs)])))
+                                 sol <- getSomeSolution substConstraint (map fst initParamEqs)
+                                 case sol of
+                                   Just solMap -> do let newParamEqs = [ (p, if p `elem` uvars then v else (Map.findWithDefault v p solMap)) | (p, v) <- paramEqs ]
+                                                     let zippedEqs = filter (\(eq1, _) -> not ((fst eq1) `elem` uvars)) (zip paramEqs newParamEqs)
+                                                     let Just summandNumber = (List.elemIndex summand summands)
+                                                     Monad.mapM_ (\((p, v), (_, w)) -> IOC.putMsgs [ EnvData.TXS_CORE_ANY ("\t" ++ (Text.unpack (VarId.name p)) ++ " := " ++ (showValExpr w) ++ " instead of " ++ (showValExpr v) ++ " in " ++ (numberToString (summandNumber + 1)) ++ " summand") ]) zippedEqs
+                                                     return (LPESummand channelOffers guard (LPEProcInst newParamEqs))
+                                   Nothing -> do return summand
       _ -> do return summand
   where
     numberToString :: Int -> String
