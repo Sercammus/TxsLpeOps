@@ -45,3 +45,19 @@ snap/.snapcraft
 
 # RPM package.
 *.rpm
+_tex/bla/bla.tps
+_tex/bla/bla.tcp
+_tex/lpeopsDoc/lpeopsDoc.run.xml
+_tex/lpeopsDoc/lpeopsDoc.pdf
+_tex/lpeopsDoc/lpeopsDoc.blg
+_tex/lpeopsDoc/lpeopsDoc.bcf
+_tex/lpeopsDoc/lpeopsDoc.bbl
+_tex/lpeopsDoc/lpeopsDoc.tcp
+_tex/lpeopsDoc/lpeopsDoc.synctex
+_tex/lpeopsDoc/constElm.aux
+_tex/lpeopsDoc/parElm.aux
+_tex/lpeopsDoc/lpeopsDoc.tps
+_tex/lpeopsDoc/lpeopsDoc.toc
+_tex/lpeopsDoc/lpeopsDoc.aux
+_tex/lpeopsDoc/lpeDefinition.aux
+_tex/lpeopsDoc/lpeopsDoc.out

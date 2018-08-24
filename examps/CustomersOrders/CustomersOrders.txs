@@ -72,15 +72,18 @@ CHANDEF Chans ::=   Customer  :: Customer
                   ; Report    :: Report 
 ENDDEF
 
+PROCDEF modelInit [ Customer :: Customer; Order :: Order; Report :: Report ] () ::=
+  HIDE [ HReport :: Report ] IN
+          handle [ Customer, Order, HReport ] ( Nil_Customer, Nil_Order, True )
+      |[ HReport ]|
+          bufferedOutput [ HReport, Report ] (Nil_Report)
+  NI
+ENDDEF
+
 MODELDEF Model ::= 
     CHAN IN    Customer, Order
     CHAN OUT   Report
-    BEHAVIOUR
-        HIDE [ HReport :: Report ] IN
-                handle [ Customer, Order, HReport ] ( Nil_Customer, Nil_Order, True )
-            |[ HReport ]|
-                bufferedOutput [ HReport, Report ] (Nil_Report)
-        NI
+    BEHAVIOUR  modelInit[Customer, Order, Report]()
 ENDDEF
 
 
