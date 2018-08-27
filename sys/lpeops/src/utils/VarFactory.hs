@@ -17,13 +17,18 @@ See LICENSE at root directory of this repository.
 {-# LANGUAGE ViewPatterns        #-}
 module VarFactory (
 createFreshVar,
-createFreshVarFromPrefix
+createFreshVarFromPrefix,
+createFreshIntVar,
+createFreshIntVarFromPrefix
 ) where
 
 import qualified EnvCore as IOC
+import qualified Data.Map as Map
 import qualified Data.Text as Text
+import qualified Data.Maybe as Maybe
 import qualified SortId
 import qualified Id
+import StdTDefs (stdSortTable)
 import VarId
 
 -- Creates a variable of the specified sort, using the specified string as part of the name.
@@ -44,7 +49,12 @@ createFreshVarFromPrefix prefix sort = do
     return VarId.VarId { VarId.name = Text.pack (prefix ++ (show absId)), VarId.unid = varUnid, VarId.varsort = sort }
 -- createFreshVarFromPrefix
 
+createFreshIntVar :: IOC.IOC VarId.VarId
+createFreshIntVar = createFreshVar (getStdSort "Int")
 
+createFreshIntVarFromPrefix :: String -> IOC.IOC VarId.VarId
+createFreshIntVarFromPrefix prefix = createFreshVarFromPrefix prefix (getStdSort "Int")
 
-
+getStdSort :: String -> SortId.SortId
+getStdSort sortName = Maybe.fromMaybe (error ("Could not find standard sort " ++ sortName ++ "!")) (Map.lookup (Text.pack sortName) stdSortTable)
 
