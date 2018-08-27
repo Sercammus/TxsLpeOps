@@ -91,7 +91,7 @@ Removing the marked parameters from the LPE gives
 \begin{lstlisting}
 //Process definition:
 PROCDEF example[A](z :: Int)
-  = A >-> example[A](2)
+  = A [[z==2]] >-> example[A](2)
   + A >-> example[A](2)
   + A >-> example[A](z+1)
   ;

@@ -80,7 +80,7 @@ resetParamsInSummand (_, initParamEqs, summands) successorsPerSummand summand@(L
     case [ (sucs, uvars) | (smd, sucs, uvars) <- successorsPerSummand, smd == summand ] of
       [(sucs, uvars)] -> if (length uvars) == (length initParamEqs)
                          then do return summand
-                         else do let substConstraint = cstrAnd (Set.fromList (guard:(map (\(LPESummand _ g _) -> cstrNot g) [smd | smd <- summands, not (smd `elem` sucs)])))
+                         else do let substConstraint = cstrAnd (Set.fromList (guard:(map (\(LPESummand _ g _) -> cstrNot (varSubst paramEqs g)) [smd | smd <- summands, not (smd `elem` sucs)])))
                                  sol <- getSomeSolution substConstraint (map fst initParamEqs)
                                  case sol of
                                    Just solMap -> do let newParamEqs = [ (p, if p `elem` uvars then v else (Map.findWithDefault v p solMap)) | (p, v) <- paramEqs ]

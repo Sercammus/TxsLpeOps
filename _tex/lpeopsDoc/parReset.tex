@@ -58,13 +58,13 @@ where
 
 \item Repeat the previous step until the new value of $R_s$ is the same as before for all summands $s$.
 
-\item For each summand $s$ with $R_s \subset P$, choose some $\rho = [x \rightarrow h_x \;|\; x \in P \cup C_s]$ so that ${c_s}[\rho]$ is satisfiable and $c_t[\rho]$ is unsatisfiable for all $t \notin S_s$, where
+\item For each summand $s$ with $R_s \subset P$, choose some $\rho = [x \rightarrow h_x \;|\; x \in P \cup C_s]$ so that ${c_s}[\rho]$ is satisfiable and $\neg{c_t}[p \rightarrow v_s(p) \;|\; p \in P][\rho]$ is satisfiable for all $t \notin S_s$, where
 
 \begin{itemize}
 \item $P$ is the set of all process parameters of the LPE;
-\item $h_x$ is a closed expression of the same sort as $x$;
-\item $C_t$ is the set of the communication variables used by summand $t$;
-\item $c_s$ is the guard of summand $s$.
+\item $h_x$ is a closed expression of the same sort as $x$.
+%\item $C_t$ is the set of the communication variables used by summand $t$;
+%\item $c_s$ is the guard of summand $s$.
 \end{itemize}
 
 For each process parameter $x \in P \setminus R_s$, change the recursive process instantiation of $s$ so that $x$ is assigned $x[\rho]$.
