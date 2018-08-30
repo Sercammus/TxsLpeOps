@@ -145,7 +145,7 @@ showSolution (SolveDefs.Solved solMap) =
 anyElm :: TxsDefs.VExpr -> IOC.IOC TxsDefs.VExpr
 anyElm expr = visitValExpr anyElmVisitorM expr
   where
-    anyElmVisitorM :: [IOC.IOC TxsDefs.VExpr] -> TxsDefs.VExpr -> IOC.IOC TxsDefs.VExpr
+    anyElmVisitorM :: [(IOC.IOC TxsDefs.VExpr, Integer)] -> TxsDefs.VExpr -> IOC.IOC TxsDefs.VExpr
     anyElmVisitorM _ (view -> Vconst (Cany sort)) = do varId <- createFreshVar sort
                                                        return (cstrVar varId)
     anyElmVisitorM vexps parentExpr = defaultValExprVisitorM vexps parentExpr
@@ -165,25 +165,25 @@ varSubst substEqs expr =
   where
     -- The first element of the pair is the condition under which the second element is a DEFINED value.
     -- We abbreviate this with dc, for 'defined condition'.
-    validityVisitor :: [(Bool, TxsDefs.VExpr)] -> TxsDefs.VExpr -> (Bool, TxsDefs.VExpr)
+    validityVisitor :: [((Bool, TxsDefs.VExpr), Integer)] -> TxsDefs.VExpr -> (Bool, TxsDefs.VExpr)
     validityVisitor _ (view -> Vvar varId) =
          -- Perform the substitution:
         case [v | (p, v) <- substEqs, p == varId] of
           [v] -> (True, v)
           _ -> (True, cstrVar varId)
-    validityVisitor [(valid, cstrExpr@(view -> Vconst (Ccstr c2 _fields)))] (view -> Vaccess c1 p _vexp) =
+    validityVisitor [((valid, cstrExpr@(view -> Vconst (Ccstr c2 _fields))), _)] (view -> Vaccess c1 p _vexp) =
         -- If a non-existent field is accessed, the value becomes undefined + unsatisfiable:
         if c1 == c2
         then (valid, cstrAccess c1 p cstrExpr)
         else (False, cstrConst (Cany (CstrId.cstrsort c1)))
-    validityVisitor [(valid, cstrExpr@(view -> Vcstr c2 _fields))] (view -> Vaccess c1 p _vexp) =
+    validityVisitor [((valid, cstrExpr@(view -> Vcstr c2 _fields)), _)] (view -> Vaccess c1 p _vexp) =
         -- If a non-existent field is accessed, the value becomes undefined + unsatisfiable:
         if (c1 == c2)
         then (valid, cstrAccess c1 p cstrExpr)
         else (False, cstrConst (Cany (CstrId.cstrsort c1)))
     validityVisitor vexps parentExpr =
         -- Usually, the parent expression is unsatisfiable if the children are unsatisfiable:
-        (combineValidity vexps, defaultValExprVisitor (map snd vexps) parentExpr)
+        (combineValidity (map fst vexps), defaultValExprVisitor (map (\((_, v), k) -> (v, k)) vexps) parentExpr)
     -- validityVisitor
     
     combineValidity :: [(Bool, TxsDefs.VExpr)] -> Bool

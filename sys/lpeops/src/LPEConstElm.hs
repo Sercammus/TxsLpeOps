@@ -49,7 +49,7 @@ constElmLoop lpeInstance@(_channels, paramEqs, summands) markedParams = do
     let rho = createVarSubst [(p, v) | p <- markedParams, (q, v) <- paramEqs, p == q]
     newMarkedParams <- constElmGuardCheck summands rho markedParams
     if newMarkedParams == markedParams
-    then removeParsFromLPE markedParams lpeInstance
+    then do removeParsFromLPE markedParams lpeInstance
     else constElmLoop lpeInstance newMarkedParams
 -- constElmLoop
 
@@ -76,16 +76,15 @@ constElmParamEqsCheck :: LPEParamEqs                       -- Initial values of 
                       -> [VarId]                           -- Marked parameters.
                       -> IOC.IOC [VarId]                   -- New marked parameters (cannot grow in size).
 constElmParamEqsCheck _ _ [] = do return []
-constElmParamEqsCheck paramEqs rho (markedParam:xs) =
+constElmParamEqsCheck paramEqs rho (markedParam:xs) = do
     case [v | (p, v) <- paramEqs, p == markedParam] of
-      [expr] -> do
-                  -- Check if rho expr = rho markedParam is a tautology:
-                  taut <- isTautology (rho (cstrEqual expr (cstrVar markedParam)))
-                  if taut -- Parameter appears to be constant (so far), so keep it around:
-                  then do otherParamInstCheck <- constElmParamEqsCheck paramEqs rho xs
-                          return (markedParam:otherParamInstCheck)
-                  else do --IOC.putMsgs [ EnvData.TXS_CORE_ANY ("Parameter " ++ (Text.unpack (VarId.name markedParam)) ++ " is no longer marked.") ]
-                          constElmParamEqsCheck paramEqs rho xs
+      [expr] -> do -- Check if rho expr = rho markedParam is a tautology:
+                   taut <- isTautology (rho (cstrEqual expr (cstrVar markedParam)))
+                   if taut -- Parameter appears to be constant (so far), so keep it around:
+                   then do otherParamInstCheck <- constElmParamEqsCheck paramEqs rho xs
+                           return (markedParam:otherParamInstCheck)
+                   else do --IOC.putMsgs [ EnvData.TXS_CORE_ANY ("Parameter " ++ (Text.unpack (VarId.name markedParam)) ++ " is no longer marked.") ]
+                           constElmParamEqsCheck paramEqs rho xs
       _ -> do IOC.putMsgs [ EnvData.TXS_CORE_SYSTEM_ERROR ("[Internal error] Parameter has an invalid number of initial values: " ++ (Text.unpack (VarId.name markedParam))) ]
               constElmParamEqsCheck paramEqs rho xs
 -- constElmParamEqsCheck
