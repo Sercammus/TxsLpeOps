@@ -20,6 +20,8 @@ isTautology,
 isSatisfiable,
 isUnsatisfiable,
 getSomeSolution,
+getUniqueSolution,
+extractValueFromSolution,
 showSolution,
 createVarSubst,
 varSubst
@@ -127,6 +129,26 @@ getSomeSolution expression variables = do
                                     SolveDefs.Solved solMap -> return (Just (Map.map cstrConst solMap))
                                     _ -> return Nothing
 -- getSomeSolution
+
+extractValueFromSolution :: VarId -> Map.Map VarId TxsDefs.VExpr -> TxsDefs.VExpr
+extractValueFromSolution varId solMap = Map.findWithDefault (cstrConst (Cany (SortOf.sortOf varId))) varId solMap
+
+-- Attempts to find a unique solution for the given expression.
+-- The solution only has to be unique with regard to the variables listed by the third parameter:
+getUniqueSolution :: TxsDefs.VExpr -> [VarId] -> [VarId] -> IOC.IOC (Maybe (Map.Map VarId TxsDefs.VExpr))
+getUniqueSolution expression variables uniquelySolvedVars = do
+    -- Start by finding some arbitrary solution:
+    expressionWithoutAny <- anyElm expression
+    someSolution <- getSomeSolution expressionWithoutAny variables
+    case someSolution of
+      Just solMap -> do -- Then check if there is NO solution where (one of) the specified variables have different values:
+                        let extraConditions = map (\v -> cstrEqual (cstrVar v) (extractValueFromSolution v solMap)) uniquelySolvedVars
+                        let restrictedExpression = cstrAnd (Set.fromList [expressionWithoutAny, cstrNot (cstrAnd (Set.fromList extraConditions))])
+                        unsat <- isUnsatisfiable restrictedExpression
+                        -- If so, the solution is unique (w.r.t. the specified variables):
+                        return (if unsat then someSolution else Nothing)
+      _ -> return Nothing
+-- getUniqueSolution
 
 showSolution :: SolveDefs.SolveProblem VarId -> String
 showSolution SolveDefs.Unsolvable = "Unsolvable"

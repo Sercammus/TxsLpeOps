@@ -17,6 +17,7 @@ See LICENSE at root directory of this repository.
 {-# LANGUAGE ViewPatterns        #-}
 module VarFactory (
 createFreshVar,
+createFreshVarFromVar,
 createFreshVarFromPrefix,
 createFreshIntVar,
 createFreshIntVarFromPrefix
@@ -27,6 +28,7 @@ import qualified Data.Map as Map
 import qualified Data.Text as Text
 import qualified Data.Maybe as Maybe
 import qualified SortId
+import qualified SortOf
 import qualified Id
 import StdTDefs (stdSortTable)
 import VarId
@@ -48,6 +50,12 @@ createFreshVarFromPrefix prefix sort = do
     let absId = if idAsInt >= 0 then idAsInt else -idAsInt
     return VarId.VarId { VarId.name = Text.pack (prefix ++ (show absId)), VarId.unid = varUnid, VarId.varsort = sort }
 -- createFreshVarFromPrefix
+
+createFreshVarFromVar :: VarId -> IOC.IOC VarId.VarId
+createFreshVarFromVar varId = do
+    freshVar <- createFreshVarFromPrefix (Text.unpack (name varId)) (SortOf.sortOf varId)
+    return freshVar
+-- createFreshVarFromVar
 
 createFreshIntVar :: IOC.IOC VarId.VarId
 createFreshIntVar = createFreshVar (getStdSort "Int")

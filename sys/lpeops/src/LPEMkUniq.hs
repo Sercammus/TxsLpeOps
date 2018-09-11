@@ -29,7 +29,7 @@ import Satisfiability
 import ValExpr
 
 makeSummandsUnique :: LPEOperation
-makeSummandsUnique (channels, paramEqs, summands) = do
+makeSummandsUnique (channels, paramEqs, summands) _invariant = do
     uniqueSummands <- Monad.foldM addSummandIfUnique [] summands
     return (Just (channels, paramEqs, uniqueSummands))
   where

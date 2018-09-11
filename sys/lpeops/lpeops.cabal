@@ -21,6 +21,7 @@ library
                     , LPEParElm
                     , LPEParRemoval
                     , LPEParReset
+                    , LPEParReset2
                     , LPEConfCheck
                     , LPETypes
                     , Satisfiability
@@ -60,6 +61,7 @@ test-suite lpeops-test
                       , LPEParElm
                       , LPEParRemoval
                       , LPEParReset
+                      , LPEParReset2
                       , LPETypes
                       , LPEConfCheck
                       , Satisfiability

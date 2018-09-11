@@ -34,7 +34,7 @@ import           ValExpr
 -- Eliminates parameters that always have the same value from an LPE.
 -- State spaces before and after are isomorph.
 constElm :: LPEOperation
-constElm lpeInstance@((_channels, paramEqs, _summands)) = do
+constElm lpeInstance@((_channels, paramEqs, _summands)) _invariant = do
     newLPEInstance <- constElmLoop lpeInstance (map fst paramEqs)
     return (Just newLPEInstance)
 -- constElm

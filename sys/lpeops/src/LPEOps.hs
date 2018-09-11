@@ -26,18 +26,18 @@ import qualified TxsDefs
 import           LPETypes
 import           Name
 
-type LPEOperation = LPEInstance -> IOC.IOC (Maybe LPEInstance)
+type LPEOperation = LPEInstance -> TxsDefs.VExpr -> IOC.IOC (Maybe LPEInstance)
 
 -- Core method that does the following:
 --  1. Transforms a closed process expression to an LPE instance;
 --  2. Applies the given operation to the LPE instance, which results in a new LPE instance;
 --  3. Transforms the new LPE instance to a process definition with the specified name and
 --     a process expression that creates an instance of this process definition.
-lpeOperation :: LPEOperation -> TxsDefs.BExpr -> Name -> IOC.IOC (Maybe (TxsDefs.BExpr, TxsDefs.ProcId, TxsDefs.ProcDef))
-lpeOperation operation procInst name = do
+lpeOperation :: LPEOperation -> TxsDefs.BExpr -> TxsDefs.VExpr -> Name -> IOC.IOC (Maybe (TxsDefs.BExpr, TxsDefs.ProcId, TxsDefs.ProcDef))
+lpeOperation operation procInst invariant name = do
     maybeLPEInstance <- toLPEInstance procInst
     case maybeLPEInstance of
-      Just lpeInstance -> do maybeNewLPEInstance <- operation lpeInstance
+      Just lpeInstance -> do maybeNewLPEInstance <- operation lpeInstance invariant
                              case maybeNewLPEInstance of
                                Just newLPEInstance -> do temp <- fromLPEInstance newLPEInstance name
                                                          return (Just temp)
@@ -46,7 +46,7 @@ lpeOperation operation procInst name = do
 -- lpeOperation
 
 dummyOp :: LPEOperation
-dummyOp lpeInstance = do return (Just lpeInstance)
+dummyOp lpeInstance _invariant = do return (Just lpeInstance)
 
 
 

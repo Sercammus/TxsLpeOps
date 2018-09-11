@@ -30,7 +30,7 @@ import           VarId
 -- Eliminates parameters that do not contribute to the behavior of a process from an LPE.
 -- State spaces before and after are isomorph.
 parElm :: LPEOperation
-parElm lpeInstance@((_channels, paramEqs, summands)) = do
+parElm lpeInstance@((_channels, paramEqs, summands)) _invariant = do
     let inertParams = foldl filterInertParamsWithSummand (map fst paramEqs) summands
     newLPEInstance <- parElmLoop lpeInstance inertParams
     return (Just newLPEInstance)
