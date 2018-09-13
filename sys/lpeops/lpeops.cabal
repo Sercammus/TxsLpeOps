@@ -22,8 +22,9 @@ library
                     , LPEParRemoval
                     , LPEParReset
                     , LPEParReset2
-                    , LPEConfCheck
+                    , LPEParUsage
                     , LPETypes
+                    , LPEConfCheck
                     , Satisfiability
                     , ValExprVisitor
                     , ValExprPrettyPrint
@@ -62,6 +63,7 @@ test-suite lpeops-test
                       , LPEParRemoval
                       , LPEParReset
                       , LPEParReset2
+                      , LPEParUsage
                       , LPETypes
                       , LPEConfCheck
                       , Satisfiability
