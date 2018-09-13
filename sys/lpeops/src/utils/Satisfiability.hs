@@ -18,7 +18,7 @@ See LICENSE at root directory of this repository.
 module Satisfiability (
 isTautology,
 isSatisfiable,
-isUnsatisfiable,
+isNotSatisfiable,
 getSomeSolution,
 getUniqueSolution,
 extractValueFromSolution,
@@ -50,7 +50,7 @@ import CstrId
 
 -- Checks if the specified expression cannot be false.
 isTautology :: TxsDefs.VExpr -> IOC.IOC Bool
-isTautology expression = isUnsatisfiable (cstrNot expression)
+isTautology expression = isNotSatisfiable (cstrNot expression)
 
 -- Checks if the specified expression can be true.
 isSatisfiable :: TxsDefs.VExpr -> IOC.IOC Bool
@@ -61,11 +61,11 @@ isSatisfiable expression = do sat <- getSat expression
 -- isSatisfiable
 
 -- Checks if the specified expression cannot be true.
-isUnsatisfiable :: TxsDefs.VExpr -> IOC.IOC Bool
-isUnsatisfiable expression = do sat <- getSat expression
-                                case sat of
-                                  SolveDefs.Unsat -> return True
-                                  _ -> return False
+isNotSatisfiable :: TxsDefs.VExpr -> IOC.IOC Bool
+isNotSatisfiable expression = do sat <- getSat expression
+                                 case sat of
+                                   SolveDefs.Unsat -> return True
+                                   _ -> return False
 -- isUnsatisfiable
 
 -- Frequently used method; code is modified code from TxsCore.
@@ -144,7 +144,7 @@ getUniqueSolution expression variables uniquelySolvedVars = do
       Just solMap -> do -- Then check if there is NO solution where (one of) the specified variables have different values:
                         let extraConditions = map (\v -> cstrEqual (cstrVar v) (extractValueFromSolution v solMap)) uniquelySolvedVars
                         let restrictedExpression = cstrAnd (Set.fromList [expressionWithoutAny, cstrNot (cstrAnd (Set.fromList extraConditions))])
-                        unsat <- isUnsatisfiable restrictedExpression
+                        unsat <- isNotSatisfiable restrictedExpression
                         -- If so, the solution is unique (w.r.t. the specified variables):
                         return (if unsat then someSolution else Nothing)
       _ -> return Nothing

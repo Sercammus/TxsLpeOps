@@ -24,7 +24,6 @@ import qualified Data.Map            as Map
 import qualified Data.Set            as Set
 import qualified Data.Text           as Text
 import qualified EnvCore             as IOC
-import qualified FreeVar
 import qualified TxsDefs
 import qualified EnvData
 import           LPEOps
@@ -39,39 +38,44 @@ parReset2 :: LPEOperation
 parReset2 lpeInstance@((_channels, paramEqs, summands)) invariant = do
     let params = map fst paramEqs
     rulingParamsPerSummand <- getRulingParamsPerSummand summands params invariant
-    controlFlowParams <- getControlFlowParams rulingParamsPerSummand params invariant
-    let _belongsToRelation = getBelongsToRelation rulingParamsPerSummand controlFlowParams (params List.\\ controlFlowParams)
+    changingParamsPerSummand <- getChangingParamsPerSummand summands params invariant
+    controlFlowParams <- getControlFlowParams summands rulingParamsPerSummand changingParamsPerSummand params invariant
+    let dataParams = params List.\\ controlFlowParams
+    let belongsToRelation = getBelongsToRelation summands rulingParamsPerSummand changingParamsPerSummand controlFlowParams dataParams
+    
     return (Just lpeInstance)
 -- parReset2
 
--- Determines which of the specified DATA parameters belong to which of the specified CONTROL FLOW parameters:
-getBelongsToRelation :: [(LPESummand, [(VarId, TxsDefs.VExpr, TxsDefs.VExpr)])] -> [VarId] -> [VarId] -> [(VarId, [VarId])]
-getBelongsToRelation rulingParamsPerSummand controlFlowParams dataParams = getBelongsToVars dataParams
-  where
-    getBelongsToVars :: [VarId] -> [(VarId, [VarId])]
-    getBelongsToVars (v:vs) = []
-        -- let furtherBelongsToVars = getBelongsToVars vs in
-        
+-- Determines which of the specified data parameters belong to which of the specified control flow parameters.
+-- A data parameter belongs to a control flow parameter if the data parameter is only changed in summands that are ruled by the control flow parameter.
+getBelongsToRelation :: [LPESummand] -> (Map.Map LPESummand [(VarId, TxsDefs.VExpr, TxsDefs.VExpr)]) -> (Map.Map LPESummand [VarId]) -> [VarId] -> [VarId] -> (Map.Map VarId [VarId])
+getBelongsToRelation _summands _rulingParamsPerSummand _changingParamsPerSummand _controlFlowParams [] = Map.empty
+getBelongsToRelation summands rulingParamsPerSummand changingParamsPerSummand controlFlowParams (d:ds) =
+    let summandsWhereDChanges = Map.keys (Map.filter (\changingParams -> d `elem` changingParams) changingParamsPerSummand) in
+    let foldRulingParams = \soFar smd -> Set.intersection soFar (Set.fromList (map (\(v, _, _) -> v) (Map.findWithDefault [] smd rulingParamsPerSummand))) in
+    let paramsThatRuleD = Set.toList (foldl foldRulingParams (Set.fromList controlFlowParams) summandsWhereDChanges) in
+    let ds' = getBelongsToRelation summands rulingParamsPerSummand changingParamsPerSummand controlFlowParams ds in
+      Map.insert d paramsThatRuleD ds'
 -- getBelongsToRelation
 
 -- Determines which of the specified parameters are 'control flow parameters'; that is,
--- parameters that only change in a summand if they rule that summand (see getRulingParamsPerSummand).
+-- parameters that may only be changed by a summand if they 'rule' that summand (see getRulingParamsPerSummand).
 -- This function requires information about which parameters are ruling the summands of the LPE; typically,
 -- getRulingParamsPerSummand is used to obtain this information.
-getControlFlowParams :: [(LPESummand, [(VarId, TxsDefs.VExpr, TxsDefs.VExpr)])] -> [VarId] -> TxsDefs.VExpr -> IOC.IOC [VarId]
-getControlFlowParams _rulingParamsPerSummand [] _invariant = do return []
-getControlFlowParams rulingParamsPerSummand (v:vs) invariant = do
-    vs' <- getControlFlowParams rulingParamsPerSummand vs invariant
-    ruling <- isRulingOrUnchangedInAllSummands rulingParamsPerSummand
-    return (if ruling then (v:vs') else vs')
+getControlFlowParams :: [LPESummand] -> (Map.Map LPESummand [(VarId, TxsDefs.VExpr, TxsDefs.VExpr)]) -> (Map.Map LPESummand [VarId]) -> [VarId] -> TxsDefs.VExpr -> IOC.IOC [VarId]
+getControlFlowParams _summands _rulingParamsPerSummand _changingParamsPerSummand [] _invariant = do return []
+getControlFlowParams summands rulingParamsPerSummand changingParamsPerSummand (v:vs) invariant = do
+    vs' <- getControlFlowParams summands rulingParamsPerSummand changingParamsPerSummand vs invariant
+    if isRulingOrUnchangedInAllSummands summands
+    then do return (v:vs')
+    else do return vs'
   where
-    isRulingOrUnchangedInAllSummands :: [(LPESummand, [(VarId, TxsDefs.VExpr, TxsDefs.VExpr)])] -> IOC.IOC Bool
-    isRulingOrUnchangedInAllSummands [] = do return True
-    isRulingOrUnchangedInAllSummands ((summand, rulingParams):xs) = do
-        if isRulingParam rulingParams
-        then do isRulingOrUnchangedInAllSummands xs
-        else do (_, destSatExpr) <- constructDestSatExpr summand v invariant
-                isTautology destSatExpr
+    isRulingOrUnchangedInAllSummands :: [LPESummand] -> Bool
+    isRulingOrUnchangedInAllSummands [] = True
+    isRulingOrUnchangedInAllSummands (x:xs) =
+        let ruling = isRulingParam (Map.findWithDefault [] x rulingParamsPerSummand) in
+        let unchanged = not (v `elem` (Map.findWithDefault [] x changingParamsPerSummand)) in
+          (ruling || unchanged) && (isRulingOrUnchangedInAllSummands xs)
     -- isRulingOrUnchangedInAllSummands
     
     isRulingParam :: [(VarId, TxsDefs.VExpr, TxsDefs.VExpr)] -> Bool
@@ -79,14 +83,33 @@ getControlFlowParams rulingParamsPerSummand (v:vs) invariant = do
     isRulingParam ((varId, _, _):xs) = if varId == v then True else isRulingParam xs
 -- getControlFlowParams
 
--- Determines the parameters that 'rule' a summand for all specified summands.
+-- Determines the parameters that are changed by a summand, for all specified summands.
+getChangingParamsPerSummand :: [LPESummand] -> [VarId] -> TxsDefs.VExpr -> IOC.IOC (Map.Map LPESummand [VarId])
+getChangingParamsPerSummand [] _ _ = do return Map.empty
+getChangingParamsPerSummand (x:xs) params invariant = do
+    changingParams <- getChangingParams x params
+    xs' <- getChangingParamsPerSummand xs params invariant
+    return (Map.insert x changingParams xs')
+  where
+    getChangingParams :: LPESummand -> [VarId] -> IOC.IOC [VarId]
+    getChangingParams _summand [] = do return []
+    getChangingParams summand (p:ps) = do
+        furtherChangingParams <- getChangingParams summand ps
+        (destVar, destSatExpr) <- constructDestSatExpr summand p invariant
+        taut <- isTautology (cstrAnd (Set.fromList [destSatExpr, cstrEqual (cstrVar destVar) (cstrVar p)]))
+        if taut
+        then do return (p:furtherChangingParams)
+        else do return furtherChangingParams
+-- getChangingParamsPerSummand
+
+-- Determines the parameters that 'rule' a summand, for all specified summands.
 -- A 'ruling' parameter is a parameter that has a unique value before and after the summand whenever the summand is enabled.
-getRulingParamsPerSummand :: [LPESummand] -> [VarId] -> TxsDefs.VExpr -> IOC.IOC [(LPESummand, [(VarId, TxsDefs.VExpr, TxsDefs.VExpr)])]
-getRulingParamsPerSummand [] _ _ = do return []
+getRulingParamsPerSummand :: [LPESummand] -> [VarId] -> TxsDefs.VExpr -> IOC.IOC (Map.Map LPESummand [(VarId, TxsDefs.VExpr, TxsDefs.VExpr)])
+getRulingParamsPerSummand [] _ _ = do return Map.empty
 getRulingParamsPerSummand (x:xs) params invariant = do
     rulingParams <- getRulingParams x params
     xs' <- getRulingParamsPerSummand xs params invariant
-    return ((x, rulingParams):xs')
+    return (Map.insert x rulingParams xs')
   where
     getRulingParams :: LPESummand -> [VarId] -> IOC.IOC [(VarId, TxsDefs.VExpr, TxsDefs.VExpr)]
     getRulingParams _ [] = do return []
@@ -105,9 +128,16 @@ getRulingParamsPerSummand (x:xs) params invariant = do
           _ -> return furtherRulingParams
 -- getRulingParamsPerSummand
 
--- Constructs an expression that we want to SAT-solve, and also gives the variable that
--- should always be assigned a unique value, regardless of how the expression is solved.
--- (This is because the 'destination' of a variable should be unique for each summand.)
+-- The function returns a pair:
+--   The first element is the variable for which must be solved in order
+--   to determine the value of a parameter after a summand.
+--   The second element is the expression with the variable that must be solved.
+-- There are two use cases:
+--   1. Looking for the value of a parameter after a summand by solving the expression for the variable.
+--   2. Determining whether the value of a parameter is unaffected by a summand
+--      by checking if 'expression && p2 == p' is a tautology. Here,
+--      p2 is the first element in the pair returned by this function, and
+--      p1 is the variable provided as the second parameter to this function.
 constructDestSatExpr :: LPESummand -> VarId -> TxsDefs.VExpr -> IOC.IOC (VarId, TxsDefs.VExpr)
 constructDestSatExpr (LPESummand _ _ LPEStop) varId _invariant = do return (varId, cstrConst (Cbool False))
 constructDestSatExpr (LPESummand _channelOffers guard (LPEProcInst paramEqs)) varId invariant = do
