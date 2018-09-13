@@ -40,58 +40,58 @@ parReset2 :: LPEOperation
 parReset2 lpeInstance@((_channels, paramEqs, summands)) invariant = do
     let params = map fst paramEqs
     paramUsagePerSummand <- getParamUsagePerSummand summands params invariant
-    -- rulingParamsPerSummand <- getRulingParamsPerSummand summands params invariant
-    -- changingParamsPerSummand <- getChangingParamsPerSummand summands params invariant
-    -- controlFlowParams <- getControlFlowParams summands rulingParamsPerSummand changingParamsPerSummand params invariant
-    -- let controlFlowGraphs = Map.restrictKeys (getControlFlowGraphs (Map.toList rulingParamsPerSummand)) (Set.fromList controlFlowParams)
-    -- let dataParams = params List.\\ controlFlowParams
-    -- let belongsToRelation = getBelongsToRelation summands rulingParamsPerSummand changingParamsPerSummand controlFlowParams dataParams
+    let controlFlowParams = getControlFlowParams summands paramUsagePerSummand params
+    let dataParams = params List.\\ controlFlowParams
+    let controlFlowGraphs = Map.restrictKeys (getControlFlowGraphs summands paramUsagePerSummand) (Set.fromList controlFlowParams)
+    let belongsToRelation = getBelongsToRelation summands paramUsagePerSummand controlFlowParams dataParams
     
     return (Just lpeInstance)
 -- parReset2
 
 -- Determines which of the specified data parameters belong to which of the specified control flow parameters.
 -- A data parameter belongs to a control flow parameter if the data parameter is only changed in summands that are ruled by the control flow parameter.
-getBelongsToRelation :: [LPESummand] -> (Map.Map LPESummand [(VarId, TxsDefs.VExpr, TxsDefs.VExpr)]) -> (Map.Map LPESummand [VarId]) -> [VarId] -> [VarId] -> (Map.Map VarId [VarId])
-getBelongsToRelation _summands _rulingParamsPerSummand _changingParamsPerSummand _controlFlowParams [] = Map.empty
-getBelongsToRelation summands rulingParamsPerSummand changingParamsPerSummand controlFlowParams (d:ds) =
-    let summandsWhereDChanges = Map.keys (Map.filter (\changingParams -> d `elem` changingParams) changingParamsPerSummand) in
-    let foldRulingParams = \soFar smd -> Set.intersection soFar (Set.fromList (map (\(v, _, _) -> v) (Map.findWithDefault [] smd rulingParamsPerSummand))) in
+getBelongsToRelation :: [LPESummand] -> Map.Map LPESummand LPEParamUsage -> [VarId] -> [VarId] -> (Map.Map VarId [VarId])
+getBelongsToRelation _summands _paramUsagePerSummand _controlFlowParams [] = Map.empty
+getBelongsToRelation summands paramUsagePerSummand controlFlowParams (d:ds) =
+    let summandsWhereDChanges = Map.keys (Map.filter (\paramUsage -> d `elem` (changedParams paramUsage)) paramUsagePerSummand) in
+    let foldRulingParams = \soFar smd -> Set.intersection soFar (Set.fromList (rulingParams (extractParamUsage smd paramUsagePerSummand))) in
     let paramsThatRuleD = Set.toList (foldl foldRulingParams (Set.fromList controlFlowParams) summandsWhereDChanges) in
-    let ds' = getBelongsToRelation summands rulingParamsPerSummand changingParamsPerSummand controlFlowParams ds in
+    let ds' = getBelongsToRelation summands paramUsagePerSummand controlFlowParams ds in
       Map.insert d paramsThatRuleD ds'
 -- getBelongsToRelation
 
-getControlFlowGraphs :: [(LPESummand, [(VarId, TxsDefs.VExpr, TxsDefs.VExpr)])] -> (Map.Map VarId [(TxsDefs.VExpr, LPESummand, TxsDefs.VExpr)])
-getControlFlowGraphs [] = Map.empty
-getControlFlowGraphs ((summand, rulingParams):xs) =
-    let newEntries = map (\(v, s1, s2) -> (v, [(s1, summand, s2)])) rulingParams in
-      Map.unionWith (++) (Map.fromList newEntries) (getControlFlowGraphs xs)
+getControlFlowGraphs :: [LPESummand] -> Map.Map LPESummand LPEParamUsage -> (Map.Map VarId [(TxsDefs.VExpr, LPESummand, TxsDefs.VExpr)])
+getControlFlowGraphs [] _paramUsagePerSummand = Map.empty
+getControlFlowGraphs (x:xs) paramUsagePerSummand =
+    let newEntries = map constructEdgeFromRulingPar (rulingParams paramUsage) in
+      Map.unionWith (++) (Map.fromList newEntries) (getControlFlowGraphs xs paramUsagePerSummand)
+  where
+    paramUsage :: LPEParamUsage
+    paramUsage = extractParamUsage x paramUsagePerSummand
+    
+    constructEdgeFromRulingPar :: VarId -> (VarId, [(TxsDefs.VExpr, LPESummand, TxsDefs.VExpr)])
+    constructEdgeFromRulingPar rulingPar =
+        let paramSource = extractParamSource rulingPar (paramSources paramUsage) in
+        let paramDestination = extractParamDestination rulingPar (paramDestinations paramUsage) in
+          (rulingPar, [(paramSource, x, paramDestination)])
 -- getControlFlowGraphs
 
 -- Determines which of the specified parameters are 'control flow parameters'; that is,
 -- parameters that may only be changed by a summand if they 'rule' that summand (see getRulingParamsPerSummand).
 -- This function requires information about which parameters are ruling the summands of the LPE; typically,
 -- getRulingParamsPerSummand is used to obtain this information.
-getControlFlowParams :: [LPESummand] -> (Map.Map LPESummand [(VarId, TxsDefs.VExpr, TxsDefs.VExpr)]) -> (Map.Map LPESummand [VarId]) -> [VarId] -> TxsDefs.VExpr -> IOC.IOC [VarId]
-getControlFlowParams _summands _rulingParamsPerSummand _changingParamsPerSummand [] _invariant = do return []
-getControlFlowParams summands rulingParamsPerSummand changingParamsPerSummand (v:vs) invariant = do
-    vs' <- getControlFlowParams summands rulingParamsPerSummand changingParamsPerSummand vs invariant
-    if isRulingOrUnchangedInAllSummands summands
-    then do return (v:vs')
-    else do return vs'
+getControlFlowParams :: [LPESummand] -> Map.Map LPESummand LPEParamUsage -> [VarId] -> [VarId]
+getControlFlowParams _summands _paramUsagePerSummand [] = []
+getControlFlowParams summands paramUsagePerSummand params =
+    filter (isRulingOrUnchangedInAllSummands summands) params
   where
-    isRulingOrUnchangedInAllSummands :: [LPESummand] -> Bool
-    isRulingOrUnchangedInAllSummands [] = True
-    isRulingOrUnchangedInAllSummands (x:xs) =
-        let ruling = isRulingParam (Map.findWithDefault [] x rulingParamsPerSummand) in
-        let unchanged = not (v `elem` (Map.findWithDefault [] x changingParamsPerSummand)) in
-          (ruling || unchanged) && (isRulingOrUnchangedInAllSummands xs)
-    -- isRulingOrUnchangedInAllSummands
-    
-    isRulingParam :: [(VarId, TxsDefs.VExpr, TxsDefs.VExpr)] -> Bool
-    isRulingParam [] = False
-    isRulingParam ((varId, _, _):xs) = if varId == v then True else isRulingParam xs
+    isRulingOrUnchangedInAllSummands :: [LPESummand] -> VarId -> Bool
+    isRulingOrUnchangedInAllSummands [] v = True
+    isRulingOrUnchangedInAllSummands (x:xs) v =
+        let paramUsage = extractParamUsage x paramUsagePerSummand in
+        let ruling = v `elem` (rulingParams paramUsage) in
+        let unchanged = not (v `elem` (changedParams paramUsage)) in
+          ruling || unchanged
 -- getControlFlowParams
 
 resetParamsInSummand :: LPEInstance -> [(LPESummand, [LPESummand], [VarId])] -> LPESummand -> IOC.IOC LPESummand

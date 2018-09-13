@@ -15,7 +15,10 @@ See LICENSE at root directory of this repository.
 -----------------------------------------------------------------------------
 
 module LPEParUsage (
-LPEParamUsage,
+LPEParamUsage(..),
+extractParamUsage,
+extractParamSource,
+extractParamDestination,
 getParamUsagePerSummand,
 getParamSourcesPerSummand,
 getParamDestinationsPerSummand,
@@ -29,6 +32,7 @@ import qualified Data.Set            as Set
 import qualified EnvCore             as IOC
 import qualified FreeVar
 import qualified TxsDefs
+import qualified SortOf
 import           LPEOps
 import           Satisfiability
 import           VarId
@@ -44,6 +48,15 @@ data LPEParamUsage = LPEParamUsage { directlyUsedParams :: [VarId]
                                    , paramDestinations :: Map.Map VarId TxsDefs.VExpr
                                    }
 -- LPEParamUsage
+
+extractParamUsage :: LPESummand -> Map.Map LPESummand LPEParamUsage -> LPEParamUsage
+extractParamUsage summand paramUsagePerSummand = Map.findWithDefault (LPEParamUsage [] [] [] [] Map.empty Map.empty) summand paramUsagePerSummand
+
+extractParamSource :: VarId -> Map.Map VarId TxsDefs.VExpr -> TxsDefs.VExpr
+extractParamSource varId parSources = Map.findWithDefault (cstrConst (Cany (SortOf.sortOf varId))) varId parSources
+
+extractParamDestination :: VarId -> Map.Map VarId TxsDefs.VExpr -> TxsDefs.VExpr
+extractParamDestination = extractParamSource
 
 getParamUsagePerSummand :: [LPESummand] -> [VarId] -> TxsDefs.VExpr -> IOC.IOC (Map.Map LPESummand LPEParamUsage)
 getParamUsagePerSummand summands params invariant = do
