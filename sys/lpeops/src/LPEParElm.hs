@@ -64,7 +64,7 @@ parElmCheck :: LPESummands                       -- Remaining summands for which
 parElmCheck [] inertParams = do return inertParams
 parElmCheck ((LPESummand _ _ LPEStop):xs) inertParams = do parElmCheck xs inertParams
 parElmCheck ((LPESummand _chanOffers guard (LPEProcInst paramEqs)):xs) inertParams = do
-    unsat <- isUnsatisfiable guard
+    unsat <- isNotSatisfiable guard
     if unsat -- Guard is NOT satisfiable, so leave the marked parameters alone:
     then do parElmCheck xs inertParams
     else do parElmCheck xs (foldl filterInertParamsWithEq inertParams paramEqs)

@@ -62,7 +62,7 @@ constElmGuardCheck :: LPESummands                       -- Remaining summands fo
 constElmGuardCheck [] _ markedParams = do return markedParams
 constElmGuardCheck ((LPESummand _ _ LPEStop):xs) rho markedParams = do constElmGuardCheck xs rho markedParams
 constElmGuardCheck ((LPESummand _chanOffers guard (LPEProcInst paramEqs)):xs) rho markedParams = do
-    unsat <- isUnsatisfiable (rho guard)
+    unsat <- isNotSatisfiable (rho guard)
     if unsat -- Guard is NOT satisfiable, so leave the marked parameters alone:
     then do constElmGuardCheck xs rho markedParams 
     else do paramInstCheck <- constElmParamEqsCheck paramEqs rho markedParams -- Otherwise, check the parameter equations.

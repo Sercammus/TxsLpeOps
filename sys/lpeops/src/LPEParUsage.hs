@@ -17,8 +17,6 @@ See LICENSE at root directory of this repository.
 module LPEParUsage (
 LPEParamUsage(..),
 extractParamUsage,
-extractParamSource,
-extractParamDestination,
 getParamUsagePerSummand,
 getParamSourcesPerSummand,
 getParamDestinationsPerSummand,
@@ -32,7 +30,6 @@ import qualified Data.Set            as Set
 import qualified EnvCore             as IOC
 import qualified FreeVar
 import qualified TxsDefs
-import qualified SortOf
 import           LPEOps
 import           Satisfiability
 import           VarId
@@ -51,12 +48,6 @@ data LPEParamUsage = LPEParamUsage { directlyUsedParams :: [VarId]
 
 extractParamUsage :: LPESummand -> Map.Map LPESummand LPEParamUsage -> LPEParamUsage
 extractParamUsage summand paramUsagePerSummand = Map.findWithDefault (LPEParamUsage [] [] [] [] Map.empty Map.empty) summand paramUsagePerSummand
-
-extractParamSource :: VarId -> Map.Map VarId TxsDefs.VExpr -> TxsDefs.VExpr
-extractParamSource varId parSources = Map.findWithDefault (cstrConst (Cany (SortOf.sortOf varId))) varId parSources
-
-extractParamDestination :: VarId -> Map.Map VarId TxsDefs.VExpr -> TxsDefs.VExpr
-extractParamDestination = extractParamSource
 
 getParamUsagePerSummand :: [LPESummand] -> [VarId] -> TxsDefs.VExpr -> IOC.IOC (Map.Map LPESummand LPEParamUsage)
 getParamUsagePerSummand summands params invariant = do
@@ -90,7 +81,7 @@ getParamSourcesPerSummand (x:xs) params invariant = do
         let srcSatExpr = cstrAnd (Set.fromList [guard, invariant])
         srcSolution <- getUniqueSolution srcSatExpr [] [p]
         case srcSolution of
-          Just srcSolMap -> do return (Map.insert p (extractValueFromSolution p srcSolMap) ps')
+          Just srcSolMap -> do return (Map.insert p (extractVExprFromMap p srcSolMap) ps')
           Nothing -> do return ps'
 -- getParamSourcesPerSummand
 
@@ -108,7 +99,7 @@ getParamDestinationsPerSummand (x:xs) params invariant = do
         (destVar, destSatExpr) <- constructDestSatExpr summand p invariant
         destSolution <- getUniqueSolution destSatExpr [] [destVar]
         case destSolution of
-          Just destSolMap -> do return (Map.insert p (extractValueFromSolution p destSolMap) ps')
+          Just destSolMap -> do return (Map.insert p (extractVExprFromMap p destSolMap) ps')
           Nothing -> do return ps'
 -- getParamDestinationsPerSummand
 

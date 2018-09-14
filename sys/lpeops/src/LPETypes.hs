@@ -24,6 +24,8 @@ LPEChannelOffer,
 LPEChannelOffers,
 LPEParamEq,
 LPEParamEqs,
+extractVExprFromMap,
+extractVExprFromParamEqs,
 toLPEInstance,
 fromLPEInstance
 ) where
@@ -34,6 +36,7 @@ import qualified Data.Set            as Set
 import qualified Data.Text           as Text
 import qualified EnvCore             as IOC
 import qualified EnvData
+import qualified SortOf
 import qualified TxsDefs
 import qualified TxsShow
 import           VarId
@@ -70,6 +73,16 @@ type LPEChannelOffers = [LPEChannelOffer]
 -- (in the case of a particular process instantiation).
 type LPEParamEq = (VarId, TxsDefs.VExpr)
 type LPEParamEqs = [LPEParamEq]
+
+-- Extracts the data expression that corresponds with the specified variable from a map.
+-- The variable should be in the specified map (unchecked precondition)!
+extractVExprFromMap :: VarId -> Map.Map VarId TxsDefs.VExpr -> TxsDefs.VExpr
+extractVExprFromMap varId m = Map.findWithDefault (cstrConst (Cany (SortOf.sortOf varId))) varId m
+
+-- Extracts the data expression that corresponds with the specified variable from a number of parameter equations.
+-- One of the equations should have the specified variable on the left-hand side (precondition)!
+extractVExprFromParamEqs :: VarId -> LPEParamEqs -> TxsDefs.VExpr
+extractVExprFromParamEqs varId paramEqs = extractVExprFromMap varId (Map.fromList paramEqs)
 
 -- Exposed method.
 -- Constructs an LPEInstance from a process expression (unless there is a problem).

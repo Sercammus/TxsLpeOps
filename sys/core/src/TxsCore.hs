@@ -194,6 +194,7 @@ import qualified SortId
 import qualified SortOf
 import Constant
 import VarId
+import ValExpr
 
 -- | TorXakis core main api -- start
 runTxsCore :: Config -> StateT s IOC.IOC a -> s -> IO ()
@@ -1179,7 +1180,7 @@ txsLPEOp opName (modelId1@(TxsDefs.ModelId _modname _moduid)) modelId2 = do
             -> do maybeOpFunc <- getLPEOperation
                   case maybeOpFunc of
                     Just opFunc -> do
-                      manipulatedLPE <- LPEOps.lpeOperation opFunc bexpr (T.pack ("LPE_" ++ modelId2))
+                      manipulatedLPE <- LPEOps.lpeOperation opFunc bexpr (cstrConst (Cbool True)) (T.pack ("LPE_" ++ modelId2))
                       case manipulatedLPE of
                         Just (newProcInst, newProcId, newProcDef) ->
                           do newModelUid <- IOC.newUnid

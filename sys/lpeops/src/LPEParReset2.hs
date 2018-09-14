@@ -18,25 +18,18 @@ module LPEParReset2 (
 parReset2
 ) where
 
-import qualified Control.Monad       as Monad
-import qualified Data.List           as List
-import qualified Data.Map            as Map
-import qualified Data.Set            as Set
-import qualified Data.Text           as Text
-import qualified EnvCore             as IOC
+import qualified Data.List as List
+import qualified Data.Map as Map
+import qualified Data.Set as Set
 import qualified FreeVar
 import qualified TxsDefs
-import qualified EnvData
-import           LPEOps
-import           LPEParUsage
-import           Satisfiability
-import           ValExprPrettyPrint
-import           VarId
-import           ValExpr
+import LPEOps
+import LPEParUsage
+import VarId
 
 parReset2 :: LPEOperation
-parReset2 lpeInstance@((_channels, paramEqs, summands)) invariant = do
-    let params = map fst paramEqs
+parReset2 (channels, initParamEqs, summands) invariant = do
+    let params = map fst initParamEqs
     paramUsagePerSummand <- getParamUsagePerSummand summands params invariant
     let controlFlowParams = getControlFlowParams summands paramUsagePerSummand params
     let dataParams = params List.\\ controlFlowParams
@@ -48,9 +41,34 @@ parReset2 lpeInstance@((_channels, paramEqs, summands)) invariant = do
                                      | dj <- djs, paramUsage <- Map.elems paramUsagePerSummand, dk `elem` (directlyUsedParams paramUsage) ]
                                    | (dk, djs) <- Map.toList belongsToRelation ]
     let relevanceRelation = repeatUntilFixpoint (updateRelevanceRelation paramUsagePerSummand controlFlowGraphs belongsToRelation) (Set.fromList initialRelevanceRelation)
-      
-    return (Just lpeInstance)
+    let newSummands = map (resetParamsInSummand initParamEqs paramUsagePerSummand belongsToRelation relevanceRelation) summands
+    return (Just (channels, initParamEqs, newSummands))
 -- parReset2
+
+resetParamsInSummand :: [(VarId, TxsDefs.VExpr)]                -- initParamEqs
+                     -> Map.Map LPESummand LPEParamUsage        -- paramUsagePerSummand
+                     -> Map.Map VarId [VarId]                   -- belongsToRelation
+                     -> Set.Set (VarId, VarId, TxsDefs.VExpr)   -- relevanceRelation
+                     -> LPESummand                              -- summand
+                     -> LPESummand                              -- result
+resetParamsInSummand _initParamEqs _paramUsagePerSummand _belongsToRelation _relevanceRelation (summand@(LPESummand _ _ LPEStop)) = summand
+resetParamsInSummand initParamEqs paramUsagePerSummand belongsToRelation relevanceRelation summand@(LPESummand channelOffers guard (LPEProcInst paramEqs)) =
+    LPESummand channelOffers guard (LPEProcInst (map resetParam paramEqs))
+  where
+    paramUsage :: LPEParamUsage
+    paramUsage = extractParamUsage summand paramUsagePerSummand
+    
+    resetParam :: LPEParamEq -> LPEParamEq
+    resetParam (p, v) =
+        let requiredElements = Set.fromList (
+                                 concat [
+                                   [ (dk, dj, extractVExprFromMap dj (paramDestinations paramUsage)) | dj <- djs, dj `elem` (rulingParams paramUsage) ]
+                                 | (dk, djs) <- Map.toList belongsToRelation ]
+                               ) in
+          if (Set.intersection relevanceRelation requiredElements) == requiredElements
+          then (p, extractVExprFromParamEqs p initParamEqs)
+          else (p, v)
+-- resetParamsInSummand
 
 repeatUntilFixpoint :: Eq t => (t -> t) -> t -> t
 repeatUntilFixpoint f i = let i' = f i in if i == i' then i else repeatUntilFixpoint f i'
@@ -59,7 +77,7 @@ updateRelevanceRelation :: Map.Map LPESummand LPEParamUsage                     
                         -> Map.Map VarId [(TxsDefs.VExpr, LPESummand, TxsDefs.VExpr)]   -- controlFlowGraphs
                         -> Map.Map VarId [VarId]                                        -- belongsToRelation
                         -> Set.Set (VarId, VarId, TxsDefs.VExpr)                        -- relevanceRelationSoFar
-                        -> Set.Set (VarId, VarId, TxsDefs.VExpr)                        -- newRelevanceRelation
+                        -> Set.Set (VarId, VarId, TxsDefs.VExpr)                        -- result
 updateRelevanceRelation paramUsagePerSummand controlFlowGraphs belongsToRelation relevanceRelationSoFar =
     let update1 = concat [
                     concat [
@@ -110,8 +128,8 @@ getControlFlowGraphs (x:xs) paramUsagePerSummand =
     
     constructEdgeFromRulingPar :: VarId -> (VarId, [(TxsDefs.VExpr, LPESummand, TxsDefs.VExpr)])
     constructEdgeFromRulingPar rulingPar =
-        let paramSource = extractParamSource rulingPar (paramSources paramUsage) in
-        let paramDestination = extractParamDestination rulingPar (paramDestinations paramUsage) in
+        let paramSource = extractVExprFromMap rulingPar (paramSources paramUsage) in
+        let paramDestination = extractVExprFromMap rulingPar (paramDestinations paramUsage) in
           (rulingPar, [(paramSource, x, paramDestination)])
 -- getControlFlowGraphs
 
@@ -132,32 +150,4 @@ getControlFlowParams summands paramUsagePerSummand params =
         let unchanged = not (v `elem` (changedParams paramUsage)) in
           (ruling || unchanged) && (isRulingOrUnchangedInAllSummands xs v)
 -- getControlFlowParams
-
-resetParamsInSummand :: LPEInstance -> [(LPESummand, [LPESummand], [VarId])] -> LPESummand -> IOC.IOC LPESummand
-resetParamsInSummand _ _ (summand@(LPESummand _ _ LPEStop)) = do return summand
-resetParamsInSummand (_, initParamEqs, summands) successorsPerSummand summand@(LPESummand channelOffers guard (LPEProcInst paramEqs)) =
-    case [ (sucs, uvars) | (smd, sucs, uvars) <- successorsPerSummand, smd == summand ] of
-      [(sucs, uvars)] -> if (length uvars) == (length initParamEqs)
-                         then do return summand
-                         else do let substConstraint = cstrAnd (Set.fromList (guard:(map (\(LPESummand _ g _) -> cstrNot (varSubst paramEqs g)) [smd | smd <- summands, not (smd `elem` sucs)])))
-                                 sol <- getSomeSolution substConstraint (map fst initParamEqs)
-                                 case sol of
-                                   Just solMap -> do let newParamEqs = [ (p, if p `elem` uvars then v else (Map.findWithDefault v p solMap)) | (p, v) <- paramEqs ]
-                                                     let zippedEqs = filter (\(eq1, _) -> not ((fst eq1) `elem` uvars)) (zip paramEqs newParamEqs)
-                                                     let Just summandNumber = (List.elemIndex summand summands)
-                                                     Monad.mapM_ (\((p, v), (_, w)) -> IOC.putMsgs [ EnvData.TXS_CORE_ANY ("\t" ++ (Text.unpack (VarId.name p)) ++ " := " ++ (showValExpr w) ++ " instead of " ++ (showValExpr v) ++ " in " ++ (numberToString (summandNumber + 1)) ++ " summand") ]) zippedEqs
-                                                     return (LPESummand channelOffers guard (LPEProcInst newParamEqs))
-                                   Nothing -> do return summand
-      _ -> do return summand
-  where
-    numberToString :: Int -> String
-    numberToString number =
-        (show number) ++
-        (case number `mod` 10 of
-          1 -> "st"
-          2 -> "nd"
-          3 -> "rd"
-          _ -> "th")
--- resetParamsInSummand
-
 
