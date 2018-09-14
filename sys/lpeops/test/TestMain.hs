@@ -12,6 +12,7 @@ import Test.HUnit
 import TestConstElm
 import TestParElm
 import TestParReset
+import TestParReset2
 import TestConfCheck
 
 testList :: Test
@@ -22,6 +23,7 @@ testList = TestList
     , TestLabel "parElmBasic"              testParElmBasic
     , TestLabel "parElmXUpperBound"        testParElmXUpperBound
     , TestLabel "parResetBasic"            testParResetBasic
+    , TestLabel "parReset2Basic"            testParReset2Basic
     , TestLabel "confCheckBasic"           testConfCheckBasic
     , TestLabel "confElmNoChange"          testConfElmNoChange
     , TestLabel "confElmBasic"             testConfElmBasic

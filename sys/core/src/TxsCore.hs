@@ -187,6 +187,7 @@ import qualified LPEMkUniq
 import qualified LPEConstElm
 import qualified LPEParElm
 import qualified LPEParReset
+import qualified LPEParReset2
 import qualified LPEConfCheck
 
 -- import from valexpr
@@ -1205,6 +1206,7 @@ txsLPEOp opName (modelId1@(TxsDefs.ModelId _modname _moduid)) modelId2 = do
                         "cstelm" -> do return $ Just LPEConstElm.constElm
                         "parelm" -> do return $ Just LPEParElm.parElm
                         "parreset" -> do return $ Just LPEParReset.parReset
+                        "parreset2" -> do return $ Just LPEParReset2.parReset2
                         "confelm" -> do return $ Just LPEConfCheck.confElm
                         _ -> do IOC.putMsgs [ EnvData.TXS_CORE_SYSTEM_ERROR ("Unknown LPE operation (" ++ opName ++ ")!") ]
                                 return Nothing

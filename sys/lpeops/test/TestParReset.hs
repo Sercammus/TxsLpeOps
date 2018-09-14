@@ -36,7 +36,7 @@ import TestUtils
 parResetFunc :: LPEInstance -> IO (Maybe LPEInstance)
 parResetFunc lpeInstance = do
     env <- createTestEnvC
-    evalStateT (parReset lpeInstance) env
+    evalStateT (parReset lpeInstance vexprTrue) env
 -- parResetFunc
 
 testParResetBasic :: Test

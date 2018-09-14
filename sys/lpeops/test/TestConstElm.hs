@@ -36,7 +36,7 @@ import TestUtils
 constElmFunc :: LPEInstance -> IO (Maybe LPEInstance)
 constElmFunc lpeInstance = do
     env <- createTestEnvC
-    evalStateT (constElm lpeInstance) env
+    evalStateT (constElm lpeInstance vexprTrue) env
 -- constElmFunc
 
 testConstElmBasic :: Test
