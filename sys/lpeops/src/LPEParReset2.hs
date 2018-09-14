@@ -33,8 +33,6 @@ import           Satisfiability
 import           ValExprPrettyPrint
 import           VarId
 import           ValExpr
-import           VarFactory
-import Constant hiding (sort)
 
 parReset2 :: LPEOperation
 parReset2 lpeInstance@((_channels, paramEqs, summands)) invariant = do
@@ -44,13 +42,54 @@ parReset2 lpeInstance@((_channels, paramEqs, summands)) invariant = do
     let dataParams = params List.\\ controlFlowParams
     let controlFlowGraphs = Map.restrictKeys (getControlFlowGraphs summands paramUsagePerSummand) (Set.fromList controlFlowParams)
     let belongsToRelation = getBelongsToRelation summands paramUsagePerSummand controlFlowParams dataParams
-    
+    let initialRelevanceRelation = concat [
+                                     concat [
+                                       [ (dk, dj, s) | (dj', s) <- Map.toList (paramSources paramUsage), dj' == dj ]
+                                     | dj <- djs, paramUsage <- Map.elems paramUsagePerSummand, dk `elem` (directlyUsedParams paramUsage) ]
+                                   | (dk, djs) <- Map.toList belongsToRelation ]
+    let relevanceRelation = repeatUntilFixpoint (updateRelevanceRelation paramUsagePerSummand controlFlowGraphs belongsToRelation) (Set.fromList initialRelevanceRelation)
+      
     return (Just lpeInstance)
 -- parReset2
 
+repeatUntilFixpoint :: Eq t => (t -> t) -> t -> t
+repeatUntilFixpoint f i = let i' = f i in if i == i' then i else repeatUntilFixpoint f i'
+
+updateRelevanceRelation :: Map.Map LPESummand LPEParamUsage                             -- paramUsagePerSummand
+                        -> Map.Map VarId [(TxsDefs.VExpr, LPESummand, TxsDefs.VExpr)]   -- controlFlowGraphs
+                        -> Map.Map VarId [VarId]                                        -- belongsToRelation
+                        -> Set.Set (VarId, VarId, TxsDefs.VExpr)                        -- relevanceRelationSoFar
+                        -> Set.Set (VarId, VarId, TxsDefs.VExpr)                        -- newRelevanceRelation
+updateRelevanceRelation paramUsagePerSummand controlFlowGraphs belongsToRelation relevanceRelationSoFar =
+    let update1 = concat [
+                    concat [
+                      concat [
+                        [ (dk, dj, s) | (s, i, t') <- Map.findWithDefault [] dj controlFlowGraphs, t' == t, dk `elem` (extractParamEqVars i dl) ]
+                        | (dl, dj', t) <- Set.toList relevanceRelationSoFar, dj' == dj ]
+                      | dj <- djs ]
+                    | (dk, djs) <- Map.toList belongsToRelation ] in
+    let update2 = concat [
+                    concat [
+                      concat [
+                        concat [
+                          [ (dk, dj, s) | (dj', s) <- Map.toList (paramSources (extractParamUsage i paramUsagePerSummand)), dj' == dj ]
+                        | (_r, i, t') <- Map.findWithDefault [] dp controlFlowGraphs, t' == t, dk `elem` (extractParamEqVars i dl) ]
+                      | (dl', dp, t) <- update1, dl' == dl ]
+                    | dj <- dkjs, not (dj `elem` dljs) ]
+                  | (dk, dkjs) <- Map.toList belongsToRelation, (dl, dljs) <- Map.toList belongsToRelation ] in
+      Set.union relevanceRelationSoFar (Set.fromList update2)
+-- updateRelevanceRelation
+
+extractParamEqVars :: LPESummand -> VarId -> [VarId]
+extractParamEqVars (LPESummand _channelOffers _guard LPEStop) _varId = []
+extractParamEqVars (LPESummand _channelOffers _guard (LPEProcInst paramEqs)) varId =
+    let assignmentVars = concat [ FreeVar.freeVars v | (p, v) <- paramEqs, p == varId ] in
+      List.intersect assignmentVars (map fst paramEqs)
+-- extractParamEqVars
+
 -- Determines which of the specified data parameters belong to which of the specified control flow parameters.
 -- A data parameter belongs to a control flow parameter if the data parameter is only changed in summands that are ruled by the control flow parameter.
-getBelongsToRelation :: [LPESummand] -> Map.Map LPESummand LPEParamUsage -> [VarId] -> [VarId] -> (Map.Map VarId [VarId])
+getBelongsToRelation :: [LPESummand] -> Map.Map LPESummand LPEParamUsage -> [VarId] -> [VarId] -> Map.Map VarId [VarId]
 getBelongsToRelation _summands _paramUsagePerSummand _controlFlowParams [] = Map.empty
 getBelongsToRelation summands paramUsagePerSummand controlFlowParams (d:ds) =
     let summandsWhereDChanges = Map.keys (Map.filter (\paramUsage -> d `elem` (changedParams paramUsage)) paramUsagePerSummand) in
@@ -60,7 +99,7 @@ getBelongsToRelation summands paramUsagePerSummand controlFlowParams (d:ds) =
       Map.insert d paramsThatRuleD ds'
 -- getBelongsToRelation
 
-getControlFlowGraphs :: [LPESummand] -> Map.Map LPESummand LPEParamUsage -> (Map.Map VarId [(TxsDefs.VExpr, LPESummand, TxsDefs.VExpr)])
+getControlFlowGraphs :: [LPESummand] -> Map.Map LPESummand LPEParamUsage -> Map.Map VarId [(TxsDefs.VExpr, LPESummand, TxsDefs.VExpr)]
 getControlFlowGraphs [] _paramUsagePerSummand = Map.empty
 getControlFlowGraphs (x:xs) paramUsagePerSummand =
     let newEntries = map constructEdgeFromRulingPar (rulingParams paramUsage) in
@@ -86,12 +125,12 @@ getControlFlowParams summands paramUsagePerSummand params =
     filter (isRulingOrUnchangedInAllSummands summands) params
   where
     isRulingOrUnchangedInAllSummands :: [LPESummand] -> VarId -> Bool
-    isRulingOrUnchangedInAllSummands [] v = True
+    isRulingOrUnchangedInAllSummands [] _ = True
     isRulingOrUnchangedInAllSummands (x:xs) v =
         let paramUsage = extractParamUsage x paramUsagePerSummand in
         let ruling = v `elem` (rulingParams paramUsage) in
         let unchanged = not (v `elem` (changedParams paramUsage)) in
-          ruling || unchanged
+          (ruling || unchanged) && (isRulingOrUnchangedInAllSummands xs v)
 -- getControlFlowParams
 
 resetParamsInSummand :: LPEInstance -> [(LPESummand, [LPESummand], [VarId])] -> LPESummand -> IOC.IOC LPESummand
