@@ -1012,18 +1012,17 @@ cmdLPEOp :: String -> IOS.IOS ()
 cmdLPEOp args = do
      tdefs <- lift TxsCore.txsGetTDefs
      let mdefs = TxsDefs.modelDefs tdefs
-     let (op, modelNames) = cutAfterSpace args
-     let (modelName1, modelName2) = cutAfterSpace modelNames
+     let (op, modelNamesAndInvariant) = cutAfterSpace args
+     let (modelName1, modelName2AndInvariant) = cutAfterSpace modelNamesAndInvariant
+     let (modelName2, invariantText) = cutAfterSpace modelName2AndInvariant
      case getModelNameIds mdefs modelName1 of
-       [modelId] -> case getModelNameIds mdefs modelName2 of
-                      [] -> do mayModelId' <- lift $ TxsCore.txsLPEOp op modelId modelName2
-                               case mayModelId' of
-                                 Just (modelId') -> do IFS.pack "LPEOP" [ "Operation successfully applied to LPE, resulting in " ++ (TxsShow.fshow modelId') ++ "!" ]
-                                                       cmdsIntpr
-                                 _               -> do IFS.nack "LPEOP" [ "Failed to apply LPE operation (" ++ op ++ ")!" ]
-                                                       cmdsIntpr
-                      _ -> do IFS.nack "LPEOP" [ "Model with that name already exists (" ++ modelName2 ++ ")!" ]
-                              cmdsIntpr
+       [modelId] -> do invariant <- readVExpr invariantText
+                       mayModelId' <- lift $ TxsCore.txsLPEOp op modelId modelName2 invariant
+                       case mayModelId' of
+                         Just (modelId') -> do IFS.pack "LPEOP" [ "Operation successfully applied to LPE, resulting in " ++ (TxsShow.fshow modelId') ++ "!" ]
+                                               cmdsIntpr
+                         _               -> do IFS.nack "LPEOP" [ "Failed to apply LPE operation (" ++ op ++ ")!" ]
+                                               cmdsIntpr
        _ -> do IFS.nack "LPEOP" [ "Could not find model (" ++ modelName1 ++ ")!" ]
                cmdsIntpr
   where
@@ -1114,3 +1113,28 @@ readBExpr chids args = do
 --                                                                                           --
 -- ----------------------------------------------------------------------------------------- --
 
+readVExpr :: String -> IOS.IOS TxsDefs.VExpr
+readVExpr args =
+     if args == ""
+     then do return (ValExpr.cstrConst (Constant.Cbool True))
+     else do env              <- get
+             let uid           = IOS.uid env
+                 sigs          = IOS.sigs env
+                 --vals          = IOS.locvals env
+             --tdefs            <- lift TxsCore.txsGetTDefs
+
+             ((_uid',vexp'),e) <- lift $ lift $ catch
+                                   ( let (i,p) = compileUnsafe $
+                                                 compileValExpr sigs [] (_id uid + 1) args
+                                      in return $!! ((i, Just p),"")
+                                   )
+                                   ( \e -> return ((uid, Nothing),show (e::ErrorCall)))
+
+             case vexp' of
+              Just vexp'' -> do return vexp''
+              Nothing -> do IFS.nack "ERROR" [ "incorrect value expression: " ++ e ]
+                            return (ValExpr.cstrConst (Constant.Cbool False))
+
+-- ----------------------------------------------------------------------------------------- --
+--                                                                                           --
+-- ----------------------------------------------------------------------------------------- --

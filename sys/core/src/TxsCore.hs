@@ -195,7 +195,6 @@ import qualified SortId
 import qualified SortOf
 import Constant
 import VarId
-import ValExpr
 
 -- | TorXakis core main api -- start
 runTxsCore :: Config -> StateT s IOC.IOC a -> s -> IO ()
@@ -1171,8 +1170,8 @@ txsLPE (Right modelid@(TxsDefs.ModelId modname _moduid))  =  do
 
 -- ----------------------------------------------------------------------------------------- --
 
-txsLPEOp :: String -> TxsDefs.ModelId -> String -> IOC.IOC (Maybe TxsDefs.ModelId)
-txsLPEOp opName (modelId1@(TxsDefs.ModelId _modname _moduid)) modelId2 = do
+txsLPEOp :: String -> TxsDefs.ModelId -> String -> TxsDefs.VExpr -> IOC.IOC (Maybe TxsDefs.ModelId)
+txsLPEOp opName (modelId1@(TxsDefs.ModelId modelName1 _moduid)) modelId2 invariant = do
     envc <- get
     case IOC.state envc of
       IOC.Initing {IOC.tdefs = tdefs} ->
@@ -1181,7 +1180,7 @@ txsLPEOp opName (modelId1@(TxsDefs.ModelId _modname _moduid)) modelId2 = do
             -> do maybeOpFunc <- getLPEOperation
                   case maybeOpFunc of
                     Just opFunc -> do
-                      manipulatedLPE <- LPEOps.lpeOperation opFunc bexpr (cstrConst (Cbool True)) (T.pack ("LPE_" ++ modelId2))
+                      manipulatedLPE <- LPEOps.lpeOperation opFunc bexpr invariant (T.pack ("LPE_" ++ modelId2))
                       case manipulatedLPE of
                         Just (newProcInst, newProcId, newProcDef) ->
                           do newModelUid <- IOC.newUnid
@@ -1194,7 +1193,7 @@ txsLPEOp opName (modelId1@(TxsDefs.ModelId _modname _moduid)) modelId2 = do
                              return (Just newModelId)
                         Nothing -> do return Nothing
                     Nothing -> do return Nothing
-          _ -> do IOC.putMsgs [ EnvData.TXS_CORE_SYSTEM_ERROR "LPE: model not defined" ]
+          _ -> do IOC.putMsgs [ EnvData.TXS_CORE_SYSTEM_ERROR ("LPE: model \"" ++ (T.unpack modelName1) ++ "\" was not found") ]
                   return Nothing
       _ -> do IOC.putMsgs [ EnvData.TXS_CORE_SYSTEM_ERROR "LPE: only allowed if initialized" ]
               return Nothing

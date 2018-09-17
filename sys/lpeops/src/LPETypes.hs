@@ -94,15 +94,6 @@ typeCheckParams _ [] = False
 typeCheckParams [] _ = False
 typeCheckParams (x:params) (y:paramValues) = ((SortOf.sortOf x) == (SortOf.sortOf y)) && (typeCheckParams params paramValues)
 
--- -- Helper function.
--- -- Folds a number of objects, unless one of them equals Nothing:
--- foldMaybes :: Foldable t => (b -> a -> Maybe b) -> b -> t a -> Maybe b
--- foldMaybes f x y = foldl f' (Just x) y
-  -- where
-    -- f' (Just x') y' = f x' y'
-    -- f' _ _ = Nothing
--- -- foldMaybes
-
 -- Helper function.
 -- Maps a number of objects, unless for one of them the mapping yields Nothing:
 mapMaybesM :: Monad m => (a -> m (Maybe b)) -> [a] -> m (Maybe [b])
@@ -115,6 +106,8 @@ mapMaybesM f x = Monad.foldM f' (Just []) x
     f' _ _ = do return Nothing
 -- mapMaybesM
 
+-- Helper function.
+-- Concatenates a number of lists, unless one of them equals Nothing:
 concatMaybesM :: Monad m => m (Maybe [[t]]) -> m (Maybe [t])
 concatMaybesM x = do x' <- x
                      case x' of
