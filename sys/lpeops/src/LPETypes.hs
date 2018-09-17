@@ -32,6 +32,7 @@ fromLPEInstance
 
 import           Control.Monad.State
 import qualified Control.Monad as Monad
+import qualified Data.List as List
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -133,7 +134,8 @@ toLPEInstance procInst = do
                                                                           Nothing -> Nothing)
                                                                 else do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("toLPEInstance: parameter mismatch " ++ (show procId)) ]
                                                                         return Nothing
-            _ -> do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("toLPEInstance: undefined process " ++ (show procId)) ]
+            _ -> do let definedProcessNames = List.intercalate ", " (map (Text.unpack . ProcId.name) (Map.keys procDefs))
+                    IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("toLPEInstance: undefined process " ++ (show (Text.unpack (ProcId.name procId))) ++ " (defined processes are {" ++ definedProcessNames ++ "})") ]
                     return Nothing
           _ -> do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("toLPEInstance: expression must be process instantiation, found " ++ (TxsShow.fshow (TxsDefs.view procInst))) ]
                   return Nothing
@@ -191,7 +193,7 @@ fromLPEInstance :: LPEInstance -> Name -> IOC.IOC (TxsDefs.BExpr, TxsDefs.ProcId
 fromLPEInstance (chans, paramEqs, summands) procName = do
     let newProcParams = map fst paramEqs
     newProcUnid <- IOC.newUnid
-    let newProcId = TxsDefs.ProcId { ProcId.name = Text.pack (Text.unpack procName)
+    let newProcId = TxsDefs.ProcId { ProcId.name = procName
                                    , ProcId.unid = newProcUnid
                                    , ProcId.procchans = map (ProcId.ChanSort . ChanId.chansorts) chans
                                    , ProcId.procvars = map (VarId.varsort) newProcParams
@@ -215,9 +217,5 @@ fromLPEInstance (chans, paramEqs, summands) procName = do
       fromOfferToOffer :: LPEChannelOffer -> TxsDefs.Offer
       fromOfferToOffer (chanId, chanVars) = TxsDefs.Offer { TxsDefs.chanid = chanId, TxsDefs.chanoffers = [TxsDefs.Quest var | var <- chanVars] }
 -- fromLPEInstance
-
-
-
-
 
 

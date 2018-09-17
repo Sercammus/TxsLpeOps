@@ -6,12 +6,15 @@ See LICENSE at root directory of this repository.
 module TestUtils
 (
 createTestEnvC,
-printInputExpectedFound
+printInputExpectedFound,
+validateLPEInstance
 )
 where
- 
+
+import Test.HUnit
 import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Text as Text
 import qualified EnvData
 import Control.Monad.State
 import TxsDefs
@@ -64,4 +67,23 @@ printInputExpectedFound input expected found =
     "\n\nExpected output:\n\n" ++ (showLPEInstance expected) ++
     "\n\nActual output:\n\n" ++ (showLPEInstance found) ++ "\n"
 -- printInputExpectedFound
+
+validateLPEInstance' :: LPEInstance -> IOC.IOC ()
+validateLPEInstance' lpeInstance = do
+    (procInit, newProcId, newProcDef) <- fromLPEInstance lpeInstance (Text.pack "LPE")
+    tdefs <- gets (IOC.tdefs . IOC.state)
+    let tdefs' = tdefs { TxsDefs.procDefs = Map.insert newProcId newProcDef (TxsDefs.procDefs tdefs) }
+    IOC.modifyCS $ \st -> st { IOC.tdefs = tdefs' }
+    lpeInstance' <- toLPEInstance procInit
+    case lpeInstance' of
+      Just _ -> do return ()
+      Nothing -> do liftIO $ assertBool ("\nInvalid LPE input:\n\n" ++ (showLPEInstance lpeInstance) ++ "\n") False
+-- validateLPEInstance
+
+validateLPEInstance :: LPEInstance -> IO ()
+validateLPEInstance lpeInstance = do
+    env <- createTestEnvC
+    evalStateT (validateLPEInstance' lpeInstance) env
+-- validateLPEInstance
+
 

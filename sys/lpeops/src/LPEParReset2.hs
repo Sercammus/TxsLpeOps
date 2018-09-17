@@ -63,11 +63,11 @@ resetParamsInSummand initParamEqs paramUsagePerSummand belongsToRelation relevan
         let requiredElements = Set.fromList (
                                  concat [
                                    [ (dk, dj, extractVExprFromMap dj (paramDestinations paramUsage)) | dj <- djs, dj `elem` (rulingParams paramUsage) ]
-                                 | (dk, djs) <- Map.toList belongsToRelation ]
+                                 | (dk, djs) <- Map.toList belongsToRelation, dk == p ]
                                ) in
           if (Set.intersection relevanceRelation requiredElements) == requiredElements
-          then (p, extractVExprFromParamEqs p initParamEqs)
-          else (p, v)
+          then (p, v)
+          else (p, extractVExprFromParamEqs p initParamEqs)
 -- resetParamsInSummand
 
 repeatUntilFixpoint :: Eq t => (t -> t) -> t -> t
