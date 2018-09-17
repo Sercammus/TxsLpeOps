@@ -6,7 +6,7 @@ See LICENSE at root directory of this repository.
 
 -----------------------------------------------------------------------------
 -- |
--- Module      :  ValExprVisitor
+-- Module      :  LPEPrettyPrint
 -- Copyright   :  TNO and University of Twente
 -- License     :  BSD3
 -- Maintainer  :  djurrevanderwal@gmail.com
@@ -16,22 +16,29 @@ See LICENSE at root directory of this repository.
 
 {-# LANGUAGE ViewPatterns        #-}
 {-# LANGUAGE FlexibleContexts    #-}
-module ValExprPrettyPrint (
-showValExpr
+module LPEPrettyPrint (
+showValExpr,
+showLPEChannelOffer,
+showLPEParamEq,
+showLPESummand,
+showLPEInstance
 ) where
 
+import qualified Data.List as List
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified FreeMonoidX as FMX
 import Constant hiding (sort)
 import VarId
 import ValExpr
+import qualified TxsDefs
 import qualified FuncId
 import qualified CstrId
 import qualified SortId
+import qualified ChanId
+import LPETypes
 
--- Visits all sub-expressions of a (data) expression, and applies a function to them.
-showValExpr :: ValExpr VarId -> String
+showValExpr :: TxsDefs.VExpr -> String
 showValExpr      (view -> Vconst (Cbool val))      = show val
 showValExpr      (view -> Vconst (Cint val))       = show val
 showValExpr      (view -> Vconst (Cstring val))    = show val
@@ -67,7 +74,7 @@ showValExpr      (view -> Vconcat vexps)           = let newVExps = map showValE
 showValExpr      (view -> Vstrinre s r)            = "regex(" ++ (showValExpr s) ++ ", " ++ (showValExpr r) ++ ")"
 -- showValExpr      (view -> Vpredef kd fid vexps)    = let newVExps = map showValExpr vexps
 --                                                        cstrPredef kd fid newVExps
-showValExpr expr                                   = error ("ValExprPrettyPrint.showValExpr not defined for " ++ (show expr))
+showValExpr expr                                   = error ("LPEPrettyPrint.showValExpr not defined for " ++ (show expr))
 -- showValExpr
 
 separatedList :: [String] -> String -> String
@@ -75,8 +82,39 @@ separatedList [] _ = ""
 separatedList [x] _ = x
 separatedList (x1:x2:xs) separator = x1 ++ separator ++ (separatedList (x2:xs) separator)
 
-visitcOccur :: (ValExpr VarId, Integer) -> String
+visitcOccur :: (TxsDefs.VExpr, Integer) -> String
 visitcOccur (v, 1) = showValExpr v
 visitcOccur (v, n) = (showValExpr v) ++ " times " ++ (show n)
+
+showLPEChannelOffer :: LPEChannelOffer -> String
+showLPEChannelOffer (chanId, vars) = (Text.unpack (ChanId.name chanId)) ++ (concat (map (\v -> " ? " ++ (Text.unpack (VarId.name v))) vars))
+
+showLPEChannelOffers :: LPEChannelOffers -> String
+showLPEChannelOffers [] = ""
+showLPEChannelOffers channelOffers = (List.intercalate " | " (map showLPEChannelOffer channelOffers)) ++ " "
+
+showLPEParamEq :: LPEParamEq -> String
+showLPEParamEq (varId, expr) = (Text.unpack (VarId.name varId)) ++ " = " ++ (showValExpr expr)
+
+showLPESummand :: LPESummand -> String
+showLPESummand (LPESummand channelOffers guard LPEStop) =
+    (showLPEChannelOffers channelOffers) ++ "[[ " ++ (showValExpr guard) ++ " ]] >-> STOP"
+showLPESummand (LPESummand channelOffers guard (LPEProcInst paramEqs)) =
+    (showLPEChannelOffers channelOffers) ++ "[[ " ++ (showValExpr guard) ++ " ]] >-> LPE(" ++ (List.intercalate ", " (map showLPEParamEq paramEqs)) ++ ")"
+-- showLPESummand
+
+showChanDecl :: ChanId.ChanId -> String
+showChanDecl chanId =
+    let chanSortStrings = map (\chansort -> Text.unpack (SortId.name chansort)) (ChanId.chansorts chanId) in
+      (Text.unpack (ChanId.name chanId)) ++ " :: " ++ (List.intercalate " # " chanSortStrings)
+-- showChanDecl
+
+showLPEInstance :: LPEInstance -> String
+showLPEInstance (chanIds, initParamEqs, summands) =
+    "LPE[" ++ (List.intercalate "; " (map showChanDecl chanIds)) ++ "] (" ++
+    (List.intercalate ", " (map showLPEParamEq initParamEqs)) ++ ") ::=\n        " ++
+    (List.intercalate "\n     ## " (map showLPESummand summands)) ++ "\n;"
+-- showLPEInstance
+
 
 

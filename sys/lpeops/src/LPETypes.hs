@@ -31,25 +31,27 @@ fromLPEInstance
 ) where
 
 import           Control.Monad.State
-import qualified Data.Map            as Map
-import qualified Data.Set            as Set
-import qualified Data.Text           as Text
-import qualified EnvCore             as IOC
+import qualified Control.Monad as Monad
+import qualified Data.Map as Map
+import qualified Data.Set as Set
+import qualified Data.Text as Text
+import qualified EnvCore as IOC
 import qualified EnvData
 import qualified SortOf
 import qualified TxsDefs
 import qualified TxsShow
+import qualified ProcId
 import           VarId
 import           ChanId
 import           Name
-import qualified ProcId
 import           Constant
 import           ValExpr
 
 -- Type around which this module revolves.
 -- It consists of the following parts:
---  - Parameters the LPE and their initial values, coupled in pairs;
---  - Information per summand of the LPE.
+--  - Channels used by the LPE.
+--  - Parameters used by the LPE and their initial values, coupled in pairs.
+--  - Contents of each summand of the LPE.
 type LPEInstance = ([TxsDefs.ChanId], LPEParamEqs, LPESummands)
 
 -- Main building block of an LPE.
@@ -84,93 +86,109 @@ extractVExprFromMap varId m = Map.findWithDefault (cstrConst (Cany (SortOf.sortO
 extractVExprFromParamEqs :: VarId -> LPEParamEqs -> TxsDefs.VExpr
 extractVExprFromParamEqs varId paramEqs = extractVExprFromMap varId (Map.fromList paramEqs)
 
--- Exposed method.
+-- Helper function.
+-- Checks if the types of the specified variables and values match.
+typeCheckParams :: [VarId] -> [TxsDefs.VExpr] -> Bool
+typeCheckParams [] [] = True
+typeCheckParams _ [] = False
+typeCheckParams [] _ = False
+typeCheckParams (x:params) (y:paramValues) = ((SortOf.sortOf x) == (SortOf.sortOf y)) && (typeCheckParams params paramValues)
+
+-- -- Helper function.
+-- -- Folds a number of objects, unless one of them equals Nothing:
+-- foldMaybes :: Foldable t => (b -> a -> Maybe b) -> b -> t a -> Maybe b
+-- foldMaybes f x y = foldl f' (Just x) y
+  -- where
+    -- f' (Just x') y' = f x' y'
+    -- f' _ _ = Nothing
+-- -- foldMaybes
+
+-- Helper function.
+-- Maps a number of objects, unless for one of them the mapping yields Nothing:
+mapMaybesM :: Monad m => (a -> m (Maybe b)) -> [a] -> m (Maybe [b])
+mapMaybesM f x = Monad.foldM f' (Just []) x
+  where
+    f' (Just soFar) x' = do x'' <- f x'
+                            case x'' of
+                              Just x''' -> do return (Just (soFar ++ [x''']))
+                              Nothing -> do return Nothing
+    f' _ _ = do return Nothing
+-- mapMaybesM
+
+concatMaybesM :: Monad m => m (Maybe [[t]]) -> m (Maybe [t])
+concatMaybesM x = do x' <- x
+                     case x' of
+                       Just x'' -> do return (Just (concat x''))
+                       Nothing -> do return Nothing
+-- concatMaybesM
+
+-- Exposed function.
 -- Constructs an LPEInstance from a process expression (unless there is a problem).
 -- The process expression should be the instantiation of a process that is already linear.
-toLPEInstance :: TxsDefs.BExpr                 -- Process instantiation; must be a closed expression!
-               -> IOC.IOC (Maybe LPEInstance)  -- Instance.
+toLPEInstance :: TxsDefs.BExpr                 -- Process instantiation.
+               -> IOC.IOC (Maybe LPEInstance)  -- Instance (unless there is a problem).
 toLPEInstance procInst = do
     envc <- get
     case IOC.state envc of
       IOC.Initing { IOC.tdefs = tdefs } -> let procDefs = TxsDefs.procDefs tdefs in
         case TxsDefs.view procInst of
           TxsDefs.ProcInst procId _chans paramValues -> case Map.lookup procId procDefs of
-            Just procDef@(TxsDefs.ProcDef chans params _) -> do maybeSummands <- getLPESummands procId procDef
-                                                                return (case maybeSummands of
-                                                                  Just summands -> Just (chans, zip params paramValues, Set.toList (Set.fromList summands))
-                                                                  _ -> Nothing)
-            _ -> do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("toLPEInstance: undefined process definition " ++ (show procId)) ]
+            Just procDef@(TxsDefs.ProcDef chans params body) -> if typeCheckParams params paramValues
+                                                                then do maybeSummands <- getLPESummands procId procDef body
+                                                                        return (case maybeSummands of
+                                                                          Just summands -> Just (chans, zip params paramValues, Set.toList (Set.fromList summands))
+                                                                          Nothing -> Nothing)
+                                                                else do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("toLPEInstance: parameter mismatch " ++ (show procId)) ]
+                                                                        return Nothing
+            _ -> do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("toLPEInstance: undefined process " ++ (show procId)) ]
                     return Nothing
-          _ -> do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("toLPEInstance: only defined for process instantiation, found " ++ (TxsShow.fshow (TxsDefs.view procInst))) ]
+          _ -> do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("toLPEInstance: expression must be process instantiation, found " ++ (TxsShow.fshow (TxsDefs.view procInst))) ]
                   return Nothing
       _ -> do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR "toLPEInstance: only allowed if initialized" ]
               return Nothing
 -- toLPEInstance
 
--- Helper method.
--- Constructs an LPESummand for each summand in an LPE process.
-getLPESummands :: TxsDefs.ProcId               -- Id of the linear process (summands may only instantiate this process).
-               -> TxsDefs.ProcDef              -- Definition of the linear process (body is analyzed).
-               -> IOC.IOC (Maybe LPESummands)  -- List of summands (unless there is a problem).
-getLPESummands expectedProcId expectedProcDef@(TxsDefs.ProcDef _ _ (TxsDefs.view -> TxsDefs.Choice summands)) = getLPESummandIterator expectedProcId expectedProcDef (Set.toList summands)
-getLPESummands expectedProcId expectedProcDef@(TxsDefs.ProcDef _ _ summand) = getLPESummandIterator expectedProcId expectedProcDef [summand]
-
--- Helper method.
--- Constructs LPESummands from a number of process expressions.
-getLPESummandIterator :: TxsDefs.ProcId               -- Id of the linear process (summands may only instantiate this process).
-                      -> TxsDefs.ProcDef              -- Definition of the linear process (allows instantiation parameters to be checked).
-                      -> [TxsDefs.BExpr]              -- List of expressions that must correspond with summands.
-                      -> IOC.IOC (Maybe LPESummands)  -- List of summands (unless there is a problem).
-getLPESummandIterator _ _ [] = do return (Just [])
-getLPESummandIterator expectedProcId expectedProcDef@(TxsDefs.ProcDef _ params _) (summand:xs) = do
-    -- Only two types of summands are valid, stop summands and linear summands:
-    case TxsDefs.view summand of
-      TxsDefs.Choice choices -> if choices == Set.empty
-                                then do maybeOtherSummands <- getLPESummandIterator expectedProcId expectedProcDef xs
-                                        return (case maybeOtherSummands of
-                                          Just otherSummands -> Just ((LPESummand [] (cstrConst (Cbool True)) LPEStop):otherSummands)
-                                          _ -> Nothing)
-                                else do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("getLPESummandIterator: invalid LPE instantiation, found " ++ (TxsShow.fshow (TxsDefs.view summand))) ]
-                                        return Nothing
-      TxsDefs.ActionPref (TxsDefs.ActOffer { TxsDefs.offers = offers, TxsDefs.constraint = constraint }) procInst -> case TxsDefs.view procInst of
-        TxsDefs.ProcInst procId _chans paramValues -> if (procId == expectedProcId) && (True) -- TODO check types of param values, channels!
-                                                      then do maybeChannelOffers <- getChannelOffers (Set.toList offers)
-                                                              case maybeChannelOffers of
-                                                                Just channelOffers -> do maybeOtherSummands <- getLPESummandIterator expectedProcId expectedProcDef xs
-                                                                                         return (case maybeOtherSummands of
-                                                                                           Just otherSummands -> Just ((LPESummand channelOffers constraint (LPEProcInst (zip params paramValues))):otherSummands)
-                                                                                           _ -> Nothing)
-                                                                _ -> do return Nothing
-                                                      else do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("getLPESummandIterator: invalid LPE instantiation, found " ++ (TxsShow.fshow (TxsDefs.view procInst))) ]
-                                                              return Nothing
-        _ -> do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("getLPESummandIterator: invalid LPE instantiation, found " ++ (TxsShow.fshow (TxsDefs.view procInst))) ]
-                return Nothing
-      _ -> do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("getLPESummandIterator: invalid summand format, found " ++ (TxsShow.fshow (TxsDefs.view summand))) ]
+-- Helper function.
+-- Constructs one or more summands from a TXS process expression (unless there is a problem).
+getLPESummands :: TxsDefs.ProcId -> TxsDefs.ProcDef -> TxsDefs.BExpr -> IOC.IOC (Maybe LPESummands)
+getLPESummands expectedProcId expectedProcDef@(TxsDefs.ProcDef defChanIds params _body) expr = do
+    case TxsDefs.view expr of
+      TxsDefs.Choice choices -> if choices == Set.empty -- (An 'empty choice' is equivalent to STOP.)
+                                then do return (Just [LPESummand [] (cstrConst (Cbool True)) LPEStop])
+                                else concatMaybesM (mapMaybesM (getLPESummands expectedProcId expectedProcDef) (Set.toList choices))
+      TxsDefs.ActionPref (TxsDefs.ActOffer { TxsDefs.offers = offers, TxsDefs.constraint = constraint }) procInst ->
+        case TxsDefs.view procInst of
+          TxsDefs.ProcInst procId chanIds paramValues ->
+            if (procId == expectedProcId) && (chanIds == defChanIds) && (typeCheckParams params paramValues)
+            then do maybeChannelOffers <- mapMaybesM (getChannelOffer params) (Set.toList offers)
+                    case maybeChannelOffers of
+                      Just channelOffers -> do return (Just [LPESummand channelOffers constraint (LPEProcInst (zip params paramValues))])
+                      Nothing -> do return Nothing
+            else do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("toLPEInstance: mismatching instantiation in " ++ (TxsShow.fshow (TxsDefs.view procInst))) ]
+                    return Nothing
+          _ -> do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("toLPEInstance: expected ProcInst, but found " ++ (TxsShow.fshow (TxsDefs.view procInst))) ]
+                  return Nothing
+      _ -> do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("toLPEInstance: expected Choice or ActionPref, but found " ++ (TxsShow.fshow (TxsDefs.view expr))) ]
               return Nothing
--- getLPESummandIterator
+-- getLPESummands
 
 -- Helper method.
 -- Extracts an LPEChannelOffer for each channel offer (unless there is a problem).
-getChannelOffers :: [TxsDefs.Offer] -> IOC.IOC (Maybe LPEChannelOffers)
-getChannelOffers [] = do return (Just [])
-getChannelOffers (TxsDefs.Offer { TxsDefs.chanid = chanid, TxsDefs.chanoffers = chanoffers }:xs) = do
-    maybeOfferVariables <- getOfferVariables chanoffers
-    case maybeOfferVariables of
-      Just vars -> do maybeOtherOffers <- getChannelOffers xs
-                      return (case maybeOtherOffers of
-                        Just otherOffers -> Just ((chanid, vars):otherOffers)
-                        _ -> Nothing)
-      _ -> return Nothing
-    where
-      getOfferVariables :: [TxsDefs.ChanOffer] -> IOC.IOC (Maybe [VarId])
-      getOfferVariables [] = return (Just [])
-      getOfferVariables (v:vs) = case v of
-          TxsDefs.Quest var -> do maybeOtherVars <- getOfferVariables vs
-                                  return (case maybeOtherVars of
-                                    Just otherVars -> Just (var:otherVars)
-                                    _ -> Nothing)
-          _ -> do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("getOfferVariables: invalid channel offer variable found, found " ++ (TxsShow.fshow v)) ]
-                  return Nothing
+getChannelOffer :: [VarId] -> TxsDefs.Offer -> IOC.IOC (Maybe LPEChannelOffer)
+getChannelOffer params (TxsDefs.Offer { TxsDefs.chanid = chanid, TxsDefs.chanoffers = chanoffers }) = do
+    offers <- mapMaybesM mapOffer chanoffers
+    case offers of
+      Just offerVars -> do return (Just (chanid, offerVars))
+      Nothing -> do return Nothing
+  where
+    mapOffer :: TxsDefs.ChanOffer -> IOC.IOC (Maybe VarId)
+    mapOffer (TxsDefs.Quest varId) =
+        if varId `elem` params -- The channel variable should be fresh!
+        then do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("toLPEInstance: channel variable should be fresh, found " ++ (TxsShow.fshow varId)) ]
+                return Nothing
+        else do return (Just varId)
+    mapOffer chanOffer = do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("toLPEInstance: invalid channel format, found " ++ (TxsShow.fshow chanOffer)) ]
+                            return Nothing
 -- getChannelOffers
 
 -- Exposed method.
@@ -188,7 +206,7 @@ fromLPEInstance (chans, paramEqs, summands) procName = do
     let newProcInit = TxsDefs.procInst newProcId chans (map snd paramEqs)
     let newProcDef = TxsDefs.ProcDef chans newProcParams (TxsDefs.choice (Set.fromList (summandIterator summands newProcId)))
     return (newProcInit, newProcId, newProcDef)
-    where
+  where
       -- Constructs a process expression from a summand:
       summandIterator :: [LPESummand] -> TxsDefs.ProcId -> [TxsDefs.BExpr]
       summandIterator [] _ = []

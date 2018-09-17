@@ -19,15 +19,15 @@ library
                     , LPEMkUniq
                     , LPEConstElm
                     , LPEParElm
-                    , LPEParRemoval
                     , LPEParReset
                     , LPEParReset2
-                    , LPEParUsage
                     , LPETypes
                     , LPEConfCheck
+                    , LPEParRemoval
+                    , LPEParUsage
+                    , LPEPrettyPrint
                     , Satisfiability
                     , ValExprVisitor
-                    , ValExprPrettyPrint
                     , VarFactory
 
   other-modules:      
@@ -60,15 +60,15 @@ test-suite lpeops-test
                       , LPEMkUniq
                       , LPEConstElm
                       , LPEParElm
-                      , LPEParRemoval
                       , LPEParReset
                       , LPEParReset2
-                      , LPEParUsage
                       , LPETypes
                       , LPEConfCheck
+                      , LPEParRemoval
+                      , LPEParUsage
+                      , LPEPrettyPrint
                       , Satisfiability
                       , ValExprVisitor
-                      , ValExprPrettyPrint
                       , VarFactory
                       , TestUtils
                       , TestConstElm

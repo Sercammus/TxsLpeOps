@@ -31,10 +31,6 @@ import ValExpr
 import FuncDef
 import FuncId
 
--- import Control.Monad as Monad
--- import ValExprPrettyPrint
--- import Control.Monad.State
-
 -- Function that applies a visitor pattern to the given value expression.
 -- Children are always evaluated before the parent, and the result is a composition
 -- that is dependent on the evaluated children and the parent.

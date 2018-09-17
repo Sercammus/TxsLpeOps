@@ -6,9 +6,6 @@ See LICENSE at root directory of this repository.
 module TestUtils
 (
 createTestEnvC,
-splitString,
-splitPrint,
-printSideBySide,
 printInputExpectedFound
 )
 where
@@ -26,6 +23,7 @@ import qualified Config
 import qualified EnvCore as IOC
 import qualified ParamCore
 import qualified Solve.Params
+import LPEPrettyPrint
 import LPETypes
 
 createTestEnvC :: IO IOC.EnvC
@@ -59,35 +57,11 @@ putMsgs msgs = do printMsg msgs
                          return ()
 -- putMsgs
 
-splitString :: String -> Int -> [String]
-splitString [] _ = []
-splitString str segmentLength =
-    let firstSegment = map snd (zip [0..(segmentLength-1)] str) in
-    let remainingSegments = map snd (filter (\x -> (fst x) >= segmentLength) (zip [0..(length str)] str)) in
-      firstSegment:(splitString remainingSegments segmentLength)
--- splitString
-
-makeLength :: [String] -> Int -> [String]
-makeLength segments targetLength =
-    if (length segments) >= targetLength then segments else makeLength (segments ++ [[]]) targetLength
--- makeLength
-
-splitPrint :: String -> String -> Int -> String
-splitPrint header str lineLength =
-    let segments = splitString str lineLength in
-      foldl (\soFar seg -> soFar ++ header ++ seg ++ "\n") "" segments
--- splitPrint
-
-printSideBySide :: String -> String -> String -> String -> Int -> String
-printSideBySide header1 header2 s1 s2 lineLength =
-    let segs1 = splitString s1 lineLength in
-    let segments2 = makeLength (splitString s2 lineLength) (length segs1) in
-    let segments1 = makeLength segs1 (length segments2) in
-      foldl (\soFar (seg1, seg2) -> soFar ++ header1 ++ seg1 ++ "\n" ++ header2 ++ seg2 ++ "\n\n") "" (zip segments1 segments2)
--- printSideBySide
-
 printInputExpectedFound :: LPEInstance -> LPEInstance -> LPEInstance -> String
 printInputExpectedFound input expected found =
-    "\n" ++ (splitPrint "   Input..." (show input) 120) ++ "\n-->\n\n" ++ (printSideBySide "Expected..." "   Found..." (show expected) (show found) 120)
+    --"\n" ++ (splitPrint "   Input..." (show input) 120) ++ "\n-->\n\n" ++ (printSideBySide "Expected..." "   Found..." (show expected) (show found) 120)
+    "\nInput:\n\n" ++ (showLPEInstance input) ++
+    "\n\nExpected output:\n\n" ++ (showLPEInstance expected) ++
+    "\n\nActual output:\n\n" ++ (showLPEInstance found) ++ "\n"
 -- printInputExpectedFound
 

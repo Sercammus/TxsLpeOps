@@ -28,7 +28,7 @@ import qualified FreeVar
 import qualified EnvData
 import           LPEOps
 import           Satisfiability
-import           ValExprPrettyPrint
+import           LPEPrettyPrint
 import           VarId
 import           ValExpr
 

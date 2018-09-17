@@ -40,13 +40,13 @@ import qualified SortId
 import qualified SortOf
 import qualified SMTData
 import Constant hiding (sort)
-import ValExprVisitor
-import ValExprPrettyPrint
-import VarFactory
 import VarId
 import ValExpr
 import CstrId
+import LPEPrettyPrint
 import LPETypes
+import ValExprVisitor
+import VarFactory
 
 -- Checks if the specified expression cannot be false.
 isTautology :: TxsDefs.VExpr -> IOC.IOC Bool
