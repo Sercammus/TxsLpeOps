@@ -6,9 +6,9 @@ See LICENSE at root directory of this repository.
      
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
-module TestParReset2
+module TestDataReset
 (
-testParReset2Basic
+testDataResetBasic
 )
 where
  
@@ -30,22 +30,22 @@ import ValExpr
 import StdTDefs (stdSortTable)
 
 import LPEOps
-import LPEParReset2
+import LPEDataReset
 import TestUtils
 
-parReset2Func :: LPEInstance -> IO (Maybe LPEInstance)
-parReset2Func lpeInstance = do
+dataResetFunc :: LPEInstance -> IO (Maybe LPEInstance)
+dataResetFunc lpeInstance = do
     env <- createTestEnvC
     evalStateT (parReset2 lpeInstance vexprTrue) env
--- parReset2Func
+-- dataResetFunc
 
-testParReset2Basic :: Test
-testParReset2Basic = TestCase $ do
+testDataResetBasic :: Test
+testDataResetBasic = TestCase $ do
     validateLPEInstance lpeInstance1
-    maybeResult <- parReset2Func lpeInstance1
+    maybeResult <- dataResetFunc lpeInstance1
     case maybeResult of
       Just result -> assertBool (printInputExpectedFound lpeInstance1 lpeInstance2 result) (result==lpeInstance2)
-      _ -> assertBool "Function parReset2 failed to produce output!" False
+      _ -> assertBool "Function dataReset failed to produce output!" False
   where
     summand1_1 :: LPESummand
     summand1_1 = LPESummand -- A ? z [x==0] >-> P(1, z)
@@ -92,7 +92,7 @@ testParReset2Basic = TestCase $ do
         (LPEProcInst [(varIdX, vexpr0), (varIdY, anyInt)])
     lpeInstance2 :: LPEInstance
     lpeInstance2 = ([chanIdA], [(varIdX, vexpr0), (varIdY, anyInt)], [summand2_1, summand2_2, summand2_3, summand2_4])
--- testParReset2Basic
+-- testDataResetBasic
 
 ---------------------------------------------------------------------------
 -- Helper functions

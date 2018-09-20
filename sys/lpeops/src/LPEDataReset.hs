@@ -14,8 +14,8 @@ See LICENSE at root directory of this repository.
 --
 -----------------------------------------------------------------------------
 
-module LPEParReset2 (
-parReset2
+module LPEDataReset (
+dataReset
 ) where
 
 import qualified Data.List as List
@@ -27,8 +27,8 @@ import LPEOps
 import LPEParUsage
 import VarId
 
-parReset2 :: LPEOperation
-parReset2 (channels, initParamEqs, summands) invariant = do
+dataReset :: LPEOperation
+dataReset (channels, initParamEqs, summands) invariant = do
     let params = map fst initParamEqs
     paramUsagePerSummand <- getParamUsagePerSummand summands params invariant
     let controlFlowParams = getControlFlowParams summands paramUsagePerSummand params
@@ -43,7 +43,7 @@ parReset2 (channels, initParamEqs, summands) invariant = do
     let relevanceRelation = repeatUntilFixpoint (updateRelevanceRelation paramUsagePerSummand controlFlowGraphs belongsToRelation) (Set.fromList initialRelevanceRelation)
     let newSummands = map (resetParamsInSummand initParamEqs paramUsagePerSummand belongsToRelation relevanceRelation) summands
     return (Just (channels, initParamEqs, newSummands))
--- parReset2
+-- dataReset
 
 resetParamsInSummand :: [(VarId, TxsDefs.VExpr)]                -- initParamEqs
                      -> Map.Map LPESummand LPEParamUsage        -- paramUsagePerSummand

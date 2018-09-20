@@ -186,9 +186,10 @@ import qualified LPEOps
 import qualified LPEMkUniq
 import qualified LPEConstElm
 import qualified LPEParElm
+import qualified LPEDataReset
 import qualified LPEParReset
-import qualified LPEParReset2
 import qualified LPEConfCheck
+import qualified LPE2MCRL2
 
 -- import from valexpr
 import qualified SortId
@@ -1204,9 +1205,10 @@ txsLPEOp opName (modelId1@(TxsDefs.ModelId modelName1 _moduid)) modelId2 invaria
                         "mkuniq" -> do return $ Just LPEMkUniq.makeSummandsUnique
                         "cstelm" -> do return $ Just LPEConstElm.constElm
                         "parelm" -> do return $ Just LPEParElm.parElm
+                        "datareset" -> do return $ Just LPEDataReset.dataReset
                         "parreset" -> do return $ Just LPEParReset.parReset
-                        "parreset2" -> do return $ Just LPEParReset2.parReset2
                         "confelm" -> do return $ Just LPEConfCheck.confElm
+                        "mcrl2" -> do return $ Just LPE2MCRL2.lpe2mcrl2
                         _ -> do IOC.putMsgs [ EnvData.TXS_CORE_SYSTEM_ERROR ("Unknown LPE operation (" ++ opName ++ ")!") ]
                                 return Nothing
 --txsLPEOp

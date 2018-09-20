@@ -40,6 +40,7 @@ import qualified CstrDef
 import qualified Constant
 
 import qualified MCRL2Defs
+import MCRL2PrettyPrint
 import MCRL2Env
 import LPEOps
 
@@ -82,6 +83,8 @@ lpe2mcrl2' lpeInstance@(channels, paramEqs, summands) _invariant = do
     -- Translate LPE initialization:
     lpeInit <- procInst2procInst (lpeProcName, lpeProc) (LPEProcInst paramEqs)
     modifySpec $ (\spec -> spec { MCRL2Defs.init = lpeInit })
+    spec <- gets specification
+    liftIO $ writeFile "output.mcrl2" (showSpecification spec)
     return (Just lpeInstance)
 -- lpe2mcrl2'
 
