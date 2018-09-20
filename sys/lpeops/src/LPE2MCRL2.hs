@@ -34,8 +34,6 @@ import qualified FuncId
 import qualified FuncDef
 import qualified VarId
 import qualified ValExpr
-import qualified ProcId
-import qualified ModelId
 import qualified ChanId
 import qualified CstrId
 import qualified CstrDef
@@ -56,7 +54,7 @@ lpe2mcrl2 lpeInstance invariant = do
 -- lpe2mcrl2
 
 lpe2mcrl2' :: LPEInstance -> TxsDefs.VExpr -> T2MMonad (Maybe LPEInstance)
-lpe2mcrl2' lpeInstance@(_channels, _paramEqs, _summands) _invariant = do
+lpe2mcrl2' lpeInstance@(channels, paramEqs, summands) _invariant = do
     tdefs <- gets txsdefs
     -- Translate sorts.
     -- (These are just identifiers; they are defined further via constructors.)
@@ -71,13 +69,18 @@ lpe2mcrl2' lpeInstance@(_channels, _paramEqs, _summands) _invariant = do
     eqGroups <- Monad.mapM function2eqGroup (Map.toList (TxsDefs.funcDefs tdefs))
     modifySpec $ (\spec -> spec { MCRL2Defs.equationGroups = eqGroups })
     -- Translate channels:
-    Monad.mapM_ process2actions (Map.toList (TxsDefs.procDefs tdefs))
-    Monad.mapM_ model2actions (Map.toList (TxsDefs.modelDefs tdefs))
-    -- Translate processes while ignoring bodies:
-    processes <- Monad.mapM process2processHeader (Map.toList (TxsDefs.procDefs tdefs))
-    modifySpec $ (\spec -> spec { MCRL2Defs.processes = Map.fromList processes })
-    -- Translate the bodies of processes:
-    Monad.mapM_ process2processBody (Map.toList (TxsDefs.procDefs tdefs))
+    actions <- Monad.mapM createFreshAction channels
+    modifySpec $ (\spec -> spec { MCRL2Defs.actions = Map.fromList actions })
+    -- Translate LPE header:
+    (lpeProcName, lpeProc) <- createLPEProcess (map fst paramEqs)
+    modifySpec $ (\spec -> spec { MCRL2Defs.processes = Map.fromList [(lpeProcName, lpeProc)] })
+    -- Translate LPE body:
+    newSummands <- Monad.mapM (summand2summand (lpeProcName, lpeProc)) summands
+    let newProcess = lpeProc { MCRL2Defs.expr = MCRL2Defs.PChoice newSummands }
+    modifySpec $ (\spec -> spec { MCRL2Defs.processes = Map.insert lpeProcName newProcess (MCRL2Defs.processes spec) })
+    -- Translate LPE initialization:
+    lpeInit <- procInst2procInst (lpeProcName, lpeProc) (LPEProcInst paramEqs)
+    modifySpec $ (\spec -> spec { MCRL2Defs.init = lpeInit })
     return (Just lpeInstance)
 -- lpe2mcrl2'
 
@@ -102,7 +105,7 @@ constructor2constructor (cstrId, CstrDef.CstrDef recognizer projections) = do
     -- Look up the (already created) mCRL2 sort that corresponds with the TXS sort of the constructor:
     (sortName, sort) <- getRegisteredSort (CstrId.cstrsort cstrId)
     registerObject (TxsDefs.IdCstr cstrId) (RegCstr sortName constructorName)
-    -- Overwrite the previous declaration of the mCRL2 sort with one with the new constructor:
+    -- Replace the previous declaration of the mCRL2 sort with one with the new constructor:
     let newStructSort = case sort of
                           MCRL2Defs.StructSort constructors -> MCRL2Defs.StructSort (constructors ++ [newConstructor])
                           _ -> MCRL2Defs.StructSort [newConstructor]
@@ -143,29 +146,10 @@ function2eqGroup (funcId, FuncDef.FuncDef params expr) = do
     return $ MCRL2Defs.EquationGroup { MCRL2Defs.variables = mappingParams, MCRL2Defs.equations = [eqn] }
 -- function2eqGroup
 
--- Creates a uniquely named action for each channel of a given process:
-process2actions :: (ProcId.ProcId, TxsDefs.ProcDef) -> T2MMonad ()
-process2actions (procId, TxsDefs.ProcDef chans _params _expr) = do
-    actions <- Monad.mapM (createFreshAction (ProcId.name procId)) chans
-    modifySpec $ (\spec -> spec { MCRL2Defs.actions = Map.union (MCRL2Defs.actions spec) (Map.fromList actions) })
--- process2actions
-
--- Creates a uniquely named action for each channel of a given model:
-model2actions :: (ModelId.ModelId, TxsDefs.ModelDef) -> T2MMonad ()
-model2actions (modelId, TxsDefs.ModelDef inChans outChans syncChans _expr) = do
-    inActions <- Monad.mapM (createFreshAction (ModelId.name modelId)) (flatten inChans)
-    outActions <- Monad.mapM (createFreshAction (ModelId.name modelId)) (flatten outChans)
-    syncActions <- Monad.mapM (createFreshAction (ModelId.name modelId)) (flatten syncChans)
-    modifySpec $ (\spec -> spec { MCRL2Defs.actions = Map.union (MCRL2Defs.actions spec) (Map.fromList (inActions ++ outActions ++ syncActions)) })
-      where
-        flatten :: [Set.Set TxsDefs.ChanId] -> [TxsDefs.ChanId]
-        flatten chans = foldl (++) [] (map Set.toList chans)
--- model2actions
-
 -- Creates a uniquely named action from a TXS channel definition:
-createFreshAction :: MCRL2Defs.ObjectId -> TxsDefs.ChanId -> T2MMonad (MCRL2Defs.ObjectId, MCRL2Defs.Action)
-createFreshAction prefix chanId = do
-    actionName <- getFreshName prefix
+createFreshAction :: TxsDefs.ChanId -> T2MMonad (MCRL2Defs.ObjectId, MCRL2Defs.Action)
+createFreshAction chanId = do
+    actionName <- getFreshName (ChanId.name chanId)
     actionSorts <- Monad.mapM sort2sort (ChanId.chansorts chanId)
     registerObject (TxsDefs.IdChan chanId) (RegAction actionName)
     return $ (actionName, MCRL2Defs.Action actionSorts)
@@ -173,22 +157,36 @@ createFreshAction prefix chanId = do
 
 -- Creates an mCRL2 process from a TXS process.
 -- The body of the process is not being translated here, because it may reference objects that do not yet exist!
-process2processHeader :: (ProcId.ProcId, TxsDefs.ProcDef) -> T2MMonad (MCRL2Defs.ObjectId, MCRL2Defs.Process)
-process2processHeader (procId, TxsDefs.ProcDef _chans params _expr) = do
-    procName <- getFreshName (ProcId.name procId)
-    procParams <- Monad.mapM createFreshVar params
-    registerObject (TxsDefs.IdProc procId) (RegProcess procName)
+createLPEProcess :: [VarId.VarId] -> T2MMonad (MCRL2Defs.ObjectId, MCRL2Defs.Process)
+createLPEProcess paramIds = do
+    procName <- getFreshName (Text.pack "LPE")
+    procParams <- Monad.mapM createFreshVar paramIds
+    --registerObject (TxsDefs.IdProc procId) (RegProcess procName)
     return $ (procName, MCRL2Defs.Process { MCRL2Defs.processParams = procParams, MCRL2Defs.expr = MCRL2Defs.PDeadlock })
--- process2processHeader
+-- createLPEProcess
 
--- Translates the body of a TXS process:
-process2processBody :: (ProcId.ProcId, TxsDefs.ProcDef) -> T2MMonad ()
-process2processBody (procId, TxsDefs.ProcDef _chans _params expr) = do
-    (procName, MCRL2Defs.Process { MCRL2Defs.processParams = procParams }) <- getRegisteredProcess procId
-    procExpr <- behaviorExpr2procExpr expr
-    let newProcess = MCRL2Defs.Process { MCRL2Defs.processParams = procParams, MCRL2Defs.expr = procExpr }
-    modifySpec $ (\spec -> spec { MCRL2Defs.processes = Map.insert procName newProcess (MCRL2Defs.processes spec) })
--- process2processBody
+summand2summand :: (MCRL2Defs.ObjectId, MCRL2Defs.Process) -> LPESummand -> T2MMonad MCRL2Defs.PExpr
+summand2summand (lpeProcName, lpeProc) (LPESummand chanOffers guard procInst) = do
+    newGuard <- valExpr2dataExpr guard
+    newActions <- Monad.mapM channelOffer2action chanOffers
+    let newActionExpr = MCRL2Defs.PAction (MCRL2Defs.AExpr newActions)
+    newProcInst <- procInst2procInst (lpeProcName, lpeProc) procInst
+    return (MCRL2Defs.PGuard newGuard (MCRL2Defs.PSeq [newActionExpr, newProcInst]) MCRL2Defs.PDeadlock)
+-- summand2summand
+
+procInst2procInst :: (MCRL2Defs.ObjectId, MCRL2Defs.Process) -> LPEProcInst -> T2MMonad MCRL2Defs.PExpr
+procInst2procInst _ LPEStop = do return MCRL2Defs.PDeadlock
+procInst2procInst (lpeProcName, lpeProc) (LPEProcInst paramEqs) = do
+    paramValues <- Monad.mapM valExpr2dataExpr (map snd paramEqs)
+    return (MCRL2Defs.PInst lpeProcName (zip (MCRL2Defs.processParams lpeProc) paramValues))
+-- paramEqs2procInst
+
+channelOffer2action :: LPEChannelOffer -> T2MMonad MCRL2Defs.AInstance
+channelOffer2action (chanId, chanVars) = do
+    (actionName, _action) <- getRegisteredAction chanId
+    ainstances <- Monad.mapM (\chanVar -> valExpr2dataExpr (ValExpr.cstrVar chanVar)) chanVars
+    return $ MCRL2Defs.AInstance actionName ainstances
+-- offer2action
 
 -- Translates a TXS sort to an mCRL2 sort:
 sort2sort :: SortId.SortId -> T2MMonad MCRL2Defs.Sort
@@ -210,128 +208,6 @@ createFreshVar varId = do
     registerObject (TxsDefs.IdVar varId) (RegVar newVar)
     return newVar
 -- createFreshVar
-
--- Creates a uniquely named mCRL2 variable from a TXS variable:
-getOrCreateFreshVar :: VarId.VarId -> T2MMonad MCRL2Defs.Variable
-getOrCreateFreshVar varId = do
-    (_varName, var) <- getRegisteredVar varId
-    case var of
-      MCRL2Defs.MissingVariable -> do createFreshVar varId
-      _ -> do return var
--- getOrCreateFreshVar
-
--- Translates a TXS behavioral expression to an mCRL2 process expression:
-behaviorExpr2procExpr :: TxsDefs.BExpr -> T2MMonad MCRL2Defs.PExpr
-behaviorExpr2procExpr (TxsDefs.view -> TxsDefs.ActionPref actOffer expr) = do
-    let offers = Set.toList (TxsDefs.offers actOffer)
-    -- First (always!), create the variables that are introduced (or overwritten?) by the offer!
-    -- The variables must exist so that they can be referenced by other components of the expression:
-    variables <- Monad.mapM getOrCreateFreshVar (foldl getOfferVariables [] offers)
-    constraint <- valExpr2dataExpr (TxsDefs.constraint actOffer) -- TODO optimize by checking if constraint == True
-    translatedExpr <- behaviorExpr2procExpr expr
-    if offers == []
-    then do -- No offers, so many components of the expression can be left out:
-            let tauThenExpr = MCRL2Defs.PSeq (MCRL2Defs.PAction MCRL2Defs.ATau) translatedExpr
-            return $ MCRL2Defs.PGuard constraint tauThenExpr MCRL2Defs.PDeadlock
-    else do -- Otherwise, construct the full expression:
-            actionInstances <- Monad.mapM offer2actionInstance offers
-            let action = MCRL2Defs.PAction (MCRL2Defs.AExpr actionInstances)
-            let actionThenExpr = MCRL2Defs.PSeq action translatedExpr
-            let guard = MCRL2Defs.PGuard constraint actionThenExpr MCRL2Defs.PDeadlock
-            -- If there are no variables, the sum operator can be left out:
-            if variables == []
-            then do return guard
-            else do return $ MCRL2Defs.PSum variables guard
-  where
-    -- Determines the variables that are introduced (or overwritten) by a given offer:
-    getOfferVariables :: [VarId.VarId] -> TxsDefs.Offer -> [VarId.VarId]
-    getOfferVariables soFar offer = soFar ++ (foldl getOfferVariable [] (TxsDefs.chanoffers offer))
-    
-    -- Helper method to the one above:
-    getOfferVariable :: [VarId.VarId] -> TxsDefs.ChanOffer -> [VarId.VarId]
-    getOfferVariable soFar (TxsDefs.Quest var) = soFar ++ [var]
-    getOfferVariable soFar _ = soFar
-    
-    -- Constructs an action instance from a given offer.
-    -- Multiple action instances can be combined into a multi-action in an action expression:
-    offer2actionInstance :: TxsDefs.Offer -> T2MMonad MCRL2Defs.AInstance
-    offer2actionInstance offer = do
-        (actionName, _action) <- getRegisteredAction (TxsDefs.chanid offer)
-        ainstances <- Monad.mapM chanOffer2actionParam (TxsDefs.chanoffers offer)
-        return $ MCRL2Defs.AInstance actionName ainstances
-    
-    -- Helper method to the one above:
-    chanOffer2actionParam :: TxsDefs.ChanOffer -> T2MMonad MCRL2Defs.DExpr
-    chanOffer2actionParam (TxsDefs.Quest var) = do valExpr2dataExpr (ValExpr.cstrVar var)
-    chanOffer2actionParam (TxsDefs.Exclam vexpr) = do valExpr2dataExpr vexpr
-behaviorExpr2procExpr (TxsDefs.view -> TxsDefs.Guard condition ifBranch) = do
-    translatedCondition <- valExpr2dataExpr condition
-    translatedIfBranch <- behaviorExpr2procExpr ifBranch
-    return $ MCRL2Defs.PGuard translatedCondition translatedIfBranch MCRL2Defs.PDeadlock
-behaviorExpr2procExpr (TxsDefs.view -> TxsDefs.Choice choices) =
-    if choices == Set.empty
-    then do return $ MCRL2Defs.PDeadlock
-    else do translatedChoices <- Monad.mapM behaviorExpr2procExpr (Set.toList choices)
-            return $ MCRL2Defs.PChoice translatedChoices
-behaviorExpr2procExpr (TxsDefs.view -> TxsDefs.Parallel chans components) = do
-    if chans == Set.empty
-    then do -- In the absence of any channels, the expression becomes very simple:
-            translatedComponents <- Monad.mapM behaviorExpr2procExpr components
-            case translatedComponents of
-              x:xs -> do -- Return the parallel components (as a tree):
-                         return $ foldr MCRL2Defs.PPar x xs
-              _ -> do return MCRL2Defs.PDeadlock -- Should not happen!
-    else do let chanList = Set.toList chans
-            translatedChans <- Monad.mapM getRegisteredAction chanList
-            -- For each channel (~=~ action), a fresh temporary action of the same sort is created:
-            temporaryActions <- Monad.mapM (\((actionName, _action), chan) -> createFreshAction actionName chan) (zip translatedChans chanList)
-            -- Relate channels with their temporary counterpart:
-            let actionPairs = zip (map fst translatedChans) (map fst temporaryActions)
-            -- Translate the parallel components:
-            translatedComponents <- Monad.mapM behaviorExpr2procExpr components
-            case translatedComponents of
-              x:xs -> do -- Construct the full expression:
-                         let componentsAsTree = foldr MCRL2Defs.PPar x xs
-                         let renaming = MCRL2Defs.PRename (map (\(a, b) -> (b, a)) actionPairs) componentsAsTree
-                         let block = MCRL2Defs.PBlock (map fst actionPairs) renaming
-                         return $ MCRL2Defs.PComm (map createComm actionPairs) block
-              _ -> do return MCRL2Defs.PDeadlock -- Should not happen!
-  where
-    createComm :: (MCRL2Defs.ObjectId, MCRL2Defs.ObjectId) -> (MCRL2Defs.MultiAction, MCRL2Defs.ObjectId)
-    createComm (translatedChan, temporaryAction) = (foldl (\soFar _ -> soFar ++ [translatedChan]) [] components, temporaryAction)
-behaviorExpr2procExpr (TxsDefs.view -> TxsDefs.Enable _expr1 _chanOffers _expr2) = do
-    return $ MCRL2Defs.PDeadlock -- TODO
-behaviorExpr2procExpr (TxsDefs.view -> TxsDefs.Disable _expr1 _expr2) = do
-    return $ MCRL2Defs.PDeadlock -- TODO
-behaviorExpr2procExpr (TxsDefs.view -> TxsDefs.Interrupt _expr1 _expr2) = do
-    return $ MCRL2Defs.PDeadlock -- TODO
-behaviorExpr2procExpr (TxsDefs.view -> TxsDefs.ProcInst procId [] paramValues) = do
-    -- Create the process instantiation:
-    (processName, MCRL2Defs.Process { MCRL2Defs.processParams = paramDefs }) <- getRegisteredProcess procId
-    translatedParamValues <- Monad.mapM valExpr2dataExpr paramValues
-    return $ MCRL2Defs.PInst processName (zip paramDefs translatedParamValues)
-behaviorExpr2procExpr (TxsDefs.view -> TxsDefs.ProcInst procId chanValues paramValues) = do
-    -- Create the process instantiation:
-    (processName, MCRL2Defs.Process { MCRL2Defs.processParams = paramDefs }) <- getRegisteredProcess procId
-    translatedParamValues <- Monad.mapM valExpr2dataExpr paramValues
-    let instantiation = MCRL2Defs.PInst processName (zip paramDefs translatedParamValues)
-    -- Create the renaming operator:
-    chanDefs <- Monad.mapM getRegisteredAction [] -- TODO fix this or remove this (ProcId.procchans procId)
-    translatedChanValues <- Monad.mapM getRegisteredAction chanValues
-    let renaming = MCRL2Defs.PRename (zip (map fst chanDefs) (map fst translatedChanValues)) instantiation
-    -- Return the combination:
-    return $ renaming
-behaviorExpr2procExpr (TxsDefs.view -> TxsDefs.Hide chans expr) = do
-    translatedChans <- Monad.mapM getRegisteredAction (Set.toList chans)
-    translatedExpr <- behaviorExpr2procExpr expr
-    return $ MCRL2Defs.PHide (map fst translatedChans) translatedExpr
-behaviorExpr2procExpr (TxsDefs.view -> TxsDefs.ValueEnv _venv _expr) = do
-    return $ MCRL2Defs.PDeadlock -- TODO what is this exactly?
-behaviorExpr2procExpr (TxsDefs.view -> TxsDefs.StAut _statId _venv _transList) = do
-    return $ MCRL2Defs.PDeadlock -- TODO what is this exactly?
-behaviorExpr2procExpr _ = do
-    return $ MCRL2Defs.PDeadlock -- Should not happen!
--- behaviorExpr2procExpr
 
 -- Translates a TXS value expression to an mCRL2 data expression:
 valExpr2dataExpr :: ValExpr.ValExpr VarId.VarId -> T2MMonad MCRL2Defs.DExpr
@@ -435,6 +311,4 @@ cOccur2dataExpr (expr, count) = do
     translatedExpr <- valExpr2dataExpr expr
     return $ MCRL2Defs.DMultiply translatedExpr (MCRL2Defs.DInt count)
 -- cOccur2dataExpr
-
-
 

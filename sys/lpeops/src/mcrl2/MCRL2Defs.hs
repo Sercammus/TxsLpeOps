@@ -101,8 +101,8 @@ data AInstance = AInstance ObjectId [DExpr]
 data AExpr = ATau | AExpr [AInstance]
 
 data PExpr = PAction AExpr
-           | PSeq PExpr PExpr
-           | PPar PExpr PExpr
+           | PSeq [PExpr]
+           | PPar [PExpr]
            | PChoice [PExpr]
            | PSum [Variable] PExpr
            | PGuard DExpr PExpr PExpr
@@ -128,7 +128,7 @@ data Specification = Specification { sorts :: Map.Map ObjectId Sort
                                    , globals :: Map.Map ObjectId Variable
                                    , init :: PExpr
                                    }
--- SpecificationDef
+-- Specification
 
 emptySpecification :: MCRL2Defs.Specification
 emptySpecification = MCRL2Defs.Specification { MCRL2Defs.sorts = Map.empty
