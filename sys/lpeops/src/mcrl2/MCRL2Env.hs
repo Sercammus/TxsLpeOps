@@ -30,6 +30,7 @@ getFreshName
 ) where
 
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Control.Monad.State hiding (state)
 import qualified EnvCore as IOC
@@ -55,6 +56,7 @@ data T2MRegisteredObject = RegSort MCRL2Defs.ObjectId
 data T2MEnv = T2MEnv { txsdefs :: TxsDefs.TxsDefs
                      , specification :: MCRL2Defs.Specification
                      , objectMap :: Map.Map TxsDefs.Ident T2MRegisteredObject
+                     , usedNames :: Set.Set MCRL2Defs.ObjectId
                      }
 -- T2MEnv
 
@@ -119,7 +121,7 @@ getRegisteredAction chanId = do
         actions <- gets (MCRL2Defs.actions . specification)
         case Map.lookup oId actions of
           Just a -> do return (oId, a)
-          _ -> do return (oId, MCRL2Defs.Action [])
+          _ -> do return (oId, MCRL2Defs.Action MCRL2Defs.MissingSort)
       _ -> do return (Text.pack "ACTION_NOT_FOUND", MCRL2Defs.MissingAction)
 -- getRegisteredAction
 
@@ -136,11 +138,20 @@ getRegisteredProcess procId = do
 -- getRegisteredProcess
 
 getFreshName :: MCRL2Defs.ObjectId -> T2MMonad MCRL2Defs.ObjectId
-getFreshName prefix = do return prefix
+getFreshName prefix = do
+    namesInUse <- gets usedNames
+    let freshName = if Set.member prefix namesInUse then getFreshNameWithIndex prefix namesInUse 1 else prefix
+    modify $ (\env -> env { usedNames = Set.insert freshName namesInUse })
+    return freshName
 -- getFreshName
 
-
-
+getFreshNameWithIndex :: MCRL2Defs.ObjectId -> Set.Set MCRL2Defs.ObjectId -> Integer -> MCRL2Defs.ObjectId
+getFreshNameWithIndex prefix namesInUse index =
+    let freshName = Text.pack ((Text.unpack prefix) ++ (show index)) in
+      if Set.member freshName namesInUse
+      then getFreshNameWithIndex prefix namesInUse (index + 1)
+      else freshName
+-- getFreshNameWithIndex
 
 
 

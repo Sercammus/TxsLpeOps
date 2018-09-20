@@ -34,6 +34,7 @@ library
                     , MCRL2Defs
                     , MCRL2Env
                     , MCRL22TXT
+                    , MCRL2PrettyPrint
 
   other-modules:      
 
@@ -79,6 +80,7 @@ test-suite lpeops-test
                       , MCRL2Defs
                       , MCRL2Env
                       , MCRL22TXT
+                      , MCRL2PrettyPrint
                       , TestUtils
                       , TestConstElm
                       , TestParElm

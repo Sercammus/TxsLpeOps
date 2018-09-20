@@ -49,6 +49,7 @@ lpe2mcrl2 lpeInstance invariant = do
     let initialEnv = T2MEnv { txsdefs = tdefs'
                             , specification = MCRL2Defs.emptySpecification
                             , objectMap = Map.empty
+                            , usedNames = Set.empty
                             }
     evalStateT (lpe2mcrl2' lpeInstance invariant) initialEnv
 -- lpe2mcrl2
@@ -121,18 +122,18 @@ function2mapping (funcId, FuncDef.FuncDef params _expr) = do
     mappingResult <- sort2sort (FuncId.funcsort funcId)
     -- Add a mapping for the function:
     let mappingSort = case mappingParams of
-                        [] -> MCRL2Defs.FunctionSort (sortList2multiSort (map MCRL2Defs.varSort mappingParams)) mappingResult
+                        [] -> MCRL2Defs.FunctionSort (sorts2multiSort (map MCRL2Defs.varSort mappingParams)) mappingResult
                         _ -> mappingResult
     registerObject (TxsDefs.IdFunc funcId) (RegMapping mappingName)
     return (mappingName, mappingSort)
 -- function2mapping
 
 -- Converts a list of mCRL2 sorts into a (binary) tree of multi-sorts:
-sortList2multiSort :: [MCRL2Defs.Sort] -> MCRL2Defs.Sort
-sortList2multiSort [] = error "Cannot create MultiSort from empty Sort list!"
-sortList2multiSort [x] = x
-sortList2multiSort (x1:x2:xs) = MCRL2Defs.MultiSort x1 (sortList2multiSort (x2:xs))
--- sortList2multiSort
+sorts2multiSort :: [MCRL2Defs.Sort] -> MCRL2Defs.Sort
+sorts2multiSort [] = error "Cannot create MultiSort from empty Sort list!"
+sorts2multiSort [x] = x
+sorts2multiSort xs = MCRL2Defs.MultiSort xs
+-- sorts2multiSort
 
 -- Creates an mCRL2 equation group from a TXS function definition:
 function2eqGroup :: (FuncId.FuncId, FuncDef.FuncDef VarId.VarId) -> T2MMonad MCRL2Defs.EquationGroup
@@ -152,7 +153,7 @@ createFreshAction chanId = do
     actionName <- getFreshName (ChanId.name chanId)
     actionSorts <- Monad.mapM sort2sort (ChanId.chansorts chanId)
     registerObject (TxsDefs.IdChan chanId) (RegAction actionName)
-    return $ (actionName, MCRL2Defs.Action actionSorts)
+    return $ (actionName, MCRL2Defs.Action (sorts2multiSort actionSorts))
 -- createFreshAction
 
 -- Creates an mCRL2 process from a TXS process.
@@ -220,7 +221,7 @@ valExpr2dataExpr (ValExpr.view -> ValExpr.Vconst (Constant.Cstring string)) = do
 valExpr2dataExpr (ValExpr.view -> ValExpr.Vconst (Constant.Cregex _value)) = do
     return $ MCRL2Defs.DList [] -- WARNING! Regular expressions are considered to be out of scope!
 valExpr2dataExpr (ValExpr.view -> ValExpr.Vconst (Constant.Ccstr cstrId fieldValues)) = do
-    valExpr2dataExpr (ValExpr.cstrCstr cstrId (map ValExpr.cstrConst fieldValues)) -- Delegate!
+    valExpr2dataExpr (ValExpr.cstrCstr cstrId (map ValExpr.cstrConst fieldValues)) -- (Just delegate each value.)
 valExpr2dataExpr (ValExpr.view -> ValExpr.Vconst (Constant.Cany sortId)) = do
     newGlobalName <- getFreshName (Text.pack ("g" ++ (Text.unpack (SortId.name sortId))))
     newGlobalSort <- sort2sort sortId

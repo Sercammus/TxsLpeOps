@@ -46,19 +46,17 @@ data Sort = BoolSort
           | BagSort Sort
           | StructSort [Constructor]
           | SortRef ObjectId
-          | MultiSort Sort Sort
+          | MultiSort [Sort]
           | FunctionSort Sort Sort
           | ImplicitSort
           | MissingMapping
-          | MissingSort
-        deriving (Eq)
+          | MissingSort deriving (Eq, Show)
 -- Sort
 
 data Constructor = Constructor { cstrName :: ObjectId
                                , fields :: [Variable]
                                , recognizer :: ObjectId
-                               } | MissingConstructor
-                             deriving (Eq)
+                               } | MissingConstructor deriving (Eq, Show)
 -- Constructor
 
 data DExpr = DBool Bool
@@ -72,6 +70,8 @@ data DExpr = DBool Bool
            | DMappingRef ObjectId [DExpr]
            | DEqual DExpr DExpr
            | DNotEqual DExpr DExpr
+           | DGreater DExpr DExpr
+           | DSmaller DExpr DExpr
            | DGreaterEquals DExpr DExpr
            | DSmallerEquals DExpr DExpr
            | DAnd DExpr DExpr
@@ -85,20 +85,19 @@ data DExpr = DBool Bool
            | DModulo DExpr DExpr
            | DListSize DExpr
            | DListElement DExpr DExpr
-           | DListConcatenate DExpr DExpr
+           | DListConcatenate DExpr DExpr deriving (Eq, Show)
 -- DExpr
 
-data Variable = Variable { varName :: ObjectId, varSort :: Sort } | MissingVariable
-                       deriving (Eq)
+data Variable = Variable { varName :: ObjectId, varSort :: Sort } | MissingVariable deriving (Eq, Show)
 
 type VariableEq = (Variable, DExpr)
 type VariableEqs = [VariableEq]
 
-data Action = Action [Sort] | MissingAction
+data Action = Action Sort | MissingAction deriving (Eq, Show)
 type MultiAction = [ObjectId]
 
-data AInstance = AInstance ObjectId [DExpr]
-data AExpr = ATau | AExpr [AInstance]
+data AInstance = AInstance ObjectId [DExpr] deriving (Eq, Show)
+data AExpr = ATau | AExpr [AInstance] deriving (Eq, Show)
 
 data PExpr = PAction AExpr
            | PSeq [PExpr]
@@ -112,13 +111,13 @@ data PExpr = PAction AExpr
            | PComm [(MultiAction, ObjectId)] PExpr
            | PRename [(ObjectId, ObjectId)] PExpr
            | PBlock [ObjectId] PExpr
-           | PInst ObjectId VariableEqs
+           | PInst ObjectId VariableEqs deriving (Eq, Show)
 -- PExpr
 
-data Equation = Equation { lhs :: DExpr, rhs :: DExpr }
-data EquationGroup = EquationGroup { variables :: [Variable], equations :: [Equation] }
+data Equation = Equation { lhs :: DExpr, rhs :: DExpr } deriving (Eq, Show)
+data EquationGroup = EquationGroup { variables :: [Variable], equations :: [Equation] } deriving (Eq, Show)
 
-data Process = Process { processParams :: [Variable], expr :: PExpr } | MissingProcess
+data Process = Process { processParams :: [Variable], expr :: PExpr } | MissingProcess deriving (Eq, Show)
 
 data Specification = Specification { sorts :: Map.Map ObjectId Sort
                                    , mappings :: Map.Map ObjectId Sort
@@ -127,7 +126,7 @@ data Specification = Specification { sorts :: Map.Map ObjectId Sort
                                    , processes :: Map.Map ObjectId Process
                                    , globals :: Map.Map ObjectId Variable
                                    , init :: PExpr
-                                   }
+                                   } deriving (Eq, Show)
 -- Specification
 
 emptySpecification :: MCRL2Defs.Specification
