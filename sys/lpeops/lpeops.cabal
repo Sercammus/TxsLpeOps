@@ -14,6 +14,7 @@ cabal-version:          >=1.10
 library
   hs-source-dirs:       src
   hs-source-dirs:       src/utils
+  hs-source-dirs:       src/mcrl2
 
   exposed-modules:    LPEOps
                     , LPEMkUniq
@@ -23,12 +24,16 @@ library
                     , LPEParReset2
                     , LPETypes
                     , LPEConfCheck
+                    , LPE2MCRL2
                     , LPEParRemoval
                     , LPEParUsage
                     , LPEPrettyPrint
                     , Satisfiability
                     , ValExprVisitor
                     , VarFactory
+                    , MCRL2Defs
+                    , MCRL2Env
+                    , MCRL22TXT
 
   other-modules:      
 
@@ -64,12 +69,16 @@ test-suite lpeops-test
                       , LPEParReset2
                       , LPETypes
                       , LPEConfCheck
+                      , LPE2MCRL2
                       , LPEParRemoval
                       , LPEParUsage
                       , LPEPrettyPrint
                       , Satisfiability
                       , ValExprVisitor
                       , VarFactory
+                      , MCRL2Defs
+                      , MCRL2Env
+                      , MCRL22TXT
                       , TestUtils
                       , TestConstElm
                       , TestParElm
