@@ -38,9 +38,9 @@ import           Constant
 chanIdConfluentIstep :: ChanId
 chanIdConfluentIstep = ChanId (Text.pack "CISTEP") 969 []
 
-getConfluentTauSummands :: LPESummands -> IOC.IOC LPESummands
-getConfluentTauSummands summands = do
-    confluentTauSummands <- Monad.filterM (isConfluentTauSummand summands) (filter isTauSummand summands)
+getConfluentTauSummands :: LPESummands -> TxsDefs.VExpr -> IOC.IOC LPESummands
+getConfluentTauSummands summands invariant = do
+    confluentTauSummands <- Monad.filterM (isConfluentTauSummand summands invariant) (filter isTauSummand summands)
     IOC.putMsgs [ EnvData.TXS_CORE_ANY ("Detected " ++ (show (length confluentTauSummands)) ++ " confluent ISTEP summand(s)!") ]
     return confluentTauSummands
 -- getConfluentTauSummands
@@ -48,8 +48,8 @@ getConfluentTauSummands summands = do
 -- LPE rewrite method.
 -- Flags confluent ISTEPs by renaming them to CISTEPs.
 confCheck :: LPEOperation
-confCheck (channels, paramEqs, summands) _invariant = do
-    confluentTauSummands <- getConfluentTauSummands summands
+confCheck (channels, paramEqs, summands) invariant = do
+    confluentTauSummands <- getConfluentTauSummands summands invariant
     let noConfluentTauSummands = (Set.fromList summands) Set.\\ (Set.fromList confluentTauSummands)
     let newSummands = Set.union noConfluentTauSummands (Set.fromList (map flagTauSummand confluentTauSummands))
     do return $ Just (channels, paramEqs, Set.toList newSummands)
@@ -64,19 +64,19 @@ flagTauSummand :: LPESummand -> LPESummand
 flagTauSummand (LPESummand [(_chanId, commVars)] guard paramEqs) = (LPESummand [(chanIdConfluentIstep, commVars)] guard paramEqs)
 flagTauSummand tauSummand = tauSummand
 
-isConfluentTauSummand :: [LPESummand] -> LPESummand -> IOC.IOC Bool
-isConfluentTauSummand [] _ = do return True
-isConfluentTauSummand (x:xs) tauSummand = do
-    check <- checkConfluenceCondition tauSummand x
+isConfluentTauSummand :: [LPESummand] -> TxsDefs.VExpr -> LPESummand -> IOC.IOC Bool
+isConfluentTauSummand [] _ _ = do return True
+isConfluentTauSummand (x:xs) invariant tauSummand = do
+    check <- checkConfluenceCondition tauSummand x invariant
     if check
-    then isConfluentTauSummand xs tauSummand
+    then isConfluentTauSummand xs invariant tauSummand
     else do return False
 -- isConfluentTauSummand
 
-checkConfluenceCondition :: LPESummand -> LPESummand -> IOC.IOC Bool
-checkConfluenceCondition (LPESummand _ _ LPEStop) _ = do return False
-checkConfluenceCondition _ (LPESummand _ _ LPEStop) = do return False
-checkConfluenceCondition (summand1@(LPESummand _channelOffers1 guard1 (LPEProcInst paramEqs1))) (summand2@(LPESummand channelOffers2 guard2 (LPEProcInst paramEqs2))) = do
+checkConfluenceCondition :: LPESummand -> LPESummand -> TxsDefs.VExpr -> IOC.IOC Bool
+checkConfluenceCondition (LPESummand _ _ LPEStop) _ _ = do return False
+checkConfluenceCondition _ (LPESummand _ _ LPEStop) _ = do return False
+checkConfluenceCondition (summand1@(LPESummand _channelOffers1 guard1 (LPEProcInst paramEqs1))) (summand2@(LPESummand channelOffers2 guard2 (LPEProcInst paramEqs2))) invariant = do
     if summand1 == summand2
     then do return True
     else do -- Create functions that can do the required substitutions in a convenient manner.
@@ -101,7 +101,7 @@ checkConfluenceCondition (summand1@(LPESummand _channelOffers1 guard1 (LPEProcIn
             let confluenceCondition = cstrITE premise conclusion (cstrConst (Cbool True))
             
             -- Is the confluence condition a tautology?
-            taut <- isTautology confluenceCondition
+            taut <- isTautology (cstrAnd (Set.fromList [invariant, confluenceCondition]))
             return taut
   where
     getChannelVars :: Set.Set VarId -> LPEChannelOffer -> Set.Set VarId
@@ -111,11 +111,11 @@ checkConfluenceCondition (summand1@(LPESummand _channelOffers1 guard1 (LPEProcIn
 -- LPE rewrite method.
 -- Appends confluent ISTEPs to predecessor summands.
 confElm :: LPEOperation
-confElm (channels, paramEqs, summands) _invariant = do
-    confluentTauSummands <- getConfluentTauSummands summands
+confElm (channels, paramEqs, summands) invariant = do
+    confluentTauSummands <- getConfluentTauSummands summands invariant
     if confluentTauSummands == []
     then do return $ Just (channels, paramEqs, summands)
-    else do definiteSuccessors <- Monad.mapM (getDefiniteSuccessors summands) summands
+    else do definiteSuccessors <- Monad.mapM (getDefiniteSuccessors summands invariant) summands
             let confluentTauSuccessors = map (List.intersect confluentTauSummands) definiteSuccessors
             return $ Just (channels, paramEqs, zipWith mergeSummands summands confluentTauSuccessors)
   where
@@ -132,15 +132,15 @@ confElm (channels, paramEqs, summands) _invariant = do
 
 -- Selects all summands from a given list that are definitely successors of a given summand.
 -- The result is an underapproximation!
-getDefiniteSuccessors :: [LPESummand] -> LPESummand -> IOC.IOC [LPESummand]
-getDefiniteSuccessors _ (LPESummand _ _ LPEStop) = do return []
-getDefiniteSuccessors allSummands (LPESummand _channelOffers guard (LPEProcInst paramEqs)) = do
+getDefiniteSuccessors :: [LPESummand] -> TxsDefs.VExpr -> LPESummand -> IOC.IOC [LPESummand]
+getDefiniteSuccessors _ _ (LPESummand _ _ LPEStop) = do return []
+getDefiniteSuccessors allSummands invariant (LPESummand _channelOffers guard (LPEProcInst paramEqs)) = do
     immediateSuccessors <- Monad.foldM addSummandIfDefiniteSuccessor [] allSummands
     return $ immediateSuccessors
   where
     addSummandIfDefiniteSuccessor :: [LPESummand] -> LPESummand -> IOC.IOC [LPESummand]
     addSummandIfDefiniteSuccessor soFar summand@(LPESummand _ g _) = do
-      taut <- isTautology (cstrAnd (Set.fromList [guard, varSubst paramEqs g]))
+      taut <- isTautology (cstrAnd (Set.fromList [invariant, guard, varSubst paramEqs g]))
       return $ if taut then soFar ++ [summand] else soFar
 -- getDefiniteSuccessors
 

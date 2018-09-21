@@ -183,7 +183,7 @@ import qualified Eval
 -- import from lpe
 import qualified LPE
 import qualified LPEOps
-import qualified LPEMkUniq
+import qualified LPEClean
 import qualified LPEConstElm
 import qualified LPEParElm
 import qualified LPEDataReset
@@ -1202,7 +1202,7 @@ txsLPEOp opName (modelId1@(TxsDefs.ModelId modelName1 _moduid)) modelId2 invaria
     getLPEOperation :: IOC.IOC (Maybe LPEOps.LPEOperation)
     getLPEOperation = case opName of
                         "dummy" -> do return $ Just LPEOps.dummyOp
-                        "mkuniq" -> do return $ Just LPEMkUniq.makeSummandsUnique
+                        "clean" -> do return $ Just LPEClean.cleanLPE
                         "cstelm" -> do return $ Just LPEConstElm.constElm
                         "parelm" -> do return $ Just LPEParElm.parElm
                         "datareset" -> do return $ Just LPEDataReset.dataReset

@@ -6,7 +6,7 @@ See LICENSE at root directory of this repository.
 
 -----------------------------------------------------------------------------
 -- |
--- Module      :  LPEParReset
+-- Module      :  LPEClean
 -- Copyright   :  TNO and University of Twente
 -- License     :  BSD3
 -- Maintainer  :  djurrevanderwal@gmail.com
@@ -14,8 +14,8 @@ See LICENSE at root directory of this repository.
 --
 -----------------------------------------------------------------------------
 
-module LPEMkUniq (
-makeSummandsUnique,
+module LPEClean (
+cleanLPE,
 containsSummand
 ) where
 
@@ -28,10 +28,11 @@ import LPEOps
 import Satisfiability
 import ValExpr
 
-makeSummandsUnique :: LPEOperation
-makeSummandsUnique (channels, paramEqs, summands) _invariant = do
+cleanLPE :: LPEOperation
+cleanLPE (channels, paramEqs, summands) invariant = do
     uniqueSummands <- Monad.foldM addSummandIfUnique [] summands
-    return (Just (channels, paramEqs, uniqueSummands))
+    satGuardSummands <- Monad.foldM addSummandIfSatGuard [] uniqueSummands
+    return (Just (channels, paramEqs, satGuardSummands))
   where
     addSummandIfUnique :: LPESummands -> LPESummand -> IOC.IOC LPESummands
     addSummandIfUnique soFar candidate = do
@@ -39,7 +40,14 @@ makeSummandsUnique (channels, paramEqs, summands) _invariant = do
       if found
       then do return soFar
       else do return (candidate:soFar)
--- makeSummandsUnique
+    
+    addSummandIfSatGuard :: LPESummands -> LPESummand -> IOC.IOC LPESummands
+    addSummandIfSatGuard soFar candidate@(LPESummand _channelOffers guard _paramEqs) = do
+      sat <- isSatisfiable (cstrAnd (Set.fromList [invariant, guard]))
+      if sat
+      then do return (candidate:soFar)
+      else do return soFar
+-- cleanLPE
 
 containsSummand :: LPESummands -> LPESummand -> IOC.IOC Bool
 containsSummand [] _ = do return False

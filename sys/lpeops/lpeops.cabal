@@ -17,7 +17,7 @@ library
   hs-source-dirs:       src/mcrl2
 
   exposed-modules:    LPEOps
-                    , LPEMkUniq
+                    , LPEClean
                     , LPEConstElm
                     , LPEParElm
                     , LPEDataReset
@@ -63,7 +63,7 @@ test-suite lpeops-test
   main-is:              TestMain.hs
 
   other-modules:        LPEOps
-                      , LPEMkUniq
+                      , LPEClean
                       , LPEConstElm
                       , LPEParElm
                       , LPEDataReset

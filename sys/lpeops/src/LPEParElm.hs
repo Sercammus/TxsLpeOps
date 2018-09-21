@@ -19,11 +19,12 @@ parElm
 ) where
 
 import qualified Data.List           as List
+import qualified Data.Set            as Set
 import qualified EnvCore             as IOC
+import qualified TxsDefs
 import qualified FreeVar
 import           LPEOps
 import           LPEParRemoval
-import           Satisfiability
 import           VarId
 
 -- LPE rewrite method.
@@ -31,17 +32,15 @@ import           VarId
 -- State spaces before and after are isomorph.
 parElm :: LPEOperation
 parElm lpeInstance@((_channels, paramEqs, summands)) _invariant = do
-    let inertParams = foldl filterInertParamsWithSummand (map fst paramEqs) summands
+    let allParams = Set.fromList (map fst paramEqs)
+    let guardParams = Set.fromList (concat (map (FreeVar.freeVars . getGuard) summands))
+    let inertParams = Set.toList (allParams Set.\\ guardParams)
     newLPEInstance <- parElmLoop lpeInstance inertParams
     return (Just newLPEInstance)
+  where
+    getGuard :: LPESummand -> TxsDefs.VExpr
+    getGuard (LPESummand _channelOffers guard _procInst) = guard
 -- parElm
-
--- Eliminate parameters from a list if they are used in the guard or channel communications of a given summand:
-filterInertParamsWithSummand :: [VarId] -> LPESummand -> [VarId]
-filterInertParamsWithSummand soFar (LPESummand channelOffers guard _procInst) =
-    let channelOfferVars = foldl (++) [] (map snd channelOffers) in
-      (soFar List.\\ channelOfferVars) List.\\ (FreeVar.freeVars guard)
--- filterInertParamsWithSummand
 
 -- Core method.
 -- Loops until the second argument only contains inert process parameters.
@@ -63,11 +62,8 @@ parElmCheck :: LPESummands                       -- Remaining summands for which
             -> IOC.IOC [VarId]                   -- New marked parameters (cannot grow in size).
 parElmCheck [] inertParams = do return inertParams
 parElmCheck ((LPESummand _ _ LPEStop):xs) inertParams = do parElmCheck xs inertParams
-parElmCheck ((LPESummand _chanOffers guard (LPEProcInst paramEqs)):xs) inertParams = do
-    unsat <- isNotSatisfiable guard
-    if unsat -- Guard is NOT satisfiable, so leave the marked parameters alone:
-    then do parElmCheck xs inertParams
-    else do parElmCheck xs (foldl filterInertParamsWithEq inertParams paramEqs)
+parElmCheck ((LPESummand _chanOffers _guard (LPEProcInst paramEqs)):xs) inertParams = do
+    parElmCheck xs (foldl filterInertParamsWithEq inertParams paramEqs)
   where
     filterInertParamsWithEq :: [VarId] -> LPEParamEq -> [VarId]
     filterInertParamsWithEq soFar (var, expr) = if (elem var inertParams) then soFar else (soFar List.\\ (FreeVar.freeVars expr))
