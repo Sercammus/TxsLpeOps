@@ -13,8 +13,8 @@ cabal-version:          >=1.10
 
 library
   hs-source-dirs:       src
-  hs-source-dirs:       src/utils
-  hs-source-dirs:       src/mcrl2
+                      , src/utils
+                      , src/mcrl2
 
   exposed-modules:    LPEOps
                     , LPEClean
@@ -33,7 +33,6 @@ library
                     , VarFactory
                     , MCRL2Defs
                     , MCRL2Env
-                    , MCRL22TXT
                     , MCRL2PrettyPrint
 
   other-modules:      
@@ -58,6 +57,7 @@ test-suite lpeops-test
   type:                 exitcode-stdio-1.0
   hs-source-dirs:       src
                       , src/utils
+                      , src/mcrl2
                       , test
 
   main-is:              TestMain.hs
@@ -79,7 +79,6 @@ test-suite lpeops-test
                       , VarFactory
                       , MCRL2Defs
                       , MCRL2Env
-                      , MCRL22TXT
                       , MCRL2PrettyPrint
                       , TestUtils
                       , TestConstElm
