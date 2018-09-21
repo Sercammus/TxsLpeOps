@@ -16,7 +16,7 @@ See LICENSE at root directory of this repository.
 
 module LPEOps (
 LPEOperation,
-lpeOperation,
+lpeOperations,
 dummyOp,
 module LPETypes
 ) where
@@ -33,17 +33,26 @@ type LPEOperation = LPEInstance -> TxsDefs.VExpr -> IOC.IOC (Maybe LPEInstance)
 --  2. Applies the given operation to the LPE instance, which results in a new LPE instance;
 --  3. Transforms the new LPE instance to a process definition with the specified name and
 --     a process expression that creates an instance of this process definition.
-lpeOperation :: LPEOperation -> TxsDefs.BExpr -> TxsDefs.VExpr -> Name -> IOC.IOC (Maybe (TxsDefs.BExpr, TxsDefs.ProcId, TxsDefs.ProcDef))
-lpeOperation operation procInst invariant name = do
+lpeOperations :: [LPEOperation] -> TxsDefs.BExpr -> TxsDefs.VExpr -> Name -> IOC.IOC (Maybe (TxsDefs.BExpr, TxsDefs.ProcId, TxsDefs.ProcDef))
+lpeOperations operations procInst invariant name = do
     maybeLPEInstance <- toLPEInstance procInst
     case maybeLPEInstance of
-      Just lpeInstance -> do maybeNewLPEInstance <- operation lpeInstance invariant
+      Just lpeInstance -> do maybeNewLPEInstance <- lpeOperation operations lpeInstance invariant
                              case maybeNewLPEInstance of
                                Just newLPEInstance -> do temp <- fromLPEInstance newLPEInstance name
                                                          return (Just temp)
-                               _ -> do return Nothing
-      _ -> do return Nothing
--- lpeOperation
+                               Nothing -> do return Nothing
+      Nothing -> do return Nothing
+-- lpeOperations
+
+lpeOperation :: [LPEOperation] -> LPEInstance -> TxsDefs.VExpr -> IOC.IOC (Maybe LPEInstance)
+lpeOperation [] lpeInstance _invariant = do return (Just lpeInstance)
+lpeOperation (x:xs) lpeInstance invariant = do
+    maybeNewLPEInstance <- x lpeInstance invariant
+    case maybeNewLPEInstance of
+      Just newLPEInstance -> do lpeOperation xs newLPEInstance invariant
+      Nothing -> do return Nothing
+-- lpeOperations
 
 dummyOp :: LPEOperation
 dummyOp lpeInstance _invariant = do return (Just lpeInstance)

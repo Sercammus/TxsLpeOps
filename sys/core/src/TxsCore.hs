@@ -1172,16 +1172,16 @@ txsLPE (Right modelid@(TxsDefs.ModelId modname _moduid))  =  do
 -- ----------------------------------------------------------------------------------------- --
 
 txsLPEOp :: String -> TxsDefs.ModelId -> String -> TxsDefs.VExpr -> IOC.IOC (Maybe TxsDefs.ModelId)
-txsLPEOp opName (modelId1@(TxsDefs.ModelId modelName1 _moduid)) modelId2 invariant = do
+txsLPEOp opNames (modelId1@(TxsDefs.ModelId modelName1 _moduid)) modelId2 invariant = do
     envc <- get
     case IOC.state envc of
       IOC.Initing {IOC.tdefs = tdefs} ->
         case Map.lookup modelId1 (TxsDefs.modelDefs tdefs) of
           Just (TxsDefs.ModelDef insyncs outsyncs splsyncs bexpr)
-            -> do maybeOpFunc <- getLPEOperation
-                  case maybeOpFunc of
-                    Just opFunc -> do
-                      manipulatedLPE <- LPEOps.lpeOperation opFunc bexpr invariant (T.pack ("LPE_" ++ modelId2))
+            -> do maybeOps <- foldM getLPEOperations (Just []) (filter (\opName -> opName /= []) (splitByArrow opNames))
+                  case maybeOps of
+                    Just ops -> do
+                      manipulatedLPE <- LPEOps.lpeOperations ops bexpr invariant (T.pack ("LPE_" ++ modelId2))
                       case manipulatedLPE of
                         Just (newProcInst, newProcId, newProcDef) ->
                           do newModelUid <- IOC.newUnid
@@ -1199,18 +1199,35 @@ txsLPEOp opName (modelId1@(TxsDefs.ModelId modelName1 _moduid)) modelId2 invaria
       _ -> do IOC.putMsgs [ EnvData.TXS_CORE_SYSTEM_ERROR "LPE: only allowed if initialized" ]
               return Nothing
   where
-    getLPEOperation :: IOC.IOC (Maybe LPEOps.LPEOperation)
-    getLPEOperation = case opName of
-                        "dummy" -> do return $ Just LPEOps.dummyOp
-                        "clean" -> do return $ Just LPEClean.cleanLPE
-                        "cstelm" -> do return $ Just LPEConstElm.constElm
-                        "parelm" -> do return $ Just LPEParElm.parElm
-                        "datareset" -> do return $ Just LPEDataReset.dataReset
-                        "parreset" -> do return $ Just LPEParReset.parReset
-                        "confelm" -> do return $ Just LPEConfCheck.confElm
-                        "mcrl2" -> do return $ Just LPE2MCRL2.lpe2mcrl2
-                        _ -> do IOC.putMsgs [ EnvData.TXS_CORE_SYSTEM_ERROR ("Unknown LPE operation (" ++ opName ++ ")!") ]
-                                return Nothing
+    splitByArrow :: String -> [String]
+    splitByArrow [] = [[]]
+    splitByArrow [x] = [[x]]
+    splitByArrow ('-':'>':xs) = [[]] ++ (splitByArrow xs)
+    splitByArrow (x:xs) =
+        case splitByArrow xs of
+          [] -> [[x]] -- (Should not happen, but anyway.)
+          (y:ys) -> (x:y):ys
+    
+    getLPEOperations :: Maybe [LPEOps.LPEOperation] -> String -> IOC.IOC (Maybe [LPEOps.LPEOperation])
+    getLPEOperations Nothing _ = do return Nothing
+    getLPEOperations (Just soFar) opName = do
+        maybeOp <- getLPEOperation opName
+        case maybeOp of
+          Just op -> do return (Just (soFar ++ [op]))
+          Nothing -> do return Nothing
+    
+    getLPEOperation :: String -> IOC.IOC (Maybe LPEOps.LPEOperation)
+    getLPEOperation opName = case opName of
+                               "dummy" -> do return $ Just LPEOps.dummyOp
+                               "clean" -> do return $ Just LPEClean.cleanLPE
+                               "cstelm" -> do return $ Just LPEConstElm.constElm
+                               "parelm" -> do return $ Just LPEParElm.parElm
+                               "datareset" -> do return $ Just LPEDataReset.dataReset
+                               "parreset" -> do return $ Just LPEParReset.parReset
+                               "confelm" -> do return $ Just LPEConfCheck.confElm
+                               "mcrl2" -> do return $ Just LPE2MCRL2.lpe2mcrl2
+                               _ -> do IOC.putMsgs [ EnvData.TXS_CORE_SYSTEM_ERROR ("Unknown LPE operation (" ++ opName ++ ")!") ]
+                                       return Nothing
 --txsLPEOp
 
 -- ----------------------------------------------------------------------------------------- --
