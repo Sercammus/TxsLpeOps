@@ -1017,12 +1017,9 @@ cmdLPEOp args = do
      let (modelName2, invariantText) = cutAfterSpace modelName2AndInvariant
      case getModelNameIds mdefs modelName1 of
        [modelId] -> do invariant <- readVExpr invariantText
-                       mayModelId' <- lift $ TxsCore.txsLPEOp op modelId modelName2 invariant
-                       case mayModelId' of
-                         Just (modelId') -> do IFS.pack "LPEOP" [ "Operation successfully applied to LPE, resulting in " ++ (TxsShow.fshow modelId') ++ "!" ]
-                                               cmdsIntpr
-                         _               -> do IFS.nack "LPEOP" [ "Failed to apply LPE operation (" ++ op ++ ")!" ]
-                                               cmdsIntpr
+                       msg <- lift $ TxsCore.txsLPEOp op modelId modelName2 invariant
+                       IFS.pack "LPEOP" [ msg ]
+                       cmdsIntpr
        _ -> do IFS.nack "LPEOP" [ "Could not find model (" ++ modelName1 ++ ")!" ]
                cmdsIntpr
   where

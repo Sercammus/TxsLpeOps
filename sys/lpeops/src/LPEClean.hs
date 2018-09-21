@@ -32,7 +32,7 @@ cleanLPE :: LPEOperation
 cleanLPE (channels, paramEqs, summands) invariant = do
     uniqueSummands <- Monad.foldM addSummandIfUnique [] summands
     satGuardSummands <- Monad.foldM addSummandIfSatGuard [] uniqueSummands
-    return (Just (channels, paramEqs, satGuardSummands))
+    return (Left (channels, paramEqs, satGuardSummands))
   where
     addSummandIfUnique :: LPESummands -> LPESummand -> IOC.IOC LPESummands
     addSummandIfUnique soFar candidate = do

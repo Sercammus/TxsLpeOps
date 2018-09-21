@@ -33,7 +33,7 @@ import LPEOps
 import LPEParReset
 import TestUtils
 
-parResetFunc :: LPEInstance -> IO (Maybe LPEInstance)
+parResetFunc :: LPEInstance -> IO (Either LPEInstance String)
 parResetFunc lpeInstance = do
     env <- createTestEnvC
     evalStateT (parReset lpeInstance vexprTrue) env
@@ -43,8 +43,8 @@ testParResetBasic :: Test
 testParResetBasic = TestCase $ do
     maybeResult <- parResetFunc lpeInstance1
     case maybeResult of
-      Just result -> assertBool (printInputExpectedFound lpeInstance1 lpeInstance2 result) (result==lpeInstance2)
-      _ -> assertBool "Function parReset failed to produce output!" False
+      Left result -> assertBool (printInputExpectedFound lpeInstance1 lpeInstance2 result) (result==lpeInstance2)
+      Right msg -> assertBool ("Function parReset failed to produce output (" ++ msg ++ ")!") False
   where
     summand1_1 :: LPESummand
     summand1_1 = LPESummand -- A ? y [x==0] >-> P(1, y)

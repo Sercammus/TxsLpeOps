@@ -48,7 +48,7 @@ showValExpr      (view -> Vconst (Ccstr cid pars)) = let newPars = map (showValE
 showValExpr      (view -> Vconst (Cany sort))      = "ANY " ++ (Text.unpack (SortId.name sort))
 showValExpr      (view -> Vvar vid)                = Text.unpack (VarId.name vid)
 showValExpr      (view -> Vfunc fid vexps)         = let newVExps = map showValExpr vexps in
-                                                      (Text.unpack (FuncId.name fid)) ++ "(" ++ (separatedList newVExps ", ") ++ ")"
+                                                       (Text.unpack (FuncId.name fid)) ++ "(" ++ (separatedList newVExps ", ") ++ ")"
 showValExpr      (view -> Vcstr cid vexps)         = let newVExps = map showValExpr vexps in
                                                        (Text.unpack (CstrId.name cid)) ++ "(" ++ (separatedList newVExps ", ") ++ ")"
 showValExpr      (view -> Viscstr cid vexp)        = let newVExp = showValExpr vexp in
@@ -72,8 +72,8 @@ showValExpr      (view -> Vat s p)                 = (showValExpr s) ++ "[" ++ (
 showValExpr      (view -> Vconcat vexps)           = let newVExps = map showValExpr vexps in
                                                        (separatedList newVExps ":")
 showValExpr      (view -> Vstrinre s r)            = "regex(" ++ (showValExpr s) ++ ", " ++ (showValExpr r) ++ ")"
--- showValExpr      (view -> Vpredef kd fid vexps)    = let newVExps = map showValExpr vexps
---                                                        cstrPredef kd fid newVExps
+showValExpr      (view -> Vpredef kd fid vexps)    = let newVExps = map showValExpr vexps in
+                                                       (Text.unpack (FuncId.name fid)) ++ "[" ++ (show kd) ++ "](" ++ (separatedList newVExps ", ") ++ ")"
 showValExpr expr                                   = error ("LPEPrettyPrint.showValExpr not defined for " ++ (show expr))
 -- showValExpr
 

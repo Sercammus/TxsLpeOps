@@ -42,7 +42,7 @@ dataReset (channels, initParamEqs, summands) invariant = do
                                    | (dk, djs) <- Map.toList belongsToRelation ]
     let relevanceRelation = repeatUntilFixpoint (updateRelevanceRelation paramUsagePerSummand controlFlowGraphs belongsToRelation) (Set.fromList initialRelevanceRelation)
     let newSummands = map (resetParamsInSummand initParamEqs paramUsagePerSummand belongsToRelation relevanceRelation) summands
-    return (Just (channels, initParamEqs, newSummands))
+    return (Left (channels, initParamEqs, newSummands))
 -- dataReset
 
 resetParamsInSummand :: [(VarId, TxsDefs.VExpr)]                -- initParamEqs

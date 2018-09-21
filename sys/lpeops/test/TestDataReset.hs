@@ -33,7 +33,7 @@ import LPEOps
 import LPEDataReset
 import TestUtils
 
-dataResetFunc :: LPEInstance -> IO (Maybe LPEInstance)
+dataResetFunc :: LPEInstance -> IO (Either LPEInstance String)
 dataResetFunc lpeInstance = do
     env <- createTestEnvC
     evalStateT (dataReset lpeInstance vexprTrue) env
@@ -44,8 +44,8 @@ testDataResetBasic = TestCase $ do
     validateLPEInstance lpeInstance1
     maybeResult <- dataResetFunc lpeInstance1
     case maybeResult of
-      Just result -> assertBool (printInputExpectedFound lpeInstance1 lpeInstance2 result) (result==lpeInstance2)
-      _ -> assertBool "Function dataReset failed to produce output!" False
+      Left result -> assertBool (printInputExpectedFound lpeInstance1 lpeInstance2 result) (result==lpeInstance2)
+      Right msg -> assertBool ("Function dataReset failed to produce output (" ++ msg ++ ")!") False
   where
     summand1_1 :: LPESummand
     summand1_1 = LPESummand -- A ? z [x==0] >-> P(1, z)

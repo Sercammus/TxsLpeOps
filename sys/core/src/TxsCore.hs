@@ -1171,19 +1171,19 @@ txsLPE (Right modelid@(TxsDefs.ModelId modname _moduid))  =  do
 
 -- ----------------------------------------------------------------------------------------- --
 
-txsLPEOp :: String -> TxsDefs.ModelId -> String -> TxsDefs.VExpr -> IOC.IOC (Maybe TxsDefs.ModelId)
+txsLPEOp :: String -> TxsDefs.ModelId -> String -> TxsDefs.VExpr -> IOC.IOC String
 txsLPEOp opNames (modelId1@(TxsDefs.ModelId modelName1 _moduid)) modelId2 invariant = do
     envc <- get
     case IOC.state envc of
       IOC.Initing {IOC.tdefs = tdefs} ->
         case Map.lookup modelId1 (TxsDefs.modelDefs tdefs) of
           Just (TxsDefs.ModelDef insyncs outsyncs splsyncs bexpr)
-            -> do maybeOps <- foldM getLPEOperations (Just []) (filter (\opName -> opName /= []) (splitByArrow opNames))
-                  case maybeOps of
-                    Just ops -> do
+            -> do eitherOps <- foldM getLPEOperations (Left []) (filter (\opName -> opName /= []) (splitByArrow opNames))
+                  case eitherOps of
+                    Left ops -> do
                       manipulatedLPE <- LPEOps.lpeOperations ops bexpr invariant (T.pack ("LPE_" ++ modelId2))
                       case manipulatedLPE of
-                        Just (newProcInst, newProcId, newProcDef) ->
+                        Left (newProcInst, newProcId, newProcDef) ->
                           do newModelUid <- IOC.newUnid
                              let newModelId = TxsDefs.ModelId (T.pack modelId2) newModelUid
                              let newModelDef = TxsDefs.ModelDef insyncs outsyncs splsyncs newProcInst
@@ -1191,13 +1191,11 @@ txsLPEOp opNames (modelId1@(TxsDefs.ModelId modelName1 _moduid)) modelId2 invari
                              let tdefs'' = tdefs' { TxsDefs.procDefs = Map.insert newProcId newProcDef (TxsDefs.procDefs tdefs') }
                              let tdefs''' = tdefs'' { TxsDefs.modelDefs = Map.insert newModelId newModelDef (TxsDefs.modelDefs tdefs'') }
                              IOC.modifyCS $ \st -> st { IOC.tdefs = tdefs''' }
-                             return (Just newModelId)
-                        Nothing -> do return Nothing
-                    Nothing -> do return Nothing
-          _ -> do IOC.putMsgs [ EnvData.TXS_CORE_SYSTEM_ERROR ("LPE: model \"" ++ (T.unpack modelName1) ++ "\" was not found") ]
-                  return Nothing
-      _ -> do IOC.putMsgs [ EnvData.TXS_CORE_SYSTEM_ERROR "LPE: only allowed if initialized" ]
-              return Nothing
+                             return ("LPE transformation complete; result saved to model " ++ (TxsShow.fshow newModelId) ++ "!")
+                        Right msg -> do return msg
+                    Right msg -> do return msg
+          _ -> do return ("Could not find model " ++ (T.unpack modelName1) ++ "!")
+      _ -> do return ("LPE transformations cannot be performed before initialization!")
   where
     splitByArrow :: String -> [String]
     splitByArrow [] = [[]]
@@ -1208,26 +1206,26 @@ txsLPEOp opNames (modelId1@(TxsDefs.ModelId modelName1 _moduid)) modelId2 invari
           [] -> [[x]] -- (Should not happen, but anyway.)
           (y:ys) -> (x:y):ys
     
-    getLPEOperations :: Maybe [LPEOps.LPEOperation] -> String -> IOC.IOC (Maybe [LPEOps.LPEOperation])
-    getLPEOperations Nothing _ = do return Nothing
-    getLPEOperations (Just soFar) opName = do
-        maybeOp <- getLPEOperation opName
-        case maybeOp of
-          Just op -> do return (Just (soFar ++ [op]))
-          Nothing -> do return Nothing
+    getLPEOperations :: Either [LPEOps.LPEOperation] String -> String -> IOC.IOC (Either [LPEOps.LPEOperation] String)
+    getLPEOperations (Right msg) _ = do return (Right msg)
+    getLPEOperations (Left soFar) opName = do
+        eitherOp <- getLPEOperation opName
+        case eitherOp of
+          Left op -> do return (Left (soFar ++ [op]))
+          Right msg -> do return (Right msg)
     
-    getLPEOperation :: String -> IOC.IOC (Maybe LPEOps.LPEOperation)
+    getLPEOperation :: String -> IOC.IOC (Either LPEOps.LPEOperation String)
     getLPEOperation opName = case opName of
-                               "dummy" -> do return $ Just LPEOps.dummyOp
-                               "clean" -> do return $ Just LPEClean.cleanLPE
-                               "cstelm" -> do return $ Just LPEConstElm.constElm
-                               "parelm" -> do return $ Just LPEParElm.parElm
-                               "datareset" -> do return $ Just LPEDataReset.dataReset
-                               "parreset" -> do return $ Just LPEParReset.parReset
-                               "confelm" -> do return $ Just LPEConfCheck.confElm
-                               "mcrl2" -> do return $ Just LPE2MCRL2.lpe2mcrl2
-                               _ -> do IOC.putMsgs [ EnvData.TXS_CORE_SYSTEM_ERROR ("Unknown LPE operation (" ++ opName ++ ")!") ]
-                                       return Nothing
+                               "stop" -> do return (Left LPEOps.discardLPE)
+                               "show" -> do return (Left LPEOps.showLPE)
+                               "clean" -> do return (Left LPEClean.cleanLPE)
+                               "cstelm" -> do return (Left LPEConstElm.constElm)
+                               "parelm" -> do return (Left LPEParElm.parElm)
+                               "datareset" -> do return (Left LPEDataReset.dataReset)
+                               "parreset" -> do return (Left LPEParReset.parReset)
+                               "confelm" -> do return (Left LPEConfCheck.confElm)
+                               "mcrl2" -> do return (Left LPE2MCRL2.lpe2mcrl2)
+                               _ -> do return (Right ("Unknown LPE operation (" ++ opName ++ ")!"))
 --txsLPEOp
 
 -- ----------------------------------------------------------------------------------------- --

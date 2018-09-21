@@ -42,6 +42,8 @@ showSort (MCRL2Defs.FunctionSort inputSort outputSort) = "(" ++ (showSort inputS
 showSort other = error ("'showSort' not defined for " ++ (show other))
 
 showConstructor :: MCRL2Defs.Constructor -> String
+showConstructor (MCRL2Defs.Constructor cstrName [] recognizer) =
+    (showObjectId cstrName) ++ " ? " ++ (showObjectId recognizer)
 showConstructor (MCRL2Defs.Constructor cstrName fields recognizer) =
     (showObjectId cstrName) ++ "(" ++ (List.intercalate ", " (map showVariable fields)) ++ ") ? " ++ (showObjectId recognizer)
 showConstructor other = error ("'showConstructor' not defined for " ++ (show other))
@@ -52,6 +54,7 @@ showDExpr (MCRL2Defs.DInt value) = show value
 showDExpr (MCRL2Defs.DList elems) = "[" ++ (List.intercalate ", " (map showDExpr elems)) ++ "]"
 showDExpr (MCRL2Defs.DFiniteSet elems) = "{" ++ (List.intercalate ", " (map showDExpr elems)) ++ "}"
 showDExpr (MCRL2Defs.DVariableRef (MCRL2Defs.Variable varId _varSort)) = showObjectId varId
+showDExpr (MCRL2Defs.DConstructorRef cstrId []) = showObjectId cstrId
 showDExpr (MCRL2Defs.DConstructorRef cstrId varEqs) = (showObjectId cstrId) ++ "(" ++ (List.intercalate ", " (map (showDExpr . snd) varEqs)) ++ ")"
 showDExpr (MCRL2Defs.DRecognizer recognizerId expr) = (showObjectId recognizerId) ++ "(" ++ (showDExpr expr) ++ ")"
 showDExpr (MCRL2Defs.DFieldAccess fieldId expr) = (showObjectId fieldId) ++ "(" ++ (showDExpr expr) ++ ")"

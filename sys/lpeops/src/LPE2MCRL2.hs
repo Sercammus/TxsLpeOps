@@ -14,6 +14,9 @@ See LICENSE at root directory of this repository.
 --
 -----------------------------------------------------------------------------
 
+{-# OPTIONS_GHC -Wno-unused-matches #-}
+{-# OPTIONS_GHC -Wno-unused-top-binds #-}
+
 {-# LANGUAGE ViewPatterns #-}
 module LPE2MCRL2 (
 lpe2mcrl2
@@ -40,9 +43,13 @@ import qualified CstrDef
 import qualified Constant
 
 import qualified MCRL2Defs
+import LPEPrettyPrint
 import MCRL2PrettyPrint
 import MCRL2Env
 import LPEOps
+import ValFactory
+
+-- import TxsShow
 
 lpe2mcrl2 :: LPEOperation
 lpe2mcrl2 lpeInstance invariant = do
@@ -55,8 +62,8 @@ lpe2mcrl2 lpeInstance invariant = do
     evalStateT (lpe2mcrl2' lpeInstance invariant) initialEnv
 -- lpe2mcrl2
 
-lpe2mcrl2' :: LPEInstance -> TxsDefs.VExpr -> T2MMonad (Maybe LPEInstance)
-lpe2mcrl2' lpeInstance@(channels, paramEqs, summands) _invariant = do
+lpe2mcrl2' :: LPEInstance -> TxsDefs.VExpr -> T2MMonad (Either LPEInstance String)
+lpe2mcrl2' (channels, paramEqs, summands) _invariant = do
     tdefs <- gets txsdefs
     -- Translate sorts.
     -- (These are just identifiers; they are defined further via constructors.)
@@ -85,7 +92,7 @@ lpe2mcrl2' lpeInstance@(channels, paramEqs, summands) _invariant = do
     modifySpec $ (\spec -> spec { MCRL2Defs.init = lpeInit })
     spec <- gets specification
     liftIO $ writeFile "output.mcrl2" (showSpecification spec)
-    return (Just lpeInstance)
+    return (Right "Model exported to output.mcrl2!")
 -- lpe2mcrl2'
 
 -- Creates an mCRL2 sort declaration from a TXS sort declaration:
@@ -165,15 +172,16 @@ createLPEProcess :: [VarId.VarId] -> T2MMonad (MCRL2Defs.ObjectId, MCRL2Defs.Pro
 createLPEProcess paramIds = do
     procName <- getFreshName (Text.pack "LPE")
     procParams <- Monad.mapM createFreshVar paramIds
-    --registerObject (TxsDefs.IdProc procId) (RegProcess procName)
     return $ (procName, MCRL2Defs.Process { MCRL2Defs.processParams = procParams, MCRL2Defs.expr = MCRL2Defs.PDeadlock })
 -- createLPEProcess
 
 summand2summand :: (MCRL2Defs.ObjectId, MCRL2Defs.Process) -> LPESummand -> T2MMonad MCRL2Defs.PExpr
 summand2summand (lpeProcName, lpeProc) (LPESummand chanOffers guard procInst) = do
-    newGuard <- valExpr2dataExpr guard
+    -- Create actions, as well as the variables over which we communicate.
+    -- (Because the guard may refer to these variables, translate it AFTER!)
     newActions <- Monad.mapM channelOffer2action chanOffers
     let newActionExpr = MCRL2Defs.PAction (MCRL2Defs.AExpr newActions)
+    newGuard <- valExpr2dataExpr guard
     newProcInst <- procInst2procInst (lpeProcName, lpeProc) procInst
     return (MCRL2Defs.PGuard newGuard (MCRL2Defs.PSeq [newActionExpr, newProcInst]) MCRL2Defs.PDeadlock)
 -- summand2summand
@@ -187,9 +195,12 @@ procInst2procInst (lpeProcName, lpeProc) (LPEProcInst paramEqs) = do
 
 channelOffer2action :: LPEChannelOffer -> T2MMonad MCRL2Defs.AInstance
 channelOffer2action (chanId, chanVars) = do
+    -- The action should already exist:
     (actionName, _action) <- getRegisteredAction chanId
-    ainstances <- Monad.mapM (\chanVar -> valExpr2dataExpr (ValExpr.cstrVar chanVar)) chanVars
-    return $ MCRL2Defs.AInstance actionName ainstances
+    -- The variables should all be fresh, so they do not yet exist in mCRL2:
+    actionVars <- Monad.mapM createFreshVar chanVars
+    let actionParams = map (\actionVar -> MCRL2Defs.DVariableRef actionVar) actionVars
+    return $ MCRL2Defs.AInstance actionName actionParams
 -- offer2action
 
 -- Translates a TXS sort to an mCRL2 sort:
@@ -213,19 +224,28 @@ createFreshVar varId = do
     return newVar
 -- createFreshVar
 
--- Translates a TXS value expression to an mCRL2 data expression:
+-- Wrapper around valExpr2dataExpr' so that it is easier to debug:
 valExpr2dataExpr :: ValExpr.ValExpr VarId.VarId -> T2MMonad MCRL2Defs.DExpr
-valExpr2dataExpr (ValExpr.view -> ValExpr.Vconst (Constant.Cbool value)) = do
+valExpr2dataExpr expr = do
+    liftIO $ putStrLn ((showValExpr expr) ++ " <<|-----|>> " ++ (show expr))
+    valExpr2dataExpr' valExpr2dataExpr expr
+-- valExpr2dataExpr
+
+-- Translates a TXS value expression to an mCRL2 data expression:
+valExpr2dataExpr' :: (ValExpr.ValExpr VarId.VarId -> T2MMonad MCRL2Defs.DExpr) -> ValExpr.ValExpr VarId.VarId -> T2MMonad MCRL2Defs.DExpr
+valExpr2dataExpr' _f (ValExpr.view -> ValExpr.Vconst (Constant.Cbool value)) = do
     return $ MCRL2Defs.DBool value
-valExpr2dataExpr (ValExpr.view -> ValExpr.Vconst (Constant.Cint value)) = do
+valExpr2dataExpr' _f (ValExpr.view -> ValExpr.Vconst (Constant.Cint value)) = do
     return $ MCRL2Defs.DInt value
-valExpr2dataExpr (ValExpr.view -> ValExpr.Vconst (Constant.Cstring string)) = do
+valExpr2dataExpr' _f (ValExpr.view -> ValExpr.Vconst (Constant.Cstring string)) = do
     return $ MCRL2Defs.DList (map (MCRL2Defs.DInt . toInteger . Char.ord) (Text.unpack string))
-valExpr2dataExpr (ValExpr.view -> ValExpr.Vconst (Constant.Cregex _value)) = do
+valExpr2dataExpr' _f (ValExpr.view -> ValExpr.Vconst (Constant.Cregex _value)) = do
     return $ MCRL2Defs.DList [] -- WARNING! Regular expressions are considered to be out of scope!
-valExpr2dataExpr (ValExpr.view -> ValExpr.Vconst (Constant.Ccstr cstrId fieldValues)) = do
-    valExpr2dataExpr (ValExpr.cstrCstr cstrId (map ValExpr.cstrConst fieldValues)) -- (Just delegate each value.)
-valExpr2dataExpr (ValExpr.view -> ValExpr.Vconst (Constant.Cany sortId)) = do
+valExpr2dataExpr' f (ValExpr.view -> ValExpr.Vconst (Constant.Ccstr cstrId fieldValues)) = do
+    (cstrName, MCRL2Defs.Constructor { MCRL2Defs.fields = fields }) <- getRegisteredCstr cstrId
+    translatedFieldValues <- Monad.mapM f (map ValExpr.cstrConst fieldValues)
+    return $ MCRL2Defs.DConstructorRef cstrName (zip fields translatedFieldValues)
+valExpr2dataExpr' _f (ValExpr.view -> ValExpr.Vconst (Constant.Cany sortId)) = do
     newGlobalName <- getFreshName (Text.pack ("g" ++ (Text.unpack (SortId.name sortId))))
     newGlobalSort <- sort2sort sortId
     let newGlobal = MCRL2Defs.Variable { MCRL2Defs.varName = newGlobalName, MCRL2Defs.varSort = newGlobalSort }
@@ -233,81 +253,84 @@ valExpr2dataExpr (ValExpr.view -> ValExpr.Vconst (Constant.Cany sortId)) = do
     -- It must be declared in mCRL2 though:
     modifySpec $ (\spec -> spec { MCRL2Defs.globals = Map.insert newGlobalName newGlobal (MCRL2Defs.globals spec) })
     return $ MCRL2Defs.DVariableRef newGlobal
-valExpr2dataExpr (ValExpr.view -> ValExpr.Vvar var) = do
+valExpr2dataExpr' _f (ValExpr.view -> ValExpr.Vvar var) = do
     (_varName, translatedVar) <- getRegisteredVar var
+    liftIO $ putStrLn ("Tried to resolve variable " ++ (show var) ++ " -> " ++ (Text.unpack _varName) ++ "::" ++ (show translatedVar))
     return $ MCRL2Defs.DVariableRef translatedVar
-valExpr2dataExpr (ValExpr.view -> ValExpr.Vequal lhs rhs) = do
-    translatedLhs <- valExpr2dataExpr lhs
-    translatedRhs <- valExpr2dataExpr rhs
+valExpr2dataExpr' f (ValExpr.view -> ValExpr.Vequal lhs rhs) = do
+    translatedLhs <- f lhs
+    translatedRhs <- f rhs
     return $ MCRL2Defs.DEqual translatedLhs translatedRhs
-valExpr2dataExpr (ValExpr.view -> ValExpr.Vite condition ifBranch elseBranch) = do
-    translatedCondition <- valExpr2dataExpr condition
-    translatedIfBranch <- valExpr2dataExpr ifBranch
-    translatedElseBranch <- valExpr2dataExpr elseBranch
+valExpr2dataExpr' f (ValExpr.view -> ValExpr.Vite condition ifBranch elseBranch) = do
+    translatedCondition <- f condition
+    translatedIfBranch <- f ifBranch
+    translatedElseBranch <- f elseBranch
     return $ MCRL2Defs.DIfThenElse translatedCondition translatedIfBranch translatedElseBranch
-valExpr2dataExpr (ValExpr.view -> ValExpr.Vnot expr) = do
-    translatedExpr <- valExpr2dataExpr expr
+valExpr2dataExpr' f (ValExpr.view -> ValExpr.Vnot expr) = do
+    translatedExpr <- f expr
     return $ MCRL2Defs.DNot translatedExpr
-valExpr2dataExpr (ValExpr.view -> ValExpr.Vand conjuncts) = do
-    translatedConjuncts <- Monad.mapM valExpr2dataExpr (Set.toList conjuncts)
+valExpr2dataExpr' f (ValExpr.view -> ValExpr.Vand conjuncts) = do
+    translatedConjuncts <- Monad.mapM f (Set.toList conjuncts)
     case translatedConjuncts of
       x:xs -> do return $ foldr MCRL2Defs.DAnd x xs
       _ -> do return $ MCRL2Defs.DBool True -- Should not happen!
-valExpr2dataExpr (ValExpr.view -> ValExpr.Vdivide dividend divisor) = do
-    translatedDividend <- valExpr2dataExpr dividend
-    translatedDivisor <- valExpr2dataExpr divisor
+valExpr2dataExpr' f (ValExpr.view -> ValExpr.Vdivide dividend divisor) = do
+    translatedDividend <- f dividend
+    translatedDivisor <- f divisor
     return $ MCRL2Defs.DDivide translatedDividend translatedDivisor
-valExpr2dataExpr (ValExpr.view -> ValExpr.Vmodulo dividend divisor) = do
-    translatedDividend <- valExpr2dataExpr dividend
-    translatedDivisor <- valExpr2dataExpr divisor
+valExpr2dataExpr' f (ValExpr.view -> ValExpr.Vmodulo dividend divisor) = do
+    translatedDividend <- f dividend
+    translatedDivisor <- f divisor
     return $ MCRL2Defs.DModulo translatedDividend translatedDivisor
-valExpr2dataExpr (ValExpr.view -> ValExpr.Vsum freeSum) = do
+valExpr2dataExpr' _f (ValExpr.view -> ValExpr.Vsum freeSum) = do
     translatedFreeSum <- Monad.mapM cOccur2dataExpr (FMX.toDistinctAscOccurListT freeSum)
     case translatedFreeSum of
       x:xs -> do return $ foldr MCRL2Defs.DAdd x xs
       [] -> do return $ MCRL2Defs.DInt 0 -- Should not happen!
-valExpr2dataExpr (ValExpr.view -> ValExpr.Vproduct freeProduct) = do
+valExpr2dataExpr' _f (ValExpr.view -> ValExpr.Vproduct freeProduct) = do
     translatedFreeProduct <- Monad.mapM cOccur2dataExpr (FMX.toDistinctAscOccurListT freeProduct)
     case translatedFreeProduct of
       x:xs -> do return $ foldr MCRL2Defs.DMultiply x xs
       [] -> do return $ MCRL2Defs.DInt 1 -- Should not happen!
-valExpr2dataExpr (ValExpr.view -> ValExpr.Vgez expr) = do
-    translatedExpr <- valExpr2dataExpr expr
+valExpr2dataExpr' f (ValExpr.view -> ValExpr.Vgez expr) = do
+    translatedExpr <- f expr
     return $ MCRL2Defs.DGreaterEquals translatedExpr (MCRL2Defs.DInt 0)
-valExpr2dataExpr (ValExpr.view -> ValExpr.Vlength string) = do
-    translatedString <- valExpr2dataExpr string
+valExpr2dataExpr' f (ValExpr.view -> ValExpr.Vlength string) = do
+    translatedString <- f string
     return $ MCRL2Defs.DListSize translatedString
-valExpr2dataExpr (ValExpr.view -> ValExpr.Vat string index) = do
-    translatedString <- valExpr2dataExpr string
-    translatedIndex <- valExpr2dataExpr index
+valExpr2dataExpr' f (ValExpr.view -> ValExpr.Vat string index) = do
+    translatedString <- f string
+    translatedIndex <- f index
     return $ MCRL2Defs.DListElement translatedString translatedIndex
-valExpr2dataExpr (ValExpr.view -> ValExpr.Vconcat strings) = do
-    translatedStrings <- Monad.mapM valExpr2dataExpr strings
+valExpr2dataExpr' f (ValExpr.view -> ValExpr.Vconcat strings) = do
+    translatedStrings <- Monad.mapM f strings
     case translatedStrings of
       x:xs -> do return $ foldr MCRL2Defs.DListConcatenate x xs
       _ -> do return $ MCRL2Defs.DList [] -- Should not happen!
-valExpr2dataExpr (ValExpr.view -> ValExpr.Vstrinre _string _regex) = do
+valExpr2dataExpr' _f (ValExpr.view -> ValExpr.Vstrinre _string _regex) = do
     return $ MCRL2Defs.DList [] -- WARNING! Regular expressions are considered to be out of scope!
-valExpr2dataExpr (ValExpr.view -> ValExpr.Vcstr cstrId fieldValues) = do
+valExpr2dataExpr' f (ValExpr.view -> ValExpr.Vcstr cstrId fieldValues) = do
     (cstrName, MCRL2Defs.Constructor { MCRL2Defs.fields = fields }) <- getRegisteredCstr cstrId
-    translatedFieldValues <- Monad.mapM valExpr2dataExpr fieldValues
+    translatedFieldValues <- Monad.mapM f fieldValues
     return $ MCRL2Defs.DConstructorRef cstrName (zip fields translatedFieldValues)
-valExpr2dataExpr (ValExpr.view -> ValExpr.Viscstr cstrId expr) = do
+valExpr2dataExpr' f (ValExpr.view -> ValExpr.Viscstr cstrId expr) = do
     (_cstrName, MCRL2Defs.Constructor { MCRL2Defs.recognizer = recognizerName }) <- getRegisteredCstr cstrId
-    translatedExpr <- valExpr2dataExpr expr
+    translatedExpr <- f expr
     return $ MCRL2Defs.DRecognizer recognizerName translatedExpr
-valExpr2dataExpr (ValExpr.view -> ValExpr.Vaccess cstrId fieldIndex expr) = do
+valExpr2dataExpr' f (ValExpr.view -> ValExpr.Vaccess cstrId fieldIndex expr) = do
     (_cstrName, MCRL2Defs.Constructor { MCRL2Defs.fields = fields }) <- getRegisteredCstr cstrId
-    translatedExpr <- valExpr2dataExpr expr
+    translatedExpr <- f expr
     return $ MCRL2Defs.DFieldAccess (MCRL2Defs.varName (fields !! fieldIndex)) translatedExpr
-valExpr2dataExpr (ValExpr.view -> ValExpr.Vfunc funcId paramValues) = do
+valExpr2dataExpr' f (ValExpr.view -> ValExpr.Vfunc funcId paramValues) = do
     (mappingName, _mappingSort) <- getRegisteredMapping funcId
-    translatedParamValues <- Monad.mapM valExpr2dataExpr paramValues
+    translatedParamValues <- Monad.mapM f paramValues
     return $ MCRL2Defs.DMappingRef mappingName translatedParamValues
-valExpr2dataExpr (ValExpr.view -> ValExpr.Vpredef _predefKind _funcId _paramValues) = do
-    return $ MCRL2Defs.DBool False -- TODO what is this exactly?
-valExpr2dataExpr _ = do return $ MCRL2Defs.DBool False
--- valExpr2dataExpr
+valExpr2dataExpr' f (ValExpr.view -> ValExpr.Vpredef _predefKind funcId _paramValues) = do -- TODO what is Vpredef exactly?
+    defaultValue <- lift $ sort2defaultValue (FuncId.funcsort funcId)
+    translatedDefaultValue <- f defaultValue
+    return translatedDefaultValue
+valExpr2dataExpr' _f _ = do return $ MCRL2Defs.DBool False
+-- valExpr2dataExpr'
 
 -- Used exclusively to translate FreeSums and FreeProducts (FreeMonoidXs):
 cOccur2dataExpr :: (ValExpr.ValExpr VarId.VarId, Integer) -> T2MMonad MCRL2Defs.DExpr
@@ -315,4 +338,7 @@ cOccur2dataExpr (expr, count) = do
     translatedExpr <- valExpr2dataExpr expr
     return $ MCRL2Defs.DMultiply translatedExpr (MCRL2Defs.DInt count)
 -- cOccur2dataExpr
+
+
+
 

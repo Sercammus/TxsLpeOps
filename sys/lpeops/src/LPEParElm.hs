@@ -36,7 +36,7 @@ parElm lpeInstance@((_channels, paramEqs, summands)) _invariant = do
     let guardParams = Set.fromList (concat (map (FreeVar.freeVars . getGuard) summands))
     let inertParams = Set.toList (allParams Set.\\ guardParams)
     newLPEInstance <- parElmLoop lpeInstance inertParams
-    return (Just newLPEInstance)
+    return (Left newLPEInstance)
   where
     getGuard :: LPESummand -> TxsDefs.VExpr
     getGuard (LPESummand _channelOffers guard _procInst) = guard

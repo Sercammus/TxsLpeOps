@@ -33,7 +33,7 @@ import LPEOps
 import LPEConstElm
 import TestUtils
 
-constElmFunc :: LPEInstance -> IO (Maybe LPEInstance)
+constElmFunc :: LPEInstance -> IO (Either LPEInstance String)
 constElmFunc lpeInstance = do
     env <- createTestEnvC
     evalStateT (constElm lpeInstance vexprTrue) env
@@ -43,8 +43,8 @@ testConstElmBasic :: Test
 testConstElmBasic = TestCase $ do
     maybeResult <- constElmFunc lpeInstance1
     case maybeResult of
-      Just result -> assertBool (printInputExpectedFound lpeInstance1 lpeInstance2 result) (result==lpeInstance2)
-      _ -> assertBool "Function constElm failed to produce output!" False
+      Left result -> assertBool (printInputExpectedFound lpeInstance1 lpeInstance2 result) (result==lpeInstance2)
+      Right msg -> assertBool ("Function constElm failed to produce output (" ++ msg ++ ")!") False
   where
     summand1_1 :: LPESummand
     summand1_1 = LPESummand -- A ? z [z==0] >-> P(1, 0)
@@ -77,8 +77,8 @@ testConstElmXYX :: Test
 testConstElmXYX = TestCase $ do
     maybeResult <- constElmFunc lpeInstance1
     case maybeResult of
-      Just result -> assertBool (printInputExpectedFound lpeInstance1 lpeInstance2 result) (result==lpeInstance2)
-      _ -> assertBool "Function constElm failed to produce output!" False
+      Left result -> assertBool (printInputExpectedFound lpeInstance1 lpeInstance2 result) (result==lpeInstance2)
+      Right msg -> assertBool ("Function constElm failed to produce output (" ++ msg ++ ")!") False
   where
     summand1_1 :: LPESummand
     summand1_1 = LPESummand -- A ? z >-> P(x, 1, z)

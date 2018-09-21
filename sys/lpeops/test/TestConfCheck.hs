@@ -36,7 +36,7 @@ import LPEOps
 import LPEConfCheck
 import TestUtils
 
-confCheckFunc :: LPEInstance -> IO (Maybe LPEInstance)
+confCheckFunc :: LPEInstance -> IO (Either LPEInstance String)
 confCheckFunc lpeInstance = do
     env <- createTestEnvC
     evalStateT (confCheck lpeInstance vexprTrue) env
@@ -46,8 +46,8 @@ testConfCheckBasic :: Test
 testConfCheckBasic = TestCase $ do
     maybeResult <- confCheckFunc lpeInstance1
     case maybeResult of
-      Just result -> assertBool (printInputExpectedFound lpeInstance1 lpeInstance2 result) (result==lpeInstance2)
-      _ -> assertBool "Function confElm failed to produce output!" False
+      Left result -> assertBool (printInputExpectedFound lpeInstance1 lpeInstance2 result) (result==lpeInstance2)
+      Right msg -> assertBool ("Function confCheck failed to produce output (" ++ msg ++ ")!") False
   where
     summand1_1 :: LPESummand
     summand1_1 = LPESummand -- A ? [x!=2] >-> P(x+1, y)
@@ -76,7 +76,7 @@ testConfCheckBasic = TestCase $ do
     lpeInstance2 = ([chanIdA], [(varIdX, vexpr0), (varIdY, vexpr0)], [summand2_1, summand2_2])
 -- testConfCheckBasic
 
-confElmFunc :: LPEInstance -> IO (Maybe LPEInstance)
+confElmFunc :: LPEInstance -> IO (Either LPEInstance String)
 confElmFunc lpeInstance = do
     env <- createTestEnvC
     evalStateT (confElm lpeInstance vexprTrue) env
@@ -86,8 +86,8 @@ testConfElmNoChange :: Test
 testConfElmNoChange = TestCase $ do
     maybeResult <- confElmFunc lpeInstance1
     case maybeResult of
-      Just result -> assertBool (printInputExpectedFound lpeInstance1 lpeInstance2 result) (result==lpeInstance2)
-      _ -> assertBool "Function confElm failed to produce output!" False
+      Left result -> assertBool (printInputExpectedFound lpeInstance1 lpeInstance2 result) (result==lpeInstance2)
+      Right msg -> assertBool ("Function confElm failed to produce output (" ++ msg ++ ")!") False
   where
     summand1_1 :: LPESummand
     summand1_1 = LPESummand -- A ? [x!=2] >-> P(x+1, y)
@@ -120,8 +120,8 @@ testConfElmBasic :: Test
 testConfElmBasic = TestCase $ do
     maybeResult <- confElmFunc lpeInstance1
     case maybeResult of
-      Just result -> assertBool (printInputExpectedFound lpeInstance1 lpeInstance2 result) (result==lpeInstance2)
-      _ -> assertBool "Function confElm failed to produce output!" False
+      Left result -> assertBool (printInputExpectedFound lpeInstance1 lpeInstance2 result) (result==lpeInstance2)
+      Right msg -> assertBool ("Function confElm failed to produce output (" ++ msg ++ ")!") False
   where
     summand1_1 :: LPESummand
     summand1_1 = LPESummand -- A >-> P(x+1, y)
@@ -154,8 +154,8 @@ testConfElmModulo :: Test
 testConfElmModulo = TestCase $ do
     maybeResult <- confElmFunc lpeInstance1
     case maybeResult of
-      Just result -> assertBool (printInputExpectedFound lpeInstance1 lpeInstance2 result) (result==lpeInstance2)
-      _ -> assertBool "Function confElm failed to produce output!" False
+      Left result -> assertBool (printInputExpectedFound lpeInstance1 lpeInstance2 result) (result==lpeInstance2)
+      Right msg -> assertBool ("Function confElm failed to produce output (" ++ msg ++ ")!") False
   where
     summand1_1 :: LPESummand
     summand1_1 = LPESummand -- A >-> P((x+1) % 3, y)

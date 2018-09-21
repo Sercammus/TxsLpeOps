@@ -37,7 +37,7 @@ import           ValExpr
 constElm :: LPEOperation
 constElm lpeInstance@((_channels, paramEqs, _summands)) invariant = do
     newLPEInstance <- constElmLoop lpeInstance invariant (map fst paramEqs)
-    return (Just newLPEInstance)
+    return (Left newLPEInstance)
 -- constElm
 
 -- Core method.

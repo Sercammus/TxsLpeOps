@@ -34,7 +34,7 @@ import LPEOps
 import LPEParElm
 import TestUtils
 
-parElmFunc :: LPEInstance -> IO (Maybe LPEInstance)
+parElmFunc :: LPEInstance -> IO (Either LPEInstance String)
 parElmFunc lpeInstance = do
     env <- createTestEnvC
     evalStateT (parElm lpeInstance vexprTrue) env
@@ -44,8 +44,8 @@ testParElmBasic :: Test
 testParElmBasic = TestCase $ do
     maybeResult <- parElmFunc lpeInstance1
     case maybeResult of
-      Just result -> assertBool (printInputExpectedFound lpeInstance1 lpeInstance2 result) (result==lpeInstance2)
-      _ -> assertBool "Function parElm failed to produce output!" False
+      Left result -> assertBool (printInputExpectedFound lpeInstance1 lpeInstance2 result) (result==lpeInstance2)
+      Right msg -> assertBool ("Function parElm failed to produce output (" ++ msg ++ ")!") False
   where
     summand1_1 :: LPESummand
     summand1_1 = LPESummand -- A ? y >-> P(x)
@@ -78,8 +78,8 @@ testParElmXUpperBound :: Test
 testParElmXUpperBound = TestCase $ do
     maybeResult <- parElmFunc lpeInstance1
     case maybeResult of
-      Just result -> assertBool (printInputExpectedFound lpeInstance1 lpeInstance2 result) (result==lpeInstance2)
-      _ -> assertBool "Function parElm failed to produce output!" False
+      Left result -> assertBool (printInputExpectedFound lpeInstance1 lpeInstance2 result) (result==lpeInstance2)
+      Right msg -> assertBool ("Function parElm failed to produce output (" ++ msg ++ ")!") False
   where
     summand1_1 :: LPESummand
     summand1_1 = LPESummand -- A ? y [x == 2] >-> P(x)

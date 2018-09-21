@@ -52,7 +52,7 @@ confCheck (channels, paramEqs, summands) invariant = do
     confluentTauSummands <- getConfluentTauSummands summands invariant
     let noConfluentTauSummands = (Set.fromList summands) Set.\\ (Set.fromList confluentTauSummands)
     let newSummands = Set.union noConfluentTauSummands (Set.fromList (map flagTauSummand confluentTauSummands))
-    do return $ Just (channels, paramEqs, Set.toList newSummands)
+    do return (Left (channels, paramEqs, Set.toList newSummands))
 -- confCheck
 
 isTauSummand :: LPESummand -> Bool
@@ -114,10 +114,10 @@ confElm :: LPEOperation
 confElm (channels, paramEqs, summands) invariant = do
     confluentTauSummands <- getConfluentTauSummands summands invariant
     if confluentTauSummands == []
-    then do return $ Just (channels, paramEqs, summands)
+    then do return $ Left (channels, paramEqs, summands)
     else do definiteSuccessors <- Monad.mapM (getDefiniteSuccessors summands invariant) summands
             let confluentTauSuccessors = map (List.intersect confluentTauSummands) definiteSuccessors
-            return $ Just (channels, paramEqs, zipWith mergeSummands summands confluentTauSuccessors)
+            return $ Left (channels, paramEqs, zipWith mergeSummands summands confluentTauSuccessors)
   where
     mergeSummands :: LPESummand -> [LPESummand] -> LPESummand
     mergeSummands summand [] = summand
