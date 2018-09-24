@@ -48,7 +48,7 @@ getConfluentTauSummands summands invariant = do
 -- LPE rewrite method.
 -- Flags confluent ISTEPs by renaming them to CISTEPs.
 confCheck :: LPEOperation
-confCheck (channels, paramEqs, summands) invariant = do
+confCheck (channels, paramEqs, summands) _out invariant = do
     confluentTauSummands <- getConfluentTauSummands summands invariant
     let noConfluentTauSummands = (Set.fromList summands) Set.\\ (Set.fromList confluentTauSummands)
     let newSummands = Set.union noConfluentTauSummands (Set.fromList (map flagTauSummand confluentTauSummands))
@@ -111,7 +111,7 @@ checkConfluenceCondition (summand1@(LPESummand _channelOffers1 guard1 (LPEProcIn
 -- LPE rewrite method.
 -- Appends confluent ISTEPs to predecessor summands.
 confElm :: LPEOperation
-confElm (channels, paramEqs, summands) invariant = do
+confElm (channels, paramEqs, summands) _out invariant = do
     confluentTauSummands <- getConfluentTauSummands summands invariant
     if confluentTauSummands == []
     then do return $ Left (channels, paramEqs, summands)

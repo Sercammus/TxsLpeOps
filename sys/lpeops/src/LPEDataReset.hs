@@ -28,7 +28,7 @@ import LPEParUsage
 import VarId
 
 dataReset :: LPEOperation
-dataReset (channels, initParamEqs, summands) invariant = do
+dataReset (channels, initParamEqs, summands) _out invariant = do
     let params = map fst initParamEqs
     paramUsagePerSummand <- getParamUsagePerSummand summands params invariant
     let controlFlowParams = getControlFlowParams summands paramUsagePerSummand params

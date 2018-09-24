@@ -36,7 +36,7 @@ import           ValExpr
 -- Eliminates parameters that do not contribute to the behavior of a process from an LPE.
 -- State spaces before and after are strongly bisimilar.
 parReset :: LPEOperation
-parReset lpeInstance@((_channels, paramEqs, summands)) _invariant = do
+parReset lpeInstance@((_channels, paramEqs, summands)) _out _invariant = do
     IOC.putMsgs [ EnvData.TXS_CORE_ANY "Identifying successors..." ]
     immediateSuccessors <- Monad.mapM (getImmediateSuccessors summands) summands
     let successorsPerSummand = zipWith (\s i -> (s, i, map fst paramEqs)) summands immediateSuccessors

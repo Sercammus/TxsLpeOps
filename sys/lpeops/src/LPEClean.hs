@@ -29,7 +29,7 @@ import Satisfiability
 import ValExpr
 
 cleanLPE :: LPEOperation
-cleanLPE (channels, paramEqs, summands) invariant = do
+cleanLPE (channels, paramEqs, summands) _out invariant = do
     uniqueSummands <- Monad.foldM addSummandIfUnique [] summands
     satGuardSummands <- Monad.foldM addSummandIfSatGuard [] uniqueSummands
     return (Left (channels, paramEqs, satGuardSummands))

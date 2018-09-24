@@ -39,7 +39,7 @@ import TestUtils
 confCheckFunc :: LPEInstance -> IO (Either LPEInstance String)
 confCheckFunc lpeInstance = do
     env <- createTestEnvC
-    evalStateT (confCheck lpeInstance vexprTrue) env
+    evalStateT (confCheck lpeInstance "" vexprTrue) env
 -- confCheckFunc
 
 testConfCheckBasic :: Test
@@ -79,7 +79,7 @@ testConfCheckBasic = TestCase $ do
 confElmFunc :: LPEInstance -> IO (Either LPEInstance String)
 confElmFunc lpeInstance = do
     env <- createTestEnvC
-    evalStateT (confElm lpeInstance vexprTrue) env
+    evalStateT (confElm lpeInstance "" vexprTrue) env
 -- confElmFunc
 
 testConfElmNoChange :: Test

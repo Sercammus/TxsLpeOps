@@ -14,7 +14,6 @@ where
 import Test.HUnit
 import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
-import qualified Data.Text as Text
 import qualified EnvData
 import Control.Monad.State
 import TxsDefs
@@ -62,7 +61,6 @@ putMsgs msgs = do printMsg msgs
 
 printInputExpectedFound :: LPEInstance -> LPEInstance -> LPEInstance -> String
 printInputExpectedFound input expected found =
-    --"\n" ++ (splitPrint "   Input..." (show input) 120) ++ "\n-->\n\n" ++ (printSideBySide "Expected..." "   Found..." (show expected) (show found) 120)
     "\nInput:\n\n" ++ (showLPEInstance input) ++
     "\n\nExpected output:\n\n" ++ (showLPEInstance expected) ++
     "\n\nActual output:\n\n" ++ (showLPEInstance found) ++ "\n"
@@ -70,7 +68,7 @@ printInputExpectedFound input expected found =
 
 validateLPEInstance' :: LPEInstance -> IOC.IOC ()
 validateLPEInstance' lpeInstance = do
-    (procInit, newProcId, newProcDef) <- fromLPEInstance lpeInstance (Text.pack "LPE")
+    (procInit, newProcId, newProcDef) <- fromLPEInstance lpeInstance "LPE" -- (This function is called within a new environment, so the name does not really matter.)
     tdefs <- gets (IOC.tdefs . IOC.state)
     let tdefs' = tdefs { TxsDefs.procDefs = Map.insert newProcId newProcDef (TxsDefs.procDefs tdefs) }
     IOC.modifyCS $ \st -> st { IOC.tdefs = tdefs' }

@@ -44,7 +44,6 @@ import qualified TxsShow
 import qualified ProcId
 import           VarId
 import           ChanId
-import           Name
 import           Constant
 import           ValExpr
 
@@ -189,11 +188,11 @@ getChannelOffer params (TxsDefs.Offer { TxsDefs.chanid = chanid, TxsDefs.chanoff
 -- Exposed method.
 -- Constructs a process expression and a process definition from an LPEInstance (unless there is a problem).
 -- The process expression creates an instance of the process definition.
-fromLPEInstance :: LPEInstance -> Name -> IOC.IOC (TxsDefs.BExpr, TxsDefs.ProcId, TxsDefs.ProcDef)
+fromLPEInstance :: LPEInstance -> String -> IOC.IOC (TxsDefs.BExpr, TxsDefs.ProcId, TxsDefs.ProcDef)
 fromLPEInstance (chans, paramEqs, summands) procName = do
     let newProcParams = map fst paramEqs
     newProcUnid <- IOC.newUnid
-    let newProcId = TxsDefs.ProcId { ProcId.name = procName
+    let newProcId = TxsDefs.ProcId { ProcId.name = (Text.pack procName)
                                    , ProcId.unid = newProcUnid
                                    , ProcId.procchans = map (ProcId.ChanSort . ChanId.chansorts) chans
                                    , ProcId.procvars = map (VarId.varsort) newProcParams

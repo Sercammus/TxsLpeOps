@@ -31,7 +31,7 @@ import           VarId
 -- Eliminates parameters that do not contribute to the behavior of a process from an LPE.
 -- State spaces before and after are isomorph.
 parElm :: LPEOperation
-parElm lpeInstance@((_channels, paramEqs, summands)) _invariant = do
+parElm lpeInstance@((_channels, paramEqs, summands)) _out _invariant = do
     let allParams = Set.fromList (map fst paramEqs)
     let guardParams = Set.fromList (concat (map (FreeVar.freeVars . getGuard) summands))
     let inertParams = Set.toList (allParams Set.\\ guardParams)

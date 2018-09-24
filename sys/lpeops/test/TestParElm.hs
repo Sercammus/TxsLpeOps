@@ -37,7 +37,7 @@ import TestUtils
 parElmFunc :: LPEInstance -> IO (Either LPEInstance String)
 parElmFunc lpeInstance = do
     env <- createTestEnvC
-    evalStateT (parElm lpeInstance vexprTrue) env
+    evalStateT (parElm lpeInstance "" vexprTrue) env
 -- parElmFunc
 
 testParElmBasic :: Test

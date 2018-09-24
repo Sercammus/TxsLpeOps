@@ -52,18 +52,18 @@ import ValFactory
 -- import TxsShow
 
 lpe2mcrl2 :: LPEOperation
-lpe2mcrl2 lpeInstance invariant = do
+lpe2mcrl2 lpeInstance out invariant = do
     tdefs' <- gets (IOC.tdefs . IOC.state)
     let initialEnv = T2MEnv { txsdefs = tdefs'
                             , specification = MCRL2Defs.emptySpecification
                             , objectMap = Map.empty
                             , usedNames = Set.empty
                             }
-    evalStateT (lpe2mcrl2' lpeInstance invariant) initialEnv
+    evalStateT (lpe2mcrl2' lpeInstance out invariant) initialEnv
 -- lpe2mcrl2
 
-lpe2mcrl2' :: LPEInstance -> TxsDefs.VExpr -> T2MMonad (Either LPEInstance String)
-lpe2mcrl2' (channels, paramEqs, summands) _invariant = do
+lpe2mcrl2' :: LPEInstance -> String -> TxsDefs.VExpr -> T2MMonad (Either LPEInstance String)
+lpe2mcrl2' (channels, paramEqs, summands) out _invariant = do
     tdefs <- gets txsdefs
     -- Translate sorts.
     -- (These are just identifiers; they are defined further via constructors.)
@@ -91,8 +91,9 @@ lpe2mcrl2' (channels, paramEqs, summands) _invariant = do
     lpeInit <- procInst2procInst (lpeProcName, lpeProc) (LPEProcInst paramEqs)
     modifySpec $ (\spec -> spec { MCRL2Defs.init = lpeInit })
     spec <- gets specification
-    liftIO $ writeFile "output.mcrl2" (showSpecification spec)
-    return (Right "Model exported to output.mcrl2!")
+    let filename = out ++ ".mcrl2"
+    liftIO $ writeFile filename (showSpecification spec)
+    return (Right ("Model exported to " ++ filename ++ "!"))
 -- lpe2mcrl2'
 
 -- Creates an mCRL2 sort declaration from a TXS sort declaration:

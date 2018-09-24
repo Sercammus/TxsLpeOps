@@ -36,7 +36,7 @@ import TestUtils
 dataResetFunc :: LPEInstance -> IO (Either LPEInstance String)
 dataResetFunc lpeInstance = do
     env <- createTestEnvC
-    evalStateT (dataReset lpeInstance vexprTrue) env
+    evalStateT (dataReset lpeInstance "" vexprTrue) env
 -- dataResetFunc
 
 testDataResetBasic :: Test

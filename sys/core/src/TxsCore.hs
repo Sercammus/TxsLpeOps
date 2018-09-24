@@ -1172,20 +1172,20 @@ txsLPE (Right modelid@(TxsDefs.ModelId modname _moduid))  =  do
 -- ----------------------------------------------------------------------------------------- --
 
 txsLPEOp :: String -> TxsDefs.ModelId -> String -> TxsDefs.VExpr -> IOC.IOC String
-txsLPEOp opNames (modelId1@(TxsDefs.ModelId modelName1 _moduid)) modelId2 invariant = do
+txsLPEOp opNames (inputModelId@(TxsDefs.ModelId modelName1 _moduid)) out invariant = do
     envc <- get
     case IOC.state envc of
       IOC.Initing {IOC.tdefs = tdefs} ->
-        case Map.lookup modelId1 (TxsDefs.modelDefs tdefs) of
+        case Map.lookup inputModelId (TxsDefs.modelDefs tdefs) of
           Just (TxsDefs.ModelDef insyncs outsyncs splsyncs bexpr)
             -> do eitherOps <- foldM getLPEOperations (Left []) (filter (\opName -> opName /= []) (splitByArrow opNames))
                   case eitherOps of
                     Left ops -> do
-                      manipulatedLPE <- LPEOps.lpeOperations ops bexpr invariant (T.pack ("LPE_" ++ modelId2))
+                      manipulatedLPE <- LPEOps.lpeOperations ops bexpr out invariant
                       case manipulatedLPE of
                         Left (newProcInst, newProcId, newProcDef) ->
                           do newModelUid <- IOC.newUnid
-                             let newModelId = TxsDefs.ModelId (T.pack modelId2) newModelUid
+                             let newModelId = TxsDefs.ModelId (T.pack out) newModelUid
                              let newModelDef = TxsDefs.ModelDef insyncs outsyncs splsyncs newProcInst
                              tdefs' <- gets (IOC.tdefs . IOC.state)
                              let tdefs'' = tdefs' { TxsDefs.procDefs = Map.insert newProcId newProcDef (TxsDefs.procDefs tdefs') }
