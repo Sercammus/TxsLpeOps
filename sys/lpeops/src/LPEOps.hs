@@ -15,6 +15,7 @@ See LICENSE at root directory of this repository.
 -----------------------------------------------------------------------------
 
 module LPEOps (
+lpeOpsVersion,
 LPEOperation,
 lpeOperations,
 discardLPE,
@@ -27,6 +28,9 @@ import qualified EnvData
 import qualified TxsDefs
 import           LPETypes
 import           LPEPrettyPrint
+
+lpeOpsVersion :: String
+lpeOpsVersion = "0.1.0"
 
 type LPEOperation = LPEInstance -> String -> TxsDefs.VExpr -> IOC.IOC (Either LPEInstance String)
 

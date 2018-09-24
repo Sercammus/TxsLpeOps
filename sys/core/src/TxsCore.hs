@@ -242,7 +242,8 @@ txsInit tdefs sigs putMsgs  =  do
                (info,smtEnv') <- lift $ runStateT SMT.openSolver smtEnv
                (_,smtEnv'')   <- lift $ runStateT (SMT.addDefinitions (SMTData.EnvDefs (TxsDefs.sortDefs tdefs) (TxsDefs.cstrDefs tdefs) (Set.foldr Map.delete (TxsDefs.funcDefs tdefs) (allENDECfuncs tdefs)))) smtEnv'
                putMsgs [ EnvData.TXS_CORE_USER_INFO $ "Solver " ++ show (Config.solverId (Config.selectedSolver cfg)) ++ " initialized : " ++ info
-                       , EnvData.TXS_CORE_USER_INFO   "TxsCore initialized :D"
+                       , EnvData.TXS_CORE_USER_INFO   "TxsCore initialized"
+                       , EnvData.TXS_CORE_USER_INFO   (" LPEOps version " ++ LPEOps.lpeOpsVersion)
                        ]
                put envc {
                  IOC.state =
