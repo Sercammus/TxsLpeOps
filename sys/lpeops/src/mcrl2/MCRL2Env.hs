@@ -18,6 +18,7 @@ module MCRL2Env (
 T2MMonad,
 T2MRegisteredObject(..),
 T2MEnv(..),
+emptyEnv,
 modifySpec,
 registerObject,
 getRegisteredSort,
@@ -59,6 +60,24 @@ data T2MEnv = T2MEnv { txsdefs :: TxsDefs.TxsDefs
                      , usedNames :: Set.Set MCRL2Defs.ObjectId
                      }
 -- T2MEnv
+
+emptyEnv :: T2MEnv
+emptyEnv = T2MEnv { txsdefs = TxsDefs.empty
+                  , specification = MCRL2Defs.emptySpecification
+                  , objectMap = Map.empty
+                  , usedNames = Set.fromList (map Text.pack mCRL2KeywordList)
+                  }
+-- emptyEnv
+
+mCRL2KeywordList :: [String]
+mCRL2KeywordList = [
+    "act", "allow", "block", "comm", "cons", "delay", "div", "end", "eqn", "exists",
+    "forall", "glob", "hide", "if", "in", "init", "lambda", "map", "mod", "mu", "nu", "pbes",
+    "proc", "rename", "sort", "struct", "sum", "val", "var", "whr", "yaled",
+    "Bag", "Bool", "Int", "List", "Nat", "Pos", "Real", "Set",
+    "delta", "false", "nil", "tau", "true"
+  ]
+-- mCRL2KeywordList
 
 modifySpec :: (MCRL2Defs.Specification -> MCRL2Defs.Specification) -> T2MMonad ()
 modifySpec f = do modify $ (\env -> env { specification = f (specification env) })
