@@ -14,9 +14,6 @@ See LICENSE at root directory of this repository.
 --
 -----------------------------------------------------------------------------
 
-{-# OPTIONS_GHC -Wno-unused-matches #-}
-{-# OPTIONS_GHC -Wno-unused-top-binds #-}
-
 {-# LANGUAGE ViewPatterns #-}
 module LPE2MCRL2 (
 lpe2mcrl2
@@ -43,7 +40,6 @@ import qualified CstrDef
 import qualified Constant
 
 import qualified MCRL2Defs
-import LPEPrettyPrint
 import MCRL2PrettyPrint
 import MCRL2Env
 import LPEOps
@@ -54,11 +50,7 @@ import ValFactory
 lpe2mcrl2 :: LPEOperation
 lpe2mcrl2 lpeInstance out invariant = do
     tdefs' <- gets (IOC.tdefs . IOC.state)
-    let initialEnv = T2MEnv { txsdefs = tdefs'
-                            , specification = MCRL2Defs.emptySpecification
-                            , objectMap = Map.empty
-                            , usedNames = Set.empty
-                            }
+    let initialEnv = emptyEnv { txsdefs = tdefs' }
     evalStateT (lpe2mcrl2' lpeInstance out invariant) initialEnv
 -- lpe2mcrl2
 
@@ -101,7 +93,16 @@ sortDef2sortDef :: (SortId.SortId, SortDef.SortDef) -> T2MMonad (MCRL2Defs.Objec
 sortDef2sortDef (sortId, _) = do
     sortName <- getFreshName (SortId.name sortId)
     registerObject (TxsDefs.IdSort sortId) (RegSort sortName)
-    return $ (sortName, MCRL2Defs.ImplicitSort) -- SortDefs do not contain information (they are defined via constructors).
+    if sortId == SortId.sortIdBool
+    then do return (sortName, MCRL2Defs.BoolSort)
+    else if sortId == SortId.sortIdInt
+         then do return (sortName, MCRL2Defs.IntSort)
+         else if sortId == SortId.sortIdString
+              then do return (sortName, MCRL2Defs.ListSort MCRL2Defs.IntSort)
+              else if sortId == SortId.sortIdRegex
+                   then do return (sortName, MCRL2Defs.ListSort MCRL2Defs.IntSort)
+                   -- Non-primitive SortDefs do not contain information (they are defined via constructors).
+                   else do return $ (sortName, MCRL2Defs.ImplicitSort) 
 -- sortDef2sortDef
 
 -- Creates an mCRL2 constructor from a TXS constructor:
@@ -207,12 +208,8 @@ channelOffer2action (chanId, chanVars) = do
 -- Translates a TXS sort to an mCRL2 sort:
 sort2sort :: SortId.SortId -> T2MMonad MCRL2Defs.Sort
 sort2sort sortId = do
-    if sortId == SortId.sortIdBool
-    then do return MCRL2Defs.BoolSort
-    else if sortId == SortId.sortIdInt
-         then do return MCRL2Defs.IntSort
-         else do (sortName, _) <- getRegisteredSort sortId
-                 return $ MCRL2Defs.SortRef sortName
+    (sortName, _) <- getRegisteredSort sortId
+    return $ MCRL2Defs.SortRef sortName
 -- sort2sort
 
 -- Creates a uniquely named mCRL2 variable from a TXS variable:
@@ -228,7 +225,7 @@ createFreshVar varId = do
 -- Wrapper around valExpr2dataExpr' so that it is easier to debug:
 valExpr2dataExpr :: ValExpr.ValExpr VarId.VarId -> T2MMonad MCRL2Defs.DExpr
 valExpr2dataExpr expr = do
-    liftIO $ putStrLn ((showValExpr expr) ++ " <<|-----|>> " ++ (show expr))
+    -- liftIO $ putStrLn ((showValExpr expr) ++ " <<|-----|>> " ++ (show expr))
     valExpr2dataExpr' valExpr2dataExpr expr
 -- valExpr2dataExpr
 
