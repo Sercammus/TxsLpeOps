@@ -101,21 +101,41 @@ showComm (multiAction, targetActionId) = (showMultiAction multiAction) ++ " -> "
 showRename :: (MCRL2Defs.ObjectId, MCRL2Defs.ObjectId) -> String
 showRename (sourceActionId, targetActionId) = (showObjectId sourceActionId) ++ " -> " ++ (showObjectId targetActionId)
 
-showPExpr :: MCRL2Defs.PExpr -> String
-showPExpr (MCRL2Defs.PAction expr) = showAExpr expr
-showPExpr (MCRL2Defs.PSeq exprs) = "(" ++ (List.intercalate " . " (map showPExpr exprs)) ++ ")"
-showPExpr (MCRL2Defs.PPar exprs) = "(" ++ (List.intercalate " || " (map showPExpr exprs)) ++ ")"
-showPExpr (MCRL2Defs.PChoice exprs) = "(" ++ (List.intercalate " + " (map showPExpr exprs)) ++ ")"
-showPExpr (MCRL2Defs.PSum [] expr) = showPExpr expr
-showPExpr (MCRL2Defs.PSum vars expr) = "(sum " ++ (List.intercalate ", " (map showVariable vars)) ++ " . " ++ (showPExpr expr) ++ ")"
-showPExpr (MCRL2Defs.PGuard condition ifBranch elseBranch) = "((" ++ (showDExpr condition) ++ ") -> " ++ (showPExpr ifBranch) ++ " <> " ++ (showPExpr elseBranch) ++ ")"
-showPExpr MCRL2Defs.PDeadlock = "delta"
-showPExpr (MCRL2Defs.PHide actions expr) = "hide({" ++ (List.intercalate ", " (map showObjectId actions)) ++ "}, " ++ (showPExpr expr) ++ ")"
-showPExpr (MCRL2Defs.PAllow multiActions expr) = "allow({" ++ (List.intercalate ", " (map showMultiAction multiActions)) ++ "}, " ++ (showPExpr expr) ++ ")"
-showPExpr (MCRL2Defs.PComm comms expr) = "comm({" ++ (List.intercalate ", " (map showComm comms)) ++ "}, " ++ (showPExpr expr) ++ ")"
-showPExpr (MCRL2Defs.PRename renames expr) = "rename({" ++ (List.intercalate ", " (map showRename renames)) ++ "}, " ++ (showPExpr expr) ++ ")"
-showPExpr (MCRL2Defs.PBlock actions expr) = "block({" ++ (List.intercalate ", " (map showObjectId actions)) ++ "}, " ++ (showPExpr expr) ++ ")"
-showPExpr (MCRL2Defs.PInst procId varEqs) = (showObjectId procId) ++ "(" ++ (List.intercalate ", " (map (showDExpr . snd) varEqs)) ++ ")"
+showPExpr :: String -> MCRL2Defs.PExpr -> String
+showPExpr _prefix (MCRL2Defs.PAction expr) = showAExpr expr
+showPExpr prefix (MCRL2Defs.PSeq exprs) =
+    let newPrefix = prefix ++ "\t" in
+      "(\n" ++ newPrefix ++ (List.intercalate ("\n" ++ newPrefix ++ ". ") (map (showPExpr newPrefix) exprs)) ++ "\n" ++ prefix ++ ")"
+showPExpr prefix (MCRL2Defs.PPar exprs) =
+    let newPrefix = prefix ++ "\t" in
+      "(\n" ++ newPrefix ++ (List.intercalate ("\n" ++ newPrefix ++ "|| ") (map (showPExpr newPrefix) exprs)) ++ "\n" ++ prefix ++ ")"
+showPExpr prefix (MCRL2Defs.PChoice exprs) =
+    let newPrefix = prefix ++ "\t" in
+      "(\n" ++ newPrefix ++ (List.intercalate ("\n" ++ newPrefix ++ "+ ") (map (showPExpr newPrefix) exprs)) ++ "\n" ++ prefix ++ ")"
+showPExpr prefix (MCRL2Defs.PSum [] expr) = showPExpr prefix expr
+showPExpr prefix (MCRL2Defs.PSum vars expr) =
+    let newPrefix = prefix ++ "\t" in
+      "(sum " ++ (List.intercalate ", " (map showVariable vars)) ++ "\n " ++ newPrefix ++ ". " ++ (showPExpr newPrefix expr) ++ "\n" ++ prefix ++ ")"
+showPExpr prefix (MCRL2Defs.PGuard condition ifBranch elseBranch) =
+    let newPrefix = prefix ++ "\t" in
+      "((" ++ (showDExpr condition) ++ ")\n" ++ newPrefix ++ "-> " ++ (showPExpr newPrefix ifBranch) ++ "\n" ++ newPrefix ++ "<> " ++ (showPExpr newPrefix elseBranch) ++ "\n" ++ prefix ++ ")"
+showPExpr _prefix MCRL2Defs.PDeadlock = "delta"
+showPExpr prefix (MCRL2Defs.PHide actions expr) =
+    let newPrefix = prefix ++ "\t" in
+      "hide({" ++ (List.intercalate ", " (map showObjectId actions)) ++ "},\n" ++ newPrefix ++ (showPExpr newPrefix expr) ++ "\n" ++ prefix ++ ")"
+showPExpr prefix (MCRL2Defs.PAllow multiActions expr) =
+    let newPrefix = prefix ++ "\t" in
+      "allow({" ++ (List.intercalate ", " (map showMultiAction multiActions)) ++ "},\n" ++ newPrefix ++ (showPExpr newPrefix expr) ++ "\n" ++ prefix ++ ")"
+showPExpr prefix (MCRL2Defs.PComm comms expr) =
+    let newPrefix = prefix ++ "\t" in
+      "comm({" ++ (List.intercalate ", " (map showComm comms)) ++ "},\n" ++ newPrefix ++ (showPExpr newPrefix expr) ++ "\n" ++ prefix ++ ")"
+showPExpr prefix (MCRL2Defs.PRename renames expr) =
+    let newPrefix = prefix ++ "\t" in
+      "rename({" ++ (List.intercalate ", " (map showRename renames)) ++ "},\n" ++ newPrefix ++ (showPExpr newPrefix expr) ++ "\n" ++ prefix ++ ")"
+showPExpr prefix (MCRL2Defs.PBlock actions expr) =
+    let newPrefix = prefix ++ "\t" in
+      "block({" ++ (List.intercalate ", " (map showObjectId actions)) ++ "},\n" ++ newPrefix ++ (showPExpr newPrefix expr) ++ ")"
+showPExpr _prefix (MCRL2Defs.PInst procId varEqs) = (showObjectId procId) ++ "(" ++ (List.intercalate ", " (map (showDExpr . snd) varEqs)) ++ ")"
 
 showSortDecl :: (MCRL2Defs.ObjectId, MCRL2Defs.Sort) -> String
 showSortDecl (sortId, MCRL2Defs.ImplicitSort) = showObjectId sortId
@@ -138,8 +158,8 @@ showActionDecl (actionId, MCRL2Defs.Action sort) = (showObjectId actionId) ++ ":
 showActionDecl other = error ("'showActionDecl' not defined for " ++ (show other))
 
 showProcessDecl :: (MCRL2Defs.ObjectId, MCRL2Defs.Process) -> String
-showProcessDecl (procId, MCRL2Defs.Process [] body) = (showObjectId procId) ++ " = " ++ (showPExpr body)
-showProcessDecl (procId, MCRL2Defs.Process params body) = (showObjectId procId) ++ "(" ++ (List.intercalate ", " (map showVariable params)) ++ ") = " ++ (showPExpr body)
+showProcessDecl (procId, MCRL2Defs.Process [] body) = (showObjectId procId) ++ " =\n\t" ++ (showPExpr "\t" body)
+showProcessDecl (procId, MCRL2Defs.Process params body) = (showObjectId procId) ++ "(" ++ (List.intercalate ", " (map showVariable params)) ++ ")\n\t= " ++ (showPExpr "\t" body)
 showProcessDecl other = error ("'showProcessDecl' not defined for " ++ (show other))
 
 showSpecification :: MCRL2Defs.Specification -> String
@@ -150,7 +170,7 @@ showSpecification specification =
     ++ (showObjectsWithHeader "act" showActionDecl (Map.toList (MCRL2Defs.actions specification)))
     ++ (showObjectsWithHeader "glob" showVariable (Map.elems (MCRL2Defs.globals specification)))
     ++ (showObjectsWithHeader "proc" showProcessDecl (Map.toList (MCRL2Defs.processes specification)))
-    ++ "init\n\t" ++ (showPExpr (MCRL2Defs.init specification)) ++ ";\n"
+    ++ "init\n\t" ++ (showPExpr "\t" (MCRL2Defs.init specification)) ++ ";\n"
 -- showSpecification
 
 showObjectsWithHeader :: String -> (t -> String) -> [t] -> String
