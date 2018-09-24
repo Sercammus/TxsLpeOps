@@ -32,6 +32,7 @@ getFreshName
 
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import qualified Data.Char as Char
 import qualified Data.Text as Text
 import Control.Monad.State hiding (state)
 import qualified EnvCore as IOC
@@ -158,8 +159,9 @@ getRegisteredProcess procId = do
 
 getFreshName :: MCRL2Defs.ObjectId -> T2MMonad MCRL2Defs.ObjectId
 getFreshName prefix = do
+    let legalizedPrefix = makeLegal prefix
     namesInUse <- gets usedNames
-    let freshName = if Set.member prefix namesInUse then getFreshNameWithIndex prefix namesInUse 1 else prefix
+    let freshName = if Set.member legalizedPrefix namesInUse then getFreshNameWithIndex legalizedPrefix namesInUse 1 else legalizedPrefix
     modify $ (\env -> env { usedNames = Set.insert freshName namesInUse })
     return freshName
 -- getFreshName
@@ -172,9 +174,15 @@ getFreshNameWithIndex prefix namesInUse index =
       else freshName
 -- getFreshNameWithIndex
 
-
-
-
+makeLegal :: MCRL2Defs.ObjectId -> MCRL2Defs.ObjectId
+makeLegal text = Text.pack (map makeCharLegal (Text.unpack text))
+  where
+    makeCharLegal :: Char -> Char
+    makeCharLegal c =
+        if (Char.isAlphaNum c) || (c == '_')
+        then c
+        else '_'
+-- makeLegal
 
 
 

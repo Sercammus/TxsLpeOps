@@ -38,7 +38,7 @@ showSort (MCRL2Defs.BagSort elemSort) = "Bag(" ++ (showSort elemSort) ++ ")"
 showSort (MCRL2Defs.StructSort constructors) = "struct " ++ (List.intercalate " | " (map showConstructor constructors))
 showSort (MCRL2Defs.SortRef sortId) = showObjectId sortId
 showSort (MCRL2Defs.MultiSort sorts) = "(" ++ (List.intercalate " # " (map showSort sorts)) ++ ")"
-showSort (MCRL2Defs.FunctionSort inputSort outputSort) = "(" ++ (showSort inputSort) ++ "" ++ (showSort outputSort) ++ ")"
+showSort (MCRL2Defs.FunctionSort inputSort outputSort) = "(" ++ (showSort inputSort) ++ " -> " ++ (showSort outputSort) ++ ")"
 showSort other = error ("'showSort' not defined for " ++ (show other))
 
 showConstructor :: MCRL2Defs.Constructor -> String
@@ -49,7 +49,7 @@ showConstructor (MCRL2Defs.Constructor cstrName fields recognizer) =
 showConstructor other = error ("'showConstructor' not defined for " ++ (show other))
 
 showDExpr :: MCRL2Defs.DExpr -> String
-showDExpr (MCRL2Defs.DBool value) = show value
+showDExpr (MCRL2Defs.DBool value) = if value then "true" else "false"
 showDExpr (MCRL2Defs.DInt value) = show value
 showDExpr (MCRL2Defs.DList elems) = "[" ++ (List.intercalate ", " (map showDExpr elems)) ++ "]"
 showDExpr (MCRL2Defs.DFiniteSet elems) = "{" ++ (List.intercalate ", " (map showDExpr elems)) ++ "}"
@@ -69,7 +69,7 @@ showDExpr (MCRL2Defs.DSmallerEquals lhs rhs) = "(" ++ (showDExpr lhs) ++ " <= " 
 showDExpr (MCRL2Defs.DAnd lhs rhs) = "(" ++ (showDExpr lhs) ++ " && " ++ (showDExpr rhs) ++ ")"
 showDExpr (MCRL2Defs.DOr lhs rhs) = "(" ++ (showDExpr lhs) ++ " || " ++ (showDExpr rhs) ++ ")"
 showDExpr (MCRL2Defs.DIfThenElse condition ifBranch elseBranch) = "if(" ++ (showDExpr condition) ++ ", " ++ (showDExpr ifBranch) ++ ", " ++ (showDExpr elseBranch) ++ ")"
-showDExpr (MCRL2Defs.DNot expr) = "not(" ++ (showDExpr expr) ++ ")"
+showDExpr (MCRL2Defs.DNot expr) = "!(" ++ (showDExpr expr) ++ ")"
 showDExpr (MCRL2Defs.DAdd lhs rhs) = "(" ++ (showDExpr lhs) ++ " + " ++ (showDExpr rhs) ++ ")"
 showDExpr (MCRL2Defs.DSubtract lhs rhs) = "(" ++ (showDExpr lhs) ++ " - " ++ (showDExpr rhs) ++ ")"
 showDExpr (MCRL2Defs.DMultiply lhs rhs) = "(" ++ (showDExpr lhs) ++ " * " ++ (showDExpr rhs) ++ ")"
@@ -115,7 +115,7 @@ showPExpr prefix (MCRL2Defs.PChoice exprs) =
 showPExpr prefix (MCRL2Defs.PSum [] expr) = showPExpr prefix expr
 showPExpr prefix (MCRL2Defs.PSum vars expr) =
     let newPrefix = prefix ++ "\t" in
-      "(sum " ++ (List.intercalate ", " (map showVariable vars)) ++ "\n " ++ newPrefix ++ ". " ++ (showPExpr newPrefix expr) ++ "\n" ++ prefix ++ ")"
+      "(sum " ++ (List.intercalate ", " (map showVariable vars)) ++ " .\n" ++ newPrefix ++ (showPExpr newPrefix expr) ++ "\n" ++ prefix ++ ")"
 showPExpr prefix (MCRL2Defs.PGuard condition ifBranch elseBranch) =
     let newPrefix = prefix ++ "\t" in
       "((" ++ (showDExpr condition) ++ ")\n" ++ newPrefix ++ "-> " ++ (showPExpr newPrefix ifBranch) ++ "\n" ++ newPrefix ++ "<> " ++ (showPExpr newPrefix elseBranch) ++ "\n" ++ prefix ++ ")"

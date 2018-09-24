@@ -134,8 +134,8 @@ function2mapping (funcId, FuncDef.FuncDef params _expr) = do
     mappingResult <- sort2sort (FuncId.funcsort funcId)
     -- Add a mapping for the function:
     let mappingSort = case mappingParams of
-                        [] -> MCRL2Defs.FunctionSort (sorts2multiSort (map MCRL2Defs.varSort mappingParams)) mappingResult
-                        _ -> mappingResult
+                        [] -> mappingResult
+                        _ -> MCRL2Defs.FunctionSort (sorts2multiSort (map MCRL2Defs.varSort mappingParams)) mappingResult
     registerObject (TxsDefs.IdFunc funcId) (RegMapping mappingName)
     return (mappingName, mappingSort)
 -- function2mapping
@@ -181,11 +181,13 @@ summand2summand :: (MCRL2Defs.ObjectId, MCRL2Defs.Process) -> LPESummand -> T2MM
 summand2summand (lpeProcName, lpeProc) (LPESummand chanOffers guard procInst) = do
     -- Create actions, as well as the variables over which we communicate.
     -- (Because the guard may refer to these variables, translate it AFTER!)
-    newActions <- Monad.mapM channelOffer2action chanOffers
+    actionsEtc <- Monad.mapM channelOffer2actionEtc chanOffers
+    let newActions = map fst actionsEtc
+    let newActionsVars = concat (map snd actionsEtc)
     let newActionExpr = MCRL2Defs.PAction (MCRL2Defs.AExpr newActions)
-    newGuard <- valExpr2dataExpr guard
+    newGuardExpr <- valExpr2dataExpr guard
     newProcInst <- procInst2procInst (lpeProcName, lpeProc) procInst
-    return (MCRL2Defs.PGuard newGuard (MCRL2Defs.PSeq [newActionExpr, newProcInst]) MCRL2Defs.PDeadlock)
+    return (MCRL2Defs.PSum newActionsVars (MCRL2Defs.PGuard newGuardExpr (MCRL2Defs.PSeq [newActionExpr, newProcInst]) MCRL2Defs.PDeadlock))
 -- summand2summand
 
 procInst2procInst :: (MCRL2Defs.ObjectId, MCRL2Defs.Process) -> LPEProcInst -> T2MMonad MCRL2Defs.PExpr
@@ -195,14 +197,14 @@ procInst2procInst (lpeProcName, lpeProc) (LPEProcInst paramEqs) = do
     return (MCRL2Defs.PInst lpeProcName (zip (MCRL2Defs.processParams lpeProc) paramValues))
 -- paramEqs2procInst
 
-channelOffer2action :: LPEChannelOffer -> T2MMonad MCRL2Defs.AInstance
-channelOffer2action (chanId, chanVars) = do
+channelOffer2actionEtc :: LPEChannelOffer -> T2MMonad (MCRL2Defs.AInstance, [MCRL2Defs.Variable])
+channelOffer2actionEtc (chanId, chanVars) = do
     -- The action should already exist:
     (actionName, _action) <- getRegisteredAction chanId
     -- The variables should all be fresh, so they do not yet exist in mCRL2:
     actionVars <- Monad.mapM createFreshVar chanVars
     let actionParams = map (\actionVar -> MCRL2Defs.DVariableRef actionVar) actionVars
-    return $ MCRL2Defs.AInstance actionName actionParams
+    return $ (MCRL2Defs.AInstance actionName actionParams, actionVars)
 -- offer2action
 
 -- Translates a TXS sort to an mCRL2 sort:
