@@ -1,0 +1,15 @@
+\chapter{dataReset}
+
+\section{Introduction}
+
+A linearized process may have parameters that are initialized, changed and used, and subsequently ignored until they are initialized again.
+Parameters that often follow this pattern are \emph{control flow parameters}.
+
+During the period in between the last change or use of a parameter and its subsequent initialization, a parameter could have different values.
+These values contribute to the size of the state space of the process \emph{without} adding any new behavior!
+It may therefore be advantageous to detect from which moment the value of a parameter is no longer used and set it to a default value instead.
+
+\section{Algorithm}
+
+
+

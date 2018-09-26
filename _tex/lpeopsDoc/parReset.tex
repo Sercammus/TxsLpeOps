@@ -58,17 +58,16 @@ where
 
 \item Repeat the previous step until the new value of $R_s$ is the same as before for all summands $s$.
 
-\item For each summand $s$ with $R_s \subset P$, choose some $\rho = [x \rightarrow h_x \;|\; x \in P \cup C_s]$ so that ${c_s}[\rho]$ is satisfiable and $\neg{c_t}[p \rightarrow v_s(p) \;|\; p \in P][\rho]$ is satisfiable for all $t \notin S_s$, where
+\item For each summand $s$ with $R_s \subset P$, choose some $\rho = [x \rightarrow h_x \;|\; x \in P \setminus R_s]$ so that $({c_s} \land {c_t}[p \rightarrow v_s(p) \;|\; p \in P])[\rho]$ is unsatisfiable for all $t \notin S_s$, where
 
 \begin{itemize}
 \item $P$ is the set of all process parameters of the LPE;
-\item $h_x$ is a closed expression of the same sort as $x$.
-%\item $C_t$ is the set of the communication variables used by summand $t$;
-%\item $c_s$ is the guard of summand $s$.
+\item $h_x$ is a closed expression of the same sort as $x$;
+\item $c_s$ and $c_t$ are the guards of summands $s$ and $t$, respectively.
 \end{itemize}
 
-For each process parameter $x \in P \setminus R_s$, change the recursive process instantiation of $s$ so that $x$ is assigned $x[\rho]$.
-Note that the choice of the value ensures that the set of summands that are successors of $s$ can only decrease.
+For each process parameter $x \in P \setminus R_s$, change the recursive process instantiation of $s$ so that $x$ is assigned $v_s(x)[\rho]$.
+Note that the choice of $\rho$ ensures that the set of summands that are successors of $s$ can only decrease.
 
 Also note that it may be possible to merge summands in specific cases if the default values of process parameters are chosen cleverly and reused for multiple summands.
 To find the optimal solution, however, a combinatorial problem must be solved, which is not expected to have a payoff that is proportional to the required effort.
