@@ -19,6 +19,8 @@ module Satisfiability (
 isTautology,
 isSatisfiable,
 isNotSatisfiable,
+areSatisfiable,
+areNotSatisfiable,
 getSomeSolution,
 getUniqueSolution,
 showSolution,
@@ -27,8 +29,10 @@ varSubst
 ) where
 
 import Control.Monad.State
+import qualified Control.Monad as Monad
 import qualified EnvCore as IOC
 import qualified EnvData
+import qualified Data.List as List
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -66,7 +70,19 @@ isNotSatisfiable expression = do sat <- getSat expression
                                  case sat of
                                    SolveDefs.Unsat -> return True
                                    _ -> return False
--- isUnsatisfiable
+-- isNotSatisfiable
+
+-- Checks if all specified expressions can be true (when considered separately.
+areSatisfiable :: [TxsDefs.VExpr] -> IOC.IOC Bool
+areSatisfiable expressions = do sat <- Monad.mapM isSatisfiable expressions
+                                return (List.all (\s -> s) sat)
+-- areSatisfiable
+
+-- Checks if the specified expression cannot be true.
+areNotSatisfiable :: [TxsDefs.VExpr] -> IOC.IOC Bool
+areNotSatisfiable expressions = do sat <- Monad.mapM isNotSatisfiable expressions
+                                   return (List.all (\s -> s) sat)
+-- areNotSatisfiable
 
 -- Frequently used method; code is modified code from TxsCore.
 -- Checks whether the given expression is satisfiable.

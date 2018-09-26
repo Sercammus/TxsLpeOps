@@ -78,17 +78,17 @@ testParResetBasic = TestCase $ do
     summand2_2 = LPESummand -- A ? z [x==1 && z==y] >-> P(2, ANY int)
         [(chanIdA, [varIdZ])]
         (cstrAnd (Set.fromList [cstrEqual vexprX vexpr1, cstrEqual vexprZ vexprY]))
-        (LPEProcInst [(varIdX, vexpr2), (varIdY, vexpr0)])
+        (LPEProcInst [(varIdX, vexpr2), (varIdY, anyInt)])
     summand2_3 :: LPESummand
     summand2_3 = LPESummand -- A ? z [x==2] >-> P(3, ANY int)
         []
         (cstrEqual vexprX vexpr2)
-        (LPEProcInst [(varIdX, vexpr3), (varIdY, vexpr0)])
+        (LPEProcInst [(varIdX, vexpr3), (varIdY, anyInt)])
     summand2_4 :: LPESummand
     summand2_4 = LPESummand -- A ? z [x==3] >-> P(0, ANY int)
         []
         (cstrEqual vexprX vexpr3)
-        (LPEProcInst [(varIdX, vexpr0), (varIdY, vexpr0)])
+        (LPEProcInst [(varIdX, vexpr0), (varIdY, anyInt)])
     lpeInstance2 :: LPEInstance
     lpeInstance2 = ([chanIdA], [(varIdX, vexpr0), (varIdY, anyInt)], [summand2_1, summand2_2, summand2_3, summand2_4])
 -- testParResetBasic

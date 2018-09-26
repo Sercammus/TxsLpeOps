@@ -6,7 +6,7 @@ See LICENSE at root directory of this repository.
 
 -----------------------------------------------------------------------------
 -- |
--- Module      :  MCRL2ProcDefs
+-- Module      :  MCRL2Defs
 -- Copyright   :  TNO and University of Twente
 -- License     :  BSD3
 -- Maintainer  :  djurrevanderwal@gmail.com
