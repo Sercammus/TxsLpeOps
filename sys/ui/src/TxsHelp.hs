@@ -91,9 +91,17 @@ helptxt  =
   "--------------------------------\n"++
   "ncomp                                 : test purpose generation via `N-Complete'-algorithm\n"++
   "lpe                                   : lpe transformation (Linear Process Equation)\n"++
-  "lpeop <op> <lpe1> <lpe2> [<inv>]      : apply lpe operation (mkuniq/cstelm/parelm/parreset/parreset2/confelm)\n"++
-  "                                        to model <lpe1> and save the output model as <lpe2>;\n"++
-  "                                        furthermore, it is possible to provide an invariant\n"++
+  "lpeop <op> <lpe> <out> [<inv>]        : apply lpe operation <op> to model <lpe> and produce output\n"++
+  "                                        named <out> assuming invariant <inv> (default: true):\n"++
+  "                                           stop       -> do nothing\n"++
+  "                                           show       -> print the lpe to console\n"++
+  "                                           clean      -> remove duplicate/inert summands\n"++
+  "                                           cstelm     -> remove parameters that never change value\n"++
+  "                                           parelm     -> remove behavior-independent parameters\n"++
+  "                                           datareset,\n"++
+  "                                            parreset  -> reset parameters when temporarily not used\n"++
+  "                                           confelm    -> statically prioritize invisible steps\n"++
+  "                                           mcrl2      -> translate mCRL2 specification file\n"++
   "--------------------------------\n"++
   "systart <name> <command>              : start external system <command> with internal <name>\n"++
   "systop  <name>                        : stop external command with internal <name>\n"++
