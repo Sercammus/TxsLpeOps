@@ -53,13 +53,11 @@ resetParamsInSummand :: [(VarId, TxsDefs.VExpr)]                -- initParamEqs
                      -> LPESummand                              -- result
 resetParamsInSummand _initParamEqs _paramUsagePerSummand _belongsToRelation _relevanceRelation (summand@(LPESummand _ _ LPEStop)) = summand
 resetParamsInSummand initParamEqs paramUsagePerSummand belongsToRelation relevanceRelation summand@(LPESummand channelOffers guard (LPEProcInst paramEqs)) =
-    LPESummand channelOffers guard (LPEProcInst (map resetParam paramEqs))
+    let paramUsage = extractParamUsage summand paramUsagePerSummand in
+      LPESummand channelOffers guard (LPEProcInst (map (resetParam paramUsage) paramEqs))
   where
-    paramUsage :: LPEParamUsage
-    paramUsage = extractParamUsage summand paramUsagePerSummand
-    
-    resetParam :: LPEParamEq -> LPEParamEq
-    resetParam (p, v) =
+    resetParam :: LPEParamUsage -> LPEParamEq -> LPEParamEq
+    resetParam paramUsage (p, v) =
         let requiredElements = Set.fromList (
                                  concat [
                                    [ (dk, dj, extractVExprFromMap dj (paramDestinations paramUsage)) | dj <- djs, dj `elem` (rulingParams paramUsage) ]
@@ -110,9 +108,9 @@ extractParamEqVars (LPESummand _channelOffers _guard (LPEProcInst paramEqs)) var
 getBelongsToRelation :: [LPESummand] -> Map.Map LPESummand LPEParamUsage -> [VarId] -> [VarId] -> Map.Map VarId [VarId]
 getBelongsToRelation _summands _paramUsagePerSummand _controlFlowParams [] = Map.empty
 getBelongsToRelation summands paramUsagePerSummand controlFlowParams (d:ds) =
-    let summandsWhereDChanges = Map.keys (Map.filter (\paramUsage -> d `elem` (changedParams paramUsage)) paramUsagePerSummand) in
+    let summandsWhereDIsChangedOrUsed = Map.keys (Map.filter (\paramUsage -> (d `elem` (changedParams paramUsage)) || (d `elem` (changedParams paramUsage))) paramUsagePerSummand) in
     let foldRulingParams = \soFar smd -> Set.intersection soFar (Set.fromList (rulingParams (extractParamUsage smd paramUsagePerSummand))) in
-    let paramsThatRuleD = Set.toList (foldl foldRulingParams (Set.fromList controlFlowParams) summandsWhereDChanges) in
+    let paramsThatRuleD = Set.toList (foldl foldRulingParams (Set.fromList controlFlowParams) summandsWhereDIsChangedOrUsed) in
     let ds' = getBelongsToRelation summands paramUsagePerSummand controlFlowParams ds in
       Map.insert d paramsThatRuleD ds'
 -- getBelongsToRelation

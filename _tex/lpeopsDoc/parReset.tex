@@ -69,8 +69,8 @@ where
 For each process parameter $x \in P \setminus R_s$, change the recursive process instantiation of $s$ so that $x$ is assigned $v_s(x)[\rho]$.
 Note that the choice of $\rho$ ensures that the set of summands that are successors of $s$ can only decrease.
 
-Also note that it may be possible to merge summands in specific cases if the default values of process parameters are chosen cleverly and reused for multiple summands.
-To find the optimal solution, however, a combinatorial problem must be solved, which is not expected to have a payoff that is proportional to the required effort.
+In practice, it is expensive to generate a suitable $\rho$, and only the initial values of the parameters in $P \setminus R_s$ are tried (that is, $\rho = [x \rightarrow v_0(x) \;|\; x \in P \setminus R_s]$).
+If this does not satisfy the further requirements, the summand is left unchanged.
 
 \end{enumerate}
 
