@@ -42,7 +42,7 @@ dataReset (channels, initParamEqs, summands) _out invariant = do
                                    | (dk, djs) <- Map.toList belongsToRelation ]
     let relevanceRelation = repeatUntilFixpoint (updateRelevanceRelation paramUsagePerSummand controlFlowGraphs belongsToRelation) (Set.fromList initialRelevanceRelation)
     let newSummands = map (resetParamsInSummand initParamEqs paramUsagePerSummand belongsToRelation relevanceRelation) summands
-    return (Left (channels, initParamEqs, newSummands))
+    return (Right (channels, initParamEqs, newSummands))
 -- dataReset
 
 resetParamsInSummand :: [(VarId, TxsDefs.VExpr)]                -- initParamEqs
@@ -51,10 +51,10 @@ resetParamsInSummand :: [(VarId, TxsDefs.VExpr)]                -- initParamEqs
                      -> Set.Set (VarId, VarId, TxsDefs.VExpr)   -- relevanceRelation
                      -> LPESummand                              -- summand
                      -> LPESummand                              -- result
-resetParamsInSummand _initParamEqs _paramUsagePerSummand _belongsToRelation _relevanceRelation (summand@(LPESummand _ _ LPEStop)) = summand
-resetParamsInSummand initParamEqs paramUsagePerSummand belongsToRelation relevanceRelation summand@(LPESummand channelOffers guard (LPEProcInst paramEqs)) =
+resetParamsInSummand _initParamEqs _paramUsagePerSummand _belongsToRelation _relevanceRelation (summand@(LPESummand _ _ _ LPEStop)) = summand
+resetParamsInSummand initParamEqs paramUsagePerSummand belongsToRelation relevanceRelation summand@(LPESummand channelVars channelOffers guard (LPEProcInst paramEqs)) =
     let paramUsage = extractParamUsage summand paramUsagePerSummand in
-      LPESummand channelOffers guard (LPEProcInst (map (resetParam paramUsage) paramEqs))
+      LPESummand channelVars channelOffers guard (LPEProcInst (map (resetParam paramUsage) paramEqs))
   where
     resetParam :: LPEParamUsage -> LPEParamEq -> LPEParamEq
     resetParam paramUsage (p, v) =
@@ -97,8 +97,8 @@ updateRelevanceRelation paramUsagePerSummand controlFlowGraphs belongsToRelation
 -- updateRelevanceRelation
 
 extractParamEqVars :: LPESummand -> VarId -> [VarId]
-extractParamEqVars (LPESummand _channelOffers _guard LPEStop) _varId = []
-extractParamEqVars (LPESummand _channelOffers _guard (LPEProcInst paramEqs)) varId =
+extractParamEqVars (LPESummand _ _ _ LPEStop) _varId = []
+extractParamEqVars (LPESummand _ _ _ (LPEProcInst paramEqs)) varId =
     let assignmentVars = concat [ FreeVar.freeVars v | (p, v) <- paramEqs, p == varId ] in
       List.intersect assignmentVars (map fst paramEqs)
 -- extractParamEqVars

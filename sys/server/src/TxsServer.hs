@@ -1010,26 +1010,18 @@ cmdLPE args = do
 
 cmdLPEOp :: String -> IOS.IOS ()
 cmdLPEOp args = do
-     tdefs <- lift TxsCore.txsGetTDefs
-     let mdefs = TxsDefs.modelDefs tdefs
-     let (op, modelNamesAndInvariant) = cutAfterSpace args
-     let (modelName1, modelName2AndInvariant) = cutAfterSpace modelNamesAndInvariant
-     let (modelName2, invariantText) = cutAfterSpace modelName2AndInvariant
-     case getModelNameIds mdefs modelName1 of
-       [modelId] -> do invariant <- readVExpr invariantText
-                       msg <- lift $ TxsCore.txsLPEOp op modelId modelName2 invariant
-                       IFS.pack "LPEOP" [ msg ]
-                       cmdsIntpr
-       _ -> do IFS.nack "LPEOP" [ "Could not find model (" ++ modelName1 ++ ")!" ]
-               cmdsIntpr
+    let (opChain, namesAndInvariant) = cutAfterSpace args
+    let (inName, outNameAndInvariant) = cutAfterSpace namesAndInvariant
+    let (outName, invariantText) = cutAfterSpace outNameAndInvariant
+    invariant <- readVExpr invariantText
+    msgs <- lift $ TxsCore.txsLPEOp opChain inName outName invariant
+    IFS.pack "LPEOP" msgs
+    cmdsIntpr
   where
     cutAfterSpace :: String -> (String, String)
     cutAfterSpace "" = ("", "")
     cutAfterSpace (' ':xs) = ("", xs)
     cutAfterSpace (x:xs) = let (s1, s2) = cutAfterSpace xs in (x:s1, s2)
-    
-    getModelNameIds :: Map.Map TxsDefs.ModelId TxsDefs.ModelDef -> String -> [TxsDefs.ModelId]
-    getModelNameIds mdefs modelName = [ modelId | (modelId@(TxsDefs.ModelId nm _uid), _) <- Map.toList mdefs, T.unpack nm == modelName ]
 --cmdLPEOp
 
 -- Helper Functions

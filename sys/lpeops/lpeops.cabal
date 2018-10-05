@@ -32,6 +32,7 @@ library
                     , ValExprVisitor
                     , ValFactory
                     , VarFactory
+                    , ConcatEither
                     , MCRL2Defs
                     , MCRL2Env
                     , MCRL2PrettyPrint
@@ -79,6 +80,7 @@ test-suite lpeops-test
                       , ValExprVisitor
                       , ValFactory
                       , VarFactory
+                      , ConcatEither
                       , MCRL2Defs
                       , MCRL2Env
                       , MCRL2PrettyPrint

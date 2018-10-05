@@ -27,14 +27,12 @@ import qualified TxsDefs
 import qualified Subst
 import           LPEOps
 import           VarId
-import           SortOf
-import           VarFactory
 
 -- Removes the specified parameters an LPE.
 -- Occurrences of the parameters in expressions are substituted by their initial values.
 removeParsFromLPE :: [VarId] -> LPEInstance -> IOC.IOC LPEInstance
 removeParsFromLPE [] lpeInstance = do
-    IOC.putMsgs [ EnvData.TXS_CORE_ANY "No LPE parameters to be removed!" ]
+    IOC.putMsgs [ EnvData.TXS_CORE_ANY "No LPE parameters have been listed for removal!" ]
     return lpeInstance
 removeParsFromLPE targetParams (channels, paramEqs, summands) = do
     IOC.putMsgs [ EnvData.TXS_CORE_ANY "Removing the following LPE parameters:" ]
@@ -51,23 +49,11 @@ removeParsFromLPE targetParams (channels, paramEqs, summands) = do
     removeParsFromProcInst LPEStop = LPEStop
     removeParsFromProcInst (LPEProcInst eqs) = LPEProcInst [(p, rho v) | (p, v) <- eqs, not (p `elem` targetParams)]
     
-    -- Eliminates parameters from a summand:
+    -- Eliminates parameters from a summand.
+    -- Note that channel variables are always fresh, and therefore do not have to be substituted:
     removeParsFromSummand :: LPESummands -> LPESummand -> IOC.IOC LPESummands
-    removeParsFromSummand soFar (LPESummand channelOffers guard procInst) = do
-        newChannelOffers <- Monad.foldM removeParsFromChannelOffer [] channelOffers
-        return (soFar ++ [LPESummand newChannelOffers (rho guard) (removeParsFromProcInst procInst)])
-    
-    -- Eliminates parameters from channel offers:
-    removeParsFromChannelOffer :: LPEChannelOffers -> LPEChannelOffer -> IOC.IOC LPEChannelOffers
-    removeParsFromChannelOffer soFar (chanId, vars) = do newVars <- Monad.foldM removeParsFromChannelVar [] vars
-                                                         return (soFar ++ [(chanId, newVars)])
-    
-    -- Eliminates parameters from channel variables:
-    removeParsFromChannelVar :: [VarId] -> VarId -> IOC.IOC [VarId]
-    removeParsFromChannelVar soFar var = if var `elem` targetParams
-                                         then do newVar <- createFreshVar (sortOf var)
-                                                 return (soFar ++ [newVar])
-                                         else do return (soFar ++ [var])
+    removeParsFromSummand soFar (LPESummand channelVars channelOffers guard procInst) = do
+        return (soFar ++ [LPESummand channelVars channelOffers (rho guard) (removeParsFromProcInst procInst)])
 -- removeParsFromLPE
 
 

@@ -18,7 +18,6 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Maybe as Maybe
 import qualified FreeMonoidX as FMX
-import Control.Monad.State
 import TxsDefs
 import ProcId
 import ChanId
@@ -34,26 +33,19 @@ import LPEOps
 import LPEParElm
 import TestUtils
 
-parElmFunc :: LPEInstance -> IO (Either LPEInstance String)
-parElmFunc lpeInstance = do
-    env <- createTestEnvC
-    evalStateT (parElm lpeInstance "" vexprTrue) env
--- parElmFunc
-
 testParElmBasic :: Test
 testParElmBasic = TestCase $ do
-    maybeResult <- parElmFunc lpeInstance1
-    case maybeResult of
-      Left result -> assertBool (printInputExpectedFound lpeInstance1 lpeInstance2 result) (result==lpeInstance2)
-      Right msg -> assertBool ("Function parElm failed to produce output (" ++ msg ++ ")!") False
+    tryLPEOperation parElm lpeInstance1 lpeInstance2
   where
     summand1_1 :: LPESummand
     summand1_1 = LPESummand -- A ? y >-> P(x)
+        [varIdY]
         [(chanIdA, [varIdY])]
         (vexprTrue)
         (LPEProcInst [(varIdX, vexprX)])
     summand1_2 :: LPESummand
     summand1_2 = LPESummand -- A ? z >-> P(x+1)
+        [varIdZ]
         [(chanIdA, [varIdZ])]
         (vexprTrue)
         (LPEProcInst [(varIdX, vexprSum vexprX vexpr1)])
@@ -62,11 +54,13 @@ testParElmBasic = TestCase $ do
     
     summand2_1 :: LPESummand
     summand2_1 = LPESummand -- A ? y >-> P()
+        [varIdY]
         [(chanIdA, [varIdY])]
         (vexprTrue)
         (LPEProcInst [])
     summand2_2 :: LPESummand
     summand2_2 = LPESummand -- A ? z >-> P()
+        [varIdZ]
         [(chanIdA, [varIdZ])]
         (vexprTrue)
         (LPEProcInst [])
@@ -76,18 +70,17 @@ testParElmBasic = TestCase $ do
 
 testParElmXUpperBound :: Test
 testParElmXUpperBound = TestCase $ do
-    maybeResult <- parElmFunc lpeInstance1
-    case maybeResult of
-      Left result -> assertBool (printInputExpectedFound lpeInstance1 lpeInstance2 result) (result==lpeInstance2)
-      Right msg -> assertBool ("Function parElm failed to produce output (" ++ msg ++ ")!") False
+    tryLPEOperation parElm lpeInstance1 lpeInstance2
   where
     summand1_1 :: LPESummand
     summand1_1 = LPESummand -- A ? y [x == 2] >-> P(x)
+        [varIdY]
         [(chanIdA, [varIdY])]
         (cstrEqual vexprX vexpr2)
         (LPEProcInst [(varIdX, vexprX)])
     summand1_2 :: LPESummand
     summand1_2 = LPESummand -- A ? z [x != 2] >-> P(x+1)
+        [varIdZ]
         [(chanIdA, [varIdZ])]
         (cstrNot (cstrEqual vexprX vexpr2))
         (LPEProcInst [(varIdX, vexprSum vexprX vexpr1)])
@@ -96,11 +89,13 @@ testParElmXUpperBound = TestCase $ do
     
     summand2_1 :: LPESummand
     summand2_1 = LPESummand -- A ? y [x == 2] >-> P(x)
+        [varIdY]
         [(chanIdA, [varIdY])]
         (cstrEqual vexprX vexpr2)
         (LPEProcInst [(varIdX, vexprX)])
     summand2_2 :: LPESummand
     summand2_2 = LPESummand -- A ? z [x != 2] >-> P(x+1)
+        [varIdZ]
         [(chanIdA, [varIdZ])]
         (cstrNot (cstrEqual vexprX vexpr2))
         (LPEProcInst [(varIdX, vexprSum vexprX vexpr1)])

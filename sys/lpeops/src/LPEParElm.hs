@@ -36,10 +36,10 @@ parElm lpeInstance@((_channels, paramEqs, summands)) _out _invariant = do
     let guardParams = Set.fromList (concat (map (FreeVar.freeVars . getGuard) summands))
     let inertParams = Set.toList (allParams Set.\\ guardParams)
     newLPEInstance <- parElmLoop lpeInstance inertParams
-    return (Left newLPEInstance)
+    return (Right newLPEInstance)
   where
     getGuard :: LPESummand -> TxsDefs.VExpr
-    getGuard (LPESummand _channelOffers guard _procInst) = guard
+    getGuard (LPESummand _ _ guard _) = guard
 -- parElm
 
 -- Core method.
@@ -61,12 +61,12 @@ parElmCheck :: LPESummands                       -- Remaining summands for which
             -> [VarId]                           -- Marked parameters.
             -> IOC.IOC [VarId]                   -- New marked parameters (cannot grow in size).
 parElmCheck [] inertParams = do return inertParams
-parElmCheck ((LPESummand _ _ LPEStop):xs) inertParams = do parElmCheck xs inertParams
-parElmCheck ((LPESummand _chanOffers _guard (LPEProcInst paramEqs)):xs) inertParams = do
+parElmCheck ((LPESummand _ _ _ LPEStop):xs) inertParams = do parElmCheck xs inertParams
+parElmCheck ((LPESummand _ _ _ (LPEProcInst paramEqs)):xs) inertParams = do
     parElmCheck xs (foldl filterInertParamsWithEq inertParams paramEqs)
   where
     filterInertParamsWithEq :: [VarId] -> LPEParamEq -> [VarId]
-    filterInertParamsWithEq soFar (var, expr) = if (elem var inertParams) then soFar else (soFar List.\\ (FreeVar.freeVars expr))
+    filterInertParamsWithEq soFar (p, expr) = if (elem p inertParams) then soFar else (soFar List.\\ (FreeVar.freeVars expr))
 -- parElmCheck
 
 

@@ -93,14 +93,22 @@ showLPEChannelOffers :: LPEChannelOffers -> String
 showLPEChannelOffers [] = ""
 showLPEChannelOffers channelOffers = (List.intercalate " | " (map showLPEChannelOffer channelOffers)) ++ " "
 
+showHiddenVars :: [VarId] -> String
+showHiddenVars [] = ""
+showHiddenVars hiddenVars = "(" ++ (List.intercalate ", " (map (\v -> Text.unpack (VarId.name v)) hiddenVars)) ++ ") "
+
 showLPEParamEq :: LPEParamEq -> String
 showLPEParamEq (varId, expr) = (Text.unpack (VarId.name varId)) ++ " = " ++ (showValExpr expr)
 
+showProcInst :: LPEProcInst -> String
+showProcInst LPEStop = "STOP"
+showProcInst (LPEProcInst paramEqs) = "LPE(" ++ (List.intercalate ", " (map showLPEParamEq paramEqs)) ++ ")"
+
 showLPESummand :: LPESummand -> String
-showLPESummand (LPESummand channelOffers guard LPEStop) =
-    (showLPEChannelOffers channelOffers) ++ "[[ " ++ (showValExpr guard) ++ " ]] >-> STOP"
-showLPESummand (LPESummand channelOffers guard (LPEProcInst paramEqs)) =
-    (showLPEChannelOffers channelOffers) ++ "[[ " ++ (showValExpr guard) ++ " ]] >-> LPE(" ++ (List.intercalate ", " (map showLPEParamEq paramEqs)) ++ ")"
+showLPESummand (LPESummand channelVars channelOffers guard procInst) =
+    let usedChannelVars = concat (map snd channelOffers) in
+    let hiddenChannelVars = Set.toList ((Set.fromList channelVars) Set.\\ (Set.fromList usedChannelVars)) in
+      (showLPEChannelOffers channelOffers) ++ (showHiddenVars hiddenChannelVars) ++ "[[ " ++ (showValExpr guard) ++ " ]] >-> " ++ (showProcInst procInst)
 -- showLPESummand
 
 showChanDecl :: ChanId.ChanId -> String

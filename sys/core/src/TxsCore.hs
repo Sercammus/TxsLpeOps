@@ -190,6 +190,7 @@ import qualified LPEDataReset
 import qualified LPEParReset
 import qualified LPEConfCheck
 import qualified LPE2MCRL2
+import ConcatEither
 
 -- import from valexpr
 import qualified SortId
@@ -1172,32 +1173,34 @@ txsLPE (Right modelid@(TxsDefs.ModelId modname _moduid))  =  do
 
 -- ----------------------------------------------------------------------------------------- --
 
-txsLPEOp :: String -> TxsDefs.ModelId -> String -> TxsDefs.VExpr -> IOC.IOC String
-txsLPEOp opNames (inputModelId@(TxsDefs.ModelId modelName1 _moduid)) out invariant = do
+txsLPEOp :: String -> String -> String -> TxsDefs.VExpr -> IOC.IOC [String]
+txsLPEOp opChain inName outName invariant = do
     envc <- get
     case IOC.state envc of
-      IOC.Initing {IOC.tdefs = tdefs} ->
-        case Map.lookup inputModelId (TxsDefs.modelDefs tdefs) of
-          Just (TxsDefs.ModelDef insyncs outsyncs splsyncs bexpr)
-            -> do eitherOps <- foldM getLPEOperations (Left []) (filter (\opName -> opName /= []) (splitByArrow opNames))
-                  case eitherOps of
-                    Left ops -> do
-                      manipulatedLPE <- LPEOps.lpeOperations ops bexpr out invariant
-                      case manipulatedLPE of
-                        Left (newProcInst, newProcId, newProcDef) ->
-                          do newModelUid <- IOC.newUnid
-                             let newModelId = TxsDefs.ModelId (T.pack out) newModelUid
-                             let newModelDef = TxsDefs.ModelDef insyncs outsyncs splsyncs newProcInst
-                             tdefs' <- gets (IOC.tdefs . IOC.state)
-                             let tdefs'' = tdefs' { TxsDefs.procDefs = Map.insert newProcId newProcDef (TxsDefs.procDefs tdefs') }
-                             let tdefs''' = tdefs'' { TxsDefs.modelDefs = Map.insert newModelId newModelDef (TxsDefs.modelDefs tdefs'') }
-                             IOC.modifyCS $ \st -> st { IOC.tdefs = tdefs''' }
-                             return ("LPE transformation complete; result saved to model " ++ (TxsShow.fshow newModelId) ++ "!")
-                        Right msg -> do return msg
-                    Right msg -> do return msg
-          _ -> do return ("Could not find model " ++ (T.unpack modelName1) ++ "!")
-      _ -> do return ("LPE transformations cannot be performed before initialization!")
+      IOC.Initing { IOC.tdefs = tdefs } ->
+        case getModels (TxsDefs.modelDefs tdefs) inName of
+          [TxsDefs.ModelDef insyncs outsyncs splsyncs bexpr] ->
+            case concatEither (map getLPEOperation (filter (\opName -> opName /= []) (splitByArrow opChain))) of
+              Left msgs -> do return msgs
+              Right ops -> do
+                manipulatedLPE <- LPEOps.lpeOperations ops bexpr outName invariant
+                case manipulatedLPE of
+                  Left msgs -> do return msgs
+                  Right (newProcInst, newProcId, newProcDef) -> do
+                    newModelUid <- IOC.newUnid
+                    let newModelId = TxsDefs.ModelId (T.pack outName) newModelUid
+                    let newModelDef = TxsDefs.ModelDef insyncs outsyncs splsyncs newProcInst
+                    tdefs' <- gets (IOC.tdefs . IOC.state)
+                    let tdefs'' = tdefs' { TxsDefs.procDefs = Map.insert newProcId newProcDef (TxsDefs.procDefs tdefs') }
+                    let tdefs''' = tdefs'' { TxsDefs.modelDefs = Map.insert newModelId newModelDef (TxsDefs.modelDefs tdefs'') }
+                    IOC.modifyCS $ \st -> st { IOC.tdefs = tdefs''' }
+                    return ["LPE transformation complete; result saved to model " ++ (TxsShow.fshow newModelId) ++ "!"]
+          _ -> return ["Could not find model " ++ inName ++ "!"]
+      _ -> do return ["TorXakis core is not initialized!"]
   where
+    getModels :: Map.Map TxsDefs.ModelId TxsDefs.ModelDef -> String -> [TxsDefs.ModelDef]
+    getModels mdefs modelName = [ modelDef | (TxsDefs.ModelId nm _uid, modelDef) <- Map.toList mdefs, T.unpack nm == modelName ]
+    
     splitByArrow :: String -> [String]
     splitByArrow [] = [[]]
     splitByArrow [x] = [[x]]
@@ -1207,26 +1210,18 @@ txsLPEOp opNames (inputModelId@(TxsDefs.ModelId modelName1 _moduid)) out invaria
           [] -> [[x]] -- (Should not happen, but anyway.)
           (y:ys) -> (x:y):ys
     
-    getLPEOperations :: Either [LPEOps.LPEOperation] String -> String -> IOC.IOC (Either [LPEOps.LPEOperation] String)
-    getLPEOperations (Right msg) _ = do return (Right msg)
-    getLPEOperations (Left soFar) opName = do
-        eitherOp <- getLPEOperation opName
-        case eitherOp of
-          Left op -> do return (Left (soFar ++ [op]))
-          Right msg -> do return (Right msg)
-    
-    getLPEOperation :: String -> IOC.IOC (Either LPEOps.LPEOperation String)
+    getLPEOperation :: String -> Either [String] [LPEOps.LPEOperation]
     getLPEOperation opName = case opName of
-                               "stop" -> do return (Left LPEOps.discardLPE)
-                               "show" -> do return (Left LPEOps.showLPE)
-                               "clean" -> do return (Left LPEClean.cleanLPE)
-                               "cstelm" -> do return (Left LPEConstElm.constElm)
-                               "parelm" -> do return (Left LPEParElm.parElm)
-                               "datareset" -> do return (Left LPEDataReset.dataReset)
-                               "parreset" -> do return (Left LPEParReset.parReset)
-                               "confelm" -> do return (Left LPEConfCheck.confElm)
-                               "mcrl2" -> do return (Left LPE2MCRL2.lpe2mcrl2)
-                               _ -> do return (Right ("Unknown LPE operation (" ++ opName ++ ")!"))
+                               "stop" -> Right [LPEOps.discardLPE]
+                               "show" -> Right [LPEOps.showLPE]
+                               "clean" -> Right [LPEClean.cleanLPE]
+                               "cstelm" -> Right [LPEConstElm.constElm]
+                               "parelm" -> Right [LPEParElm.parElm]
+                               "datareset" -> Right [LPEDataReset.dataReset]
+                               "parreset" -> Right [LPEParReset.parReset]
+                               "confelm" -> Right [LPEConfCheck.confElm]
+                               "mcrl2" -> Right [LPE2MCRL2.lpe2mcrl2]
+                               _ -> Left ["Unknown LPE operation (" ++ opName ++ ")!"]
 --txsLPEOp
 
 -- ----------------------------------------------------------------------------------------- --

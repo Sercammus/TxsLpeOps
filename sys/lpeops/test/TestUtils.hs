@@ -7,11 +7,13 @@ module TestUtils
 (
 createTestEnvC,
 printInputExpectedFound,
-validateLPEInstance
+validateLPEInstance,
+tryLPEOperation
 )
 where
 
 import Test.HUnit
+import qualified Data.List as List
 import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
 import qualified EnvData
@@ -26,7 +28,9 @@ import qualified EnvCore as IOC
 import qualified ParamCore
 import qualified Solve.Params
 import LPEPrettyPrint
-import LPETypes
+import LPEOps
+import ValExpr
+import Constant
 
 createTestEnvC :: IO IOC.EnvC
 createTestEnvC = do
@@ -66,22 +70,37 @@ printInputExpectedFound input expected found =
     "\n\nActual output:\n\n" ++ (showLPEInstance found) ++ "\n"
 -- printInputExpectedFound
 
-validateLPEInstance' :: LPEInstance -> IOC.IOC ()
+validateLPEInstance' :: LPEInstance -> IOC.IOC (Maybe [String])
 validateLPEInstance' lpeInstance = do
     (procInit, newProcId, newProcDef) <- fromLPEInstance lpeInstance "LPE" -- (This function is called within a new environment, so the name does not really matter.)
     tdefs <- gets (IOC.tdefs . IOC.state)
     let tdefs' = tdefs { TxsDefs.procDefs = Map.insert newProcId newProcDef (TxsDefs.procDefs tdefs) }
     IOC.modifyCS $ \st -> st { IOC.tdefs = tdefs' }
-    lpeInstance' <- toLPEInstance procInit
-    case lpeInstance' of
-      Just _ -> do return ()
-      Nothing -> do liftIO $ assertBool ("\nInvalid LPE input:\n\n" ++ (showLPEInstance lpeInstance) ++ "\n") False
+    eitherLpeInstance <- toLPEInstance procInit
+    case eitherLpeInstance of
+      Left msgs -> do return (Just msgs)
+      Right _ -> do return Nothing
 -- validateLPEInstance
 
-validateLPEInstance :: LPEInstance -> IO ()
+validateLPEInstance :: LPEInstance -> IO (Maybe [String])
 validateLPEInstance lpeInstance = do
     env <- createTestEnvC
     evalStateT (validateLPEInstance' lpeInstance) env
 -- validateLPEInstance
+
+tryLPEOperation :: LPEOperation -> LPEInstance -> LPEInstance -> IO ()
+tryLPEOperation op input expected = do
+    maybeV1 <- validateLPEInstance input
+    case maybeV1 of
+      Just msgs -> assertBool ("\nInvalid input LPE:\n\n" ++ (showLPEInstance input) ++ "\nProblems:\n\n" ++ (List.intercalate "\n" msgs) ++ "\n") False
+      Nothing -> do maybeV2 <- validateLPEInstance expected
+                    case maybeV2 of
+                      Just msgs -> assertBool ("\nInvalid expected LPE:\n\n" ++ (showLPEInstance expected) ++ "\nProblems:\n\n" ++ (List.intercalate "\n" msgs) ++ "\n") False
+                      Nothing -> do env <- createTestEnvC
+                                    eitherFound <- evalStateT (op input "Out" (cstrConst (Cbool True))) env
+                                    case eitherFound of
+                                      Left msgs -> assertBool ("\nCould not produce output LPE:\n\n" ++ (List.intercalate "\n" msgs) ++ "\n") False
+                                      Right found -> assertBool (printInputExpectedFound input expected found) (found==expected)
+-- tryLPEOperation
 
 

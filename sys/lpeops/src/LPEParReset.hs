@@ -42,7 +42,7 @@ parReset lpeInstance@((_channels, paramEqs, summands)) _out invariant = do
     let successorsPerSummand = zipWith (\s i -> (s, i, map fst paramEqs)) summands immediateSuccessors
     IOC.putMsgs [ EnvData.TXS_CORE_ANY "Analyzing control flow..." ]
     newLPEInstance <- parResetLoop lpeInstance invariant successorsPerSummand
-    return (Left newLPEInstance)
+    return (Right newLPEInstance)
 -- parReset
 
 -- Selects all potential successors summands of a given summand from a list with all summands.
@@ -50,13 +50,13 @@ parReset lpeInstance@((_channels, paramEqs, summands)) _out invariant = do
 -- whose guard can be satisfied after the guard of the current summand has been satisfied and
 -- after the substitutions of the process recursion have taken place.)
 getImmediateSuccessors :: [LPESummand] -> TxsDefs.VExpr -> LPESummand -> IOC.IOC [LPESummand]
-getImmediateSuccessors _ _ (LPESummand _ _ LPEStop) = do return []
-getImmediateSuccessors allSummands invariant (LPESummand _channelOffers guard (LPEProcInst paramEqs)) = do
+getImmediateSuccessors _ _ (LPESummand _ _ _ LPEStop) = do return []
+getImmediateSuccessors allSummands invariant (LPESummand _channelVars _channelOffers guard (LPEProcInst paramEqs)) = do
     immediateSuccessors <- Monad.foldM addSummandIfImmediateSuccessor [] allSummands
     return $ immediateSuccessors
   where
     addSummandIfImmediateSuccessor :: [LPESummand] -> LPESummand -> IOC.IOC [LPESummand]
-    addSummandIfImmediateSuccessor soFar summand@(LPESummand _ g _) = do
+    addSummandIfImmediateSuccessor soFar summand@(LPESummand _ _ g _) = do
       sat <- isSatisfiable (cstrAnd (Set.fromList [invariant, guard, varSubst paramEqs g]))
       return $ if sat then soFar ++ [summand] else soFar
 -- getImmediateSuccessors
@@ -75,18 +75,18 @@ parResetLoop lpeInstance@(channels, initParamEqs, summands) invariant successors
 -- parResetLoop
 
 resetParamsInSummand :: LPEInstance -> TxsDefs.VExpr -> [(LPESummand, [LPESummand], [VarId])] -> LPESummand -> IOC.IOC LPESummand
-resetParamsInSummand _ _ _ (summand@(LPESummand _ _ LPEStop)) = do return summand
-resetParamsInSummand (_, initParamEqs, summands) invariant successorsPerSummand summand@(LPESummand channelOffers guard (LPEProcInst paramEqs)) =
+resetParamsInSummand _ _ _ (summand@(LPESummand _ _ _ LPEStop)) = do return summand
+resetParamsInSummand (_, initParamEqs, summands) invariant successorsPerSummand summand@(LPESummand channelVars channelOffers guard (LPEProcInst paramEqs)) =
     case [ (sucs, uvars) | (smd, sucs, uvars) <- successorsPerSummand, smd == summand ] of
       [(sucs, uvars)] -> if (length uvars) == (length initParamEqs)
                          then do return summand -- (All variables are used, apparently, so do not touch the summand.)
                          else do let nonSuccessors = Set.toList ((Set.fromList summands) Set.\\ (Set.fromList sucs))
                                  let newParamEqs = [ (p1, if p1 `elem` uvars then v2 else v1) | (p1, v1) <- initParamEqs, (p2, v2) <- paramEqs, p1 == p2 ]
-                                 let smd2constraint = \(LPESummand _ g _) -> cstrAnd (Set.fromList [invariant, guard, varSubst newParamEqs g])
+                                 let smd2constraint = \(LPESummand _ _ g _) -> cstrAnd (Set.fromList [invariant, guard, varSubst newParamEqs g])
                                  notSat <- areNotSatisfiable (map smd2constraint nonSuccessors)
                                  if notSat
                                  then do printNewParamEqs newParamEqs
-                                         return (LPESummand channelOffers guard (LPEProcInst newParamEqs))
+                                         return (LPESummand channelVars channelOffers guard (LPEProcInst newParamEqs))
                                  else  do return summand
       _ -> do return summand
   where
@@ -120,19 +120,19 @@ parResetUpdate successorsPerSummand = map updateSummand successorsPerSummand
           (summand, successors, Set.toList relevantToSuccessorVars)
     
     getRelevantToSuccessorVars :: LPESummand -> Set.Set VarId
-    getRelevantToSuccessorVars successor@(LPESummand channelOffers guard procInst) =
-        let usedVars = foldl (++) [] [uvars | (s, _g, uvars) <- successorsPerSummand, s == successor] in
+    getRelevantToSuccessorVars successor@(LPESummand _channelVars channelOffers guard procInst) =
+        let usedVars = concat [uvars | (s, _g, uvars) <- successorsPerSummand, s == successor] in
         
         -- Parameters in the guard are relevant to the successor, because they enable/disable the channel+instantiation:
         let guardVars = Set.fromList (FreeVar.freeVars guard) in
         
         -- Parameters used in assignments to used variables are relevant (because the variables are used):
         let assignmentVars = (case procInst of
-                                LPEProcInst paramEqs -> Set.fromList (foldl (++) [] [FreeVar.freeVars v | (p, v) <- paramEqs, q <- usedVars, p == q])
+                                LPEProcInst paramEqs -> Set.fromList (concat [FreeVar.freeVars v | (p, v) <- paramEqs, q <- usedVars, p == q])
                                 _ -> Set.empty) in
         
         -- The successor communicates via these variables, so their values are NOT relevant to the successor:
-        let channelOfferVars = Set.fromList (foldl (++) [] (map snd channelOffers)) in
+        let channelOfferVars = Set.fromList (concat (map snd channelOffers)) in
         
         -- Combine them all:
           (Set.union guardVars assignmentVars) Set.\\ channelOfferVars

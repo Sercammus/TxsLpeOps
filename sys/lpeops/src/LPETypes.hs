@@ -31,13 +31,11 @@ fromLPEInstance
 ) where
 
 import           Control.Monad.State
-import qualified Control.Monad as Monad
 import qualified Data.List as List
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified EnvCore as IOC
-import qualified EnvData
 import qualified SortOf
 import qualified TxsDefs
 import qualified TxsShow
@@ -46,23 +44,25 @@ import           VarId
 import           ChanId
 import           Constant
 import           ValExpr
+import           ConcatEither
 
 -- Type around which this module revolves.
 -- It consists of the following parts:
---  - Channels used by the LPE.
---  - Parameters used by the LPE and their initial values, coupled in pairs.
---  - Contents of each summand of the LPE.
+--  - Channels used by the LPE (included mostly so that conversion to TXS is possible without additional channel information).
+--  - Parameters used by the LPE and their initial values (each pair forms a 'parameter equation').
+--  - List of summands of the LPE.
 type LPEInstance = ([TxsDefs.ChanId], LPEParamEqs, LPESummands)
 
 -- Main building block of an LPE.
 -- Each summand provides the following pieces of critical information:
---  - Channel offers (channel references and fresh variables for communication over those channel).
---  - Guard (capable of restricting the value of the communication variable).
---  - Possibly a number of value initializations (for the instantiation of the next process).
-data LPESummand = LPESummand LPEChannelOffers TxsDefs.VExpr LPEProcInst deriving (Eq, Ord, Show)
+--  - All channel variables, including hidden variables.
+--  - Channel offers (action prefices and the *fresh* variables - also found in the earlier list - used per action prefix for synchronization).
+--  - Guard (restriction on when the summand can be 'applied').
+--  - STOP, or a number of parameter equations to be used for the recursive instantiation.
+data LPESummand = LPESummand [VarId] LPEChannelOffers TxsDefs.VExpr LPEProcInst deriving (Eq, Ord, Show)
 type LPESummands = [LPESummand]
 
--- Summands can have a process instantiation or STOP:
+-- Summands can end with a recursive instantiation of the LPE or with a STOP:
 data LPEProcInst = LPEStop | LPEProcInst LPEParamEqs deriving (Eq, Ord, Show)
 
 -- Convenience type.
@@ -77,113 +77,96 @@ type LPEParamEq = (VarId, TxsDefs.VExpr)
 type LPEParamEqs = [LPEParamEq]
 
 -- Extracts the data expression that corresponds with the specified variable from a map.
--- The variable should be in the specified map (unchecked precondition)!
+-- The variable should be in the specified map (unchecked precondition!);
+-- however, if the variable is not found the function returns ANY <variable sort>.
 extractVExprFromMap :: VarId -> Map.Map VarId TxsDefs.VExpr -> TxsDefs.VExpr
 extractVExprFromMap varId m = Map.findWithDefault (cstrConst (Cany (SortOf.sortOf varId))) varId m
 
--- Extracts the data expression that corresponds with the specified variable from a number of parameter equations.
--- One of the equations should have the specified variable on the left-hand side (precondition)!
+-- Extracts the data expression that corresponds with the specified parameter from a number of parameter equations.
+-- One of the equations should have the specified parameter on the left-hand side;
+-- however, if the parameter is not found the function returns ANY <parameter sort>.
 extractVExprFromParamEqs :: VarId -> LPEParamEqs -> TxsDefs.VExpr
 extractVExprFromParamEqs varId paramEqs = extractVExprFromMap varId (Map.fromList paramEqs)
-
--- Helper function.
--- Checks if the types of the specified variables and values match.
-typeCheckParams :: [VarId] -> [TxsDefs.VExpr] -> Bool
-typeCheckParams [] [] = True
-typeCheckParams _ [] = False
-typeCheckParams [] _ = False
-typeCheckParams (x:params) (y:paramValues) = ((SortOf.sortOf x) == (SortOf.sortOf y)) && (typeCheckParams params paramValues)
-
--- Helper function.
--- Maps a number of objects, unless for one of them the mapping yields Nothing:
-mapMaybesM :: Monad m => (a -> m (Maybe b)) -> [a] -> m (Maybe [b])
-mapMaybesM f x = Monad.foldM f' (Just []) x
-  where
-    f' (Just soFar) x' = do x'' <- f x'
-                            case x'' of
-                              Just x''' -> do return (Just (soFar ++ [x''']))
-                              Nothing -> do return Nothing
-    f' _ _ = do return Nothing
--- mapMaybesM
-
--- Helper function.
--- Concatenates a number of lists, unless one of them equals Nothing:
-concatMaybesM :: Monad m => m (Maybe [[t]]) -> m (Maybe [t])
-concatMaybesM x = do x' <- x
-                     case x' of
-                       Just x'' -> do return (Just (concat x''))
-                       Nothing -> do return Nothing
--- concatMaybesM
 
 -- Exposed function.
 -- Constructs an LPEInstance from a process expression (unless there is a problem).
 -- The process expression should be the instantiation of a process that is already linear.
-toLPEInstance :: TxsDefs.BExpr                 -- Process instantiation.
-               -> IOC.IOC (Maybe LPEInstance)  -- Instance (unless there is a problem).
+toLPEInstance :: TxsDefs.BExpr                          -- Process instantiation.
+              -> IOC.IOC (Either [String] LPEInstance)  -- Instance (unless there are problems).
 toLPEInstance procInst = do
     envc <- get
     case IOC.state envc of
       IOC.Initing { IOC.tdefs = tdefs } -> let procDefs = TxsDefs.procDefs tdefs in
         case TxsDefs.view procInst of
           TxsDefs.ProcInst procId _chans paramValues -> case Map.lookup procId procDefs of
-            Just procDef@(TxsDefs.ProcDef chans params body) -> if typeCheckParams params paramValues
-                                                                then do maybeSummands <- getLPESummands procId procDef body
-                                                                        return (case maybeSummands of
-                                                                          Just summands -> Just (chans, zip params paramValues, Set.toList (Set.fromList summands))
-                                                                          Nothing -> Nothing)
-                                                                else do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("toLPEInstance: parameter mismatch " ++ (show procId)) ]
-                                                                        return Nothing
-            _ -> do let definedProcessNames = List.intercalate ", " (map (Text.unpack . ProcId.name) (Map.keys procDefs))
-                    IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("toLPEInstance: undefined process " ++ (show (Text.unpack (ProcId.name procId))) ++ " (defined processes are {" ++ definedProcessNames ++ "})") ]
-                    return Nothing
-          _ -> do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("toLPEInstance: expression must be process instantiation, found " ++ (TxsShow.fshow (TxsDefs.view procInst))) ]
-                  return Nothing
-      _ -> do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR "toLPEInstance: only allowed if initialized" ]
-              return Nothing
+            Just procDef@(TxsDefs.ProcDef chans params body) ->
+              case getParamEqs params paramValues of
+                Left msgs -> do return (Left msgs)
+                Right eqs -> case getLPESummands procId procDef body of
+                               Left msgs -> do return (Left msgs)
+                               Right summands -> do return (Right (chans, eqs, summands))
+            Nothing -> do let definedProcessNames = List.intercalate " or " (map (Text.unpack . ProcId.name) (Map.keys procDefs))
+                          return (Left ["Expected " ++ definedProcessNames ++ ", found " ++ (show (Text.unpack (ProcId.name procId))) ++ "!"])
+          _ -> do return (Left ["Expression must be process instantiation, found " ++ (TxsShow.fshow (TxsDefs.view procInst)) ++ "!"])
+      _ -> do return (Left ["TorXakis core is not initialized!"])
 -- toLPEInstance
 
 -- Helper function.
--- Constructs one or more summands from a TXS process expression (unless there is a problem).
-getLPESummands :: TxsDefs.ProcId -> TxsDefs.ProcDef -> TxsDefs.BExpr -> IOC.IOC (Maybe LPESummands)
-getLPESummands expectedProcId expectedProcDef@(TxsDefs.ProcDef defChanIds params _body) expr = do
+-- Constructs one or more summands from a TXS process expression (unless there are problems):
+getLPESummands :: TxsDefs.ProcId -> TxsDefs.ProcDef -> TxsDefs.BExpr -> Either [String] [LPESummand]
+getLPESummands expectedProcId expectedProcDef@(TxsDefs.ProcDef defChanIds params _body) expr =
     case TxsDefs.view expr of
       TxsDefs.Choice choices -> if choices == Set.empty -- (An 'empty choice' is equivalent to STOP.)
-                                then do return (Just [LPESummand [] (cstrConst (Cbool True)) LPEStop])
-                                else concatMaybesM (mapMaybesM (getLPESummands expectedProcId expectedProcDef) (Set.toList choices))
-      TxsDefs.ActionPref (TxsDefs.ActOffer { TxsDefs.offers = offers, TxsDefs.constraint = constraint }) procInst ->
+                                then Right [LPESummand [] [] (cstrConst (Cbool True)) LPEStop]
+                                else concatEither (map (getLPESummands expectedProcId expectedProcDef) (Set.toList choices))
+      TxsDefs.ActionPref (TxsDefs.ActOffer { TxsDefs.offers = offers, TxsDefs.hiddenvars = hiddenvars, TxsDefs.constraint = constraint }) procInst ->
         case TxsDefs.view procInst of
           TxsDefs.ProcInst procId chanIds paramValues ->
-            if (procId == expectedProcId) && (chanIds == defChanIds) && (typeCheckParams params paramValues)
-            then do maybeChannelOffers <- mapMaybesM (getChannelOffer params) (Set.toList offers)
-                    case maybeChannelOffers of
-                      Just channelOffers -> do return (Just [LPESummand channelOffers constraint (LPEProcInst (zip params paramValues))])
-                      Nothing -> do return Nothing
-            else do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("toLPEInstance: mismatching instantiation in " ++ (TxsShow.fshow (TxsDefs.view procInst))) ]
-                    return Nothing
-          _ -> do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("toLPEInstance: expected ProcInst, but found " ++ (TxsShow.fshow (TxsDefs.view procInst))) ]
-                  return Nothing
-      _ -> do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("toLPEInstance: expected Choice or ActionPref, but found " ++ (TxsShow.fshow (TxsDefs.view expr))) ]
-              return Nothing
+            if procId /= expectedProcId
+            then Left ["Instantiating incorrect process, found " ++ (TxsShow.fshow (TxsDefs.view procInst)) ++ "!"]
+            else if chanIds /= defChanIds
+                 then Left ["Channel mismatch in process instantiation, found " ++ (TxsShow.fshow (TxsDefs.view procInst)) ++ "!"]
+                 else case getParamEqs params paramValues of
+                        Left msgs -> Left msgs
+                        Right eqs -> case concatEither (map (getChannelOffer params) (Set.toList offers)) of
+                                       Left msgs -> Left msgs
+                                       Right channelOffers -> let channelVars = (concat (map snd channelOffers)) ++ (Set.toList hiddenvars) in
+                                                                Right [LPESummand channelVars channelOffers constraint (LPEProcInst eqs)]
+          _ -> Left ["Expected process instantiation, but found " ++ (TxsShow.fshow (TxsDefs.view procInst)) ++ "!"]
+      _ -> Left ["Expected choice or channel, but found " ++ (TxsShow.fshow (TxsDefs.view expr)) ++ "!"]
 -- getLPESummands
 
 -- Helper method.
--- Extracts an LPEChannelOffer for each channel offer (unless there is a problem).
-getChannelOffer :: [VarId] -> TxsDefs.Offer -> IOC.IOC (Maybe LPEChannelOffer)
-getChannelOffer params (TxsDefs.Offer { TxsDefs.chanid = chanid, TxsDefs.chanoffers = chanoffers }) = do
-    offers <- mapMaybesM mapOffer chanoffers
-    case offers of
-      Just offerVars -> do return (Just (chanid, offerVars))
-      Nothing -> do return Nothing
+-- Extracts an LPEChannelOffer for each channel offer (unless there are problems):
+getChannelOffer :: [VarId] -> TxsDefs.Offer -> Either [String] [LPEChannelOffer]
+getChannelOffer params (TxsDefs.Offer { TxsDefs.chanid = chanid, TxsDefs.chanoffers = chanoffers }) =
+    case concatEither (map offerToVar chanoffers) of
+      Left msgs -> Left msgs
+      Right offerVars -> Right [(chanid, offerVars)]
   where
-    mapOffer :: TxsDefs.ChanOffer -> IOC.IOC (Maybe VarId)
-    mapOffer (TxsDefs.Quest varId) =
+    offerToVar :: TxsDefs.ChanOffer -> Either [String] [VarId]
+    offerToVar (TxsDefs.Quest varId) =
         if varId `elem` params -- The channel variable should be fresh!
-        then do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("toLPEInstance: channel variable should be fresh, found " ++ (TxsShow.fshow varId)) ]
-                return Nothing
-        else do return (Just varId)
-    mapOffer chanOffer = do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("toLPEInstance: invalid channel format, found " ++ (TxsShow.fshow chanOffer)) ]
-                            return Nothing
+        then do Left ["Channel variable should be fresh, found " ++ (TxsShow.fshow varId) ++ "!" ]
+        else do Right [varId]
+    offerToVar chanOffer = Left ["Invalid channel format, found " ++ (TxsShow.fshow chanOffer) ++ "!"]
 -- getChannelOffers
+
+-- Helper function.
+-- Creates parameter equations from the specified variables and expressions (unless there are problems):
+getParamEqs :: [VarId] -> [TxsDefs.VExpr] -> Either [String] [LPEParamEq]
+getParamEqs [] [] = Right []
+getParamEqs (x:_) [] = Left ["Too few expressions, " ++ (Text.unpack (VarId.name x)) ++ " is unassigned!"]
+getParamEqs [] (x:_) = Left ["Too many expressions, found '" ++ (TxsShow.fshow x) ++ "'!"]
+getParamEqs (x:params) (y:paramValues) =
+    case getParamEqs params paramValues of
+      Left msgs -> if (SortOf.sortOf x) /= (SortOf.sortOf y)
+                   then Left (("Mismatching sorts, found " ++ (Text.unpack (VarId.name x)) ++ " and " ++ (TxsShow.fshow y) ++ "!"):msgs)
+                   else Left msgs
+      Right eqs -> if (SortOf.sortOf x) /= (SortOf.sortOf y)
+                   then Left ["Mismatching sorts, found " ++ (Text.unpack (VarId.name x)) ++ " and " ++ (TxsShow.fshow y) ++ "!"]
+                   else Right ((x, y):eqs)
+-- getParamEqs
 
 -- Exposed method.
 -- Constructs a process expression and a process definition from an LPEInstance (unless there is a problem).
@@ -206,11 +189,14 @@ fromLPEInstance (chans, paramEqs, summands) procName = do
       summandIterator [] _ = []
       summandIterator (summand:xs) lpeProcId =
           case summand of
-            LPESummand channelOffers gd LPEStop -> let actPref = TxsDefs.ActOffer { TxsDefs.offers = Set.fromList (map fromOfferToOffer channelOffers), TxsDefs.constraint = gd, TxsDefs.hiddenvars = Set.empty } in
-                (TxsDefs.actionPref actPref TxsDefs.stop):(summandIterator xs lpeProcId)
-            LPESummand channelOffers gd (LPEProcInst eqs) -> let actPref = TxsDefs.ActOffer { TxsDefs.offers = Set.fromList (map fromOfferToOffer channelOffers), TxsDefs.constraint = gd, TxsDefs.hiddenvars = Set.empty } in
-              let procInst = TxsDefs.procInst lpeProcId chans (map snd eqs) in
-                (TxsDefs.actionPref actPref procInst):(summandIterator xs lpeProcId)
+            LPESummand chanVars chanOffers gd inst -> let usedChanVars = concat (map snd chanOffers) in
+                                                      let hiddenChanVars = (Set.fromList chanVars) Set.\\ (Set.fromList usedChanVars) in
+                                                      let actPref = TxsDefs.ActOffer { TxsDefs.offers = Set.fromList (map fromOfferToOffer chanOffers), TxsDefs.constraint = gd, TxsDefs.hiddenvars = hiddenChanVars } in
+                                                        case inst of
+                                                          LPEStop -> (TxsDefs.actionPref actPref TxsDefs.stop):(summandIterator xs lpeProcId)
+                                                          LPEProcInst eqs -> let procInst = TxsDefs.procInst lpeProcId chans (map snd eqs) in
+                                                                               (TxsDefs.actionPref actPref procInst):(summandIterator xs lpeProcId)
+      -- summandIterator
       
       -- Constructs an offer from an offer:
       fromOfferToOffer :: LPEChannelOffer -> TxsDefs.Offer

@@ -17,7 +17,6 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Maybe as Maybe
 import qualified FreeMonoidX as FMX
-import Control.Monad.State
 import TxsDefs
 import ProcId
 import ChanId
@@ -33,37 +32,31 @@ import LPEOps
 import LPEDataReset
 import TestUtils
 
-dataResetFunc :: LPEInstance -> IO (Either LPEInstance String)
-dataResetFunc lpeInstance = do
-    env <- createTestEnvC
-    evalStateT (dataReset lpeInstance "" vexprTrue) env
--- dataResetFunc
-
 testDataResetBasic :: Test
 testDataResetBasic = TestCase $ do
-    validateLPEInstance lpeInstance1
-    maybeResult <- dataResetFunc lpeInstance1
-    case maybeResult of
-      Left result -> assertBool (printInputExpectedFound lpeInstance1 lpeInstance2 result) (result==lpeInstance2)
-      Right msg -> assertBool ("Function dataReset failed to produce output (" ++ msg ++ ")!") False
+    tryLPEOperation dataReset lpeInstance1 lpeInstance2
   where
     summand1_1 :: LPESummand
     summand1_1 = LPESummand -- A ? z [x==0] >-> P(1, z)
+        [varIdZ]
         [(chanIdA, [varIdZ])]
         (cstrEqual vexprX vexpr0)
         (LPEProcInst [(varIdX, vexpr1), (varIdY, vexprZ)])
     summand1_2 :: LPESummand
     summand1_2 = LPESummand -- A ? z [x==1 && z==y] >-> P(2, y)
+        [varIdZ]
         [(chanIdA, [varIdZ])]
         (cstrAnd (Set.fromList [cstrEqual vexprX vexpr1, cstrEqual vexprZ vexprY]))
         (LPEProcInst [(varIdX, vexpr2), (varIdY, vexprY)])
     summand1_3 :: LPESummand
     summand1_3 = LPESummand -- A ? z [x==2] >-> P(3, y)
         []
+        []
         (cstrEqual vexprX vexpr2)
         (LPEProcInst [(varIdX, vexpr3), (varIdY, vexprY)])
     summand1_4 :: LPESummand
     summand1_4 = LPESummand -- A ? z [x==3] >-> P(0, y)
+        []
         []
         (cstrEqual vexprX vexpr3)
         (LPEProcInst [(varIdX, vexpr0), (varIdY, vexprY)])
@@ -72,21 +65,25 @@ testDataResetBasic = TestCase $ do
     
     summand2_1 :: LPESummand
     summand2_1 = LPESummand -- A ? y [x==0] >-> P(1, y)
+        [varIdZ]
         [(chanIdA, [varIdZ])]
         (cstrEqual vexprX vexpr0)
         (LPEProcInst [(varIdX, vexpr1), (varIdY, vexprZ)])
     summand2_2 :: LPESummand
     summand2_2 = LPESummand -- A ? z [x==1 && z==y] >-> P(2, ANY int)
+        [varIdZ]
         [(chanIdA, [varIdZ])]
         (cstrAnd (Set.fromList [cstrEqual vexprX vexpr1, cstrEqual vexprZ vexprY]))
         (LPEProcInst [(varIdX, vexpr2), (varIdY, anyInt)])
     summand2_3 :: LPESummand
     summand2_3 = LPESummand -- A ? z [x==2] >-> P(3, ANY int)
         []
+        []
         (cstrEqual vexprX vexpr2)
         (LPEProcInst [(varIdX, vexpr3), (varIdY, anyInt)])
     summand2_4 :: LPESummand
     summand2_4 = LPESummand -- A ? z [x==3] >-> P(0, ANY int)
+        []
         []
         (cstrEqual vexprX vexpr3)
         (LPEProcInst [(varIdX, vexpr0), (varIdY, anyInt)])

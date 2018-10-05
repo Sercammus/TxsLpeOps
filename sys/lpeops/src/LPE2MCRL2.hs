@@ -54,7 +54,7 @@ lpe2mcrl2 lpeInstance out invariant = do
     evalStateT (lpe2mcrl2' lpeInstance out invariant) initialEnv
 -- lpe2mcrl2
 
-lpe2mcrl2' :: LPEInstance -> String -> TxsDefs.VExpr -> T2MMonad (Either LPEInstance String)
+lpe2mcrl2' :: LPEInstance -> String -> TxsDefs.VExpr -> T2MMonad (Either [String] LPEInstance)
 lpe2mcrl2' (channels, paramEqs, summands) out _invariant = do
     tdefs <- gets txsdefs
     -- Translate sorts.
@@ -85,7 +85,7 @@ lpe2mcrl2' (channels, paramEqs, summands) out _invariant = do
     spec <- gets specification
     let filename = out ++ ".mcrl2"
     liftIO $ writeFile filename (showSpecification spec)
-    return (Right ("Model exported to " ++ filename ++ "!"))
+    return (Left ["Model exported to " ++ filename ++ "!"])
 -- lpe2mcrl2'
 
 -- Creates an mCRL2 sort declaration from a TXS sort declaration:
@@ -178,16 +178,18 @@ createLPEProcess paramIds = do
 -- createLPEProcess
 
 summand2summand :: (MCRL2Defs.ObjectId, MCRL2Defs.Process) -> LPESummand -> T2MMonad MCRL2Defs.PExpr
-summand2summand (lpeProcName, lpeProc) (LPESummand chanOffers guard procInst) = do
-    -- Create actions, as well as the variables over which we communicate.
-    -- (Because the guard may refer to these variables, translate it AFTER!)
-    actionsEtc <- Monad.mapM channelOffer2actionEtc chanOffers
-    let newActions = map fst actionsEtc
-    let newActionsVars = concat (map snd actionsEtc)
-    let newActionExpr = MCRL2Defs.PAction (MCRL2Defs.AExpr newActions)
+summand2summand (lpeProcName, lpeProc) (LPESummand chanVars chanOffers guard procInst) = do
+    -- Create the channel variables (both explicit and hidden) first, so that they can be referenced:
+    actionVars <- Monad.mapM createFreshVar chanVars
+    -- Create actions (with their arguments):
+    actions <- Monad.mapM channelOffer2action chanOffers
+    -- Combine the actions in an expression:
+    let newActionExpr = MCRL2Defs.PAction (MCRL2Defs.AExpr actions)
+    -- Translate guard and recursive instantiation:
     newGuardExpr <- valExpr2dataExpr guard
     newProcInst <- procInst2procInst (lpeProcName, lpeProc) procInst
-    return (MCRL2Defs.PSum newActionsVars (MCRL2Defs.PGuard newGuardExpr (MCRL2Defs.PSeq [newActionExpr, newProcInst]) MCRL2Defs.PDeadlock))
+    -- Combine the different parts:
+    return (MCRL2Defs.PSum actionVars (MCRL2Defs.PGuard newGuardExpr (MCRL2Defs.PSeq [newActionExpr, newProcInst]) MCRL2Defs.PDeadlock))
 -- summand2summand
 
 procInst2procInst :: (MCRL2Defs.ObjectId, MCRL2Defs.Process) -> LPEProcInst -> T2MMonad MCRL2Defs.PExpr
@@ -197,14 +199,13 @@ procInst2procInst (lpeProcName, lpeProc) (LPEProcInst paramEqs) = do
     return (MCRL2Defs.PInst lpeProcName (zip (MCRL2Defs.processParams lpeProc) paramValues))
 -- paramEqs2procInst
 
-channelOffer2actionEtc :: LPEChannelOffer -> T2MMonad (MCRL2Defs.AInstance, [MCRL2Defs.Variable])
-channelOffer2actionEtc (chanId, chanVars) = do
+channelOffer2action :: LPEChannelOffer -> T2MMonad MCRL2Defs.AInstance
+channelOffer2action (chanId, chanVars) = do
     -- The action should already exist:
     (actionName, _action) <- getRegisteredAction chanId
-    -- The variables should all be fresh, so they do not yet exist in mCRL2:
-    actionVars <- Monad.mapM createFreshVar chanVars
-    let actionParams = map (\actionVar -> MCRL2Defs.DVariableRef actionVar) actionVars
-    return $ (MCRL2Defs.AInstance actionName actionParams, actionVars)
+    translatedVars <- Monad.mapM getRegisteredVar chanVars
+    let translatedVarExprs = map (\(_varName, varObj) -> MCRL2Defs.DVariableRef varObj) translatedVars
+    return (MCRL2Defs.AInstance actionName translatedVarExprs)
 -- offer2action
 
 -- Translates a TXS sort to an mCRL2 sort:
@@ -255,7 +256,7 @@ valExpr2dataExpr' _f (ValExpr.view -> ValExpr.Vconst (Constant.Cany sortId)) = d
     return $ MCRL2Defs.DVariableRef newGlobal
 valExpr2dataExpr' _f (ValExpr.view -> ValExpr.Vvar var) = do
     (_varName, translatedVar) <- getRegisteredVar var
-    liftIO $ putStrLn ("Tried to resolve variable " ++ (show var) ++ " -> " ++ (Text.unpack _varName) ++ "::" ++ (show translatedVar))
+    --liftIO $ putStrLn ("Tried to resolve variable " ++ (show var) ++ " -> " ++ (Text.unpack _varName) ++ "::" ++ (show translatedVar))
     return $ MCRL2Defs.DVariableRef translatedVar
 valExpr2dataExpr' f (ValExpr.view -> ValExpr.Vequal lhs rhs) = do
     translatedLhs <- f lhs

@@ -17,7 +17,6 @@ import Test.HUnit
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Maybe as Maybe
-import Control.Monad.State
 import TxsDefs
 import ProcId
 import ChanId
@@ -33,41 +32,36 @@ import LPEOps
 import LPEConstElm
 import TestUtils
 
-constElmFunc :: LPEInstance -> IO (Either LPEInstance String)
-constElmFunc lpeInstance = do
-    env <- createTestEnvC
-    evalStateT (constElm lpeInstance "" vexprTrue) env
--- constElmFunc
-
 testConstElmBasic :: Test
 testConstElmBasic = TestCase $ do
-    maybeResult <- constElmFunc lpeInstance1
-    case maybeResult of
-      Left result -> assertBool (printInputExpectedFound lpeInstance1 lpeInstance2 result) (result==lpeInstance2)
-      Right msg -> assertBool ("Function constElm failed to produce output (" ++ msg ++ ")!") False
+    tryLPEOperation constElm lpeInstance1 lpeInstance2
   where
     summand1_1 :: LPESummand
     summand1_1 = LPESummand -- A ? z [z==0] >-> P(1, 0)
+        [varIdZ]
         [(chanIdA, [varIdZ])]
         (cstrEqual vexprZ vexpr0)
         (LPEProcInst [(varIdX, vexpr1), (varIdY, vexpr0)])
     summand1_2 :: LPESummand
-    summand1_2 = LPESummand -- A ? y [x==1 && y==0] >-> P(0, y)
-        [(chanIdA, [varIdY])]
-        (cstrAnd (Set.fromList [cstrEqual vexprX vexpr1, cstrEqual vexprY vexpr0]))
+    summand1_2 = LPESummand -- A ? z [x==1 && y==z] >-> P(0, y)
+        [varIdZ]
+        [(chanIdA, [varIdZ])]
+        (cstrAnd (Set.fromList [cstrEqual vexprX vexpr1, cstrEqual vexprY vexprZ]))
         (LPEProcInst [(varIdX, vexpr0), (varIdY, vexprY)])
     lpeInstance1 :: LPEInstance
     lpeInstance1 = ([chanIdA], [(varIdX, vexpr0), (varIdY, vexpr0)], [summand1_1, summand1_2])
     
     summand2_1 :: LPESummand
     summand2_1 = LPESummand -- A ? z [z==0] >-> P(1)
+        [varIdZ]
         [(chanIdA, [varIdZ])]
         (cstrEqual vexprZ vexpr0)
         (LPEProcInst [(varIdX, vexpr1)])
     summand2_2 :: LPESummand
-    summand2_2 = LPESummand -- A ? __FV1 [0==0 && x==1] >-> P(0)
-        [(chanIdA, [varIdFV1])]
-        (cstrAnd (Set.fromList [cstrEqual vexprX vexpr1, cstrEqual vexpr0 vexpr0]))
+    summand2_2 = LPESummand -- A ? z [0==0 && 0==z] >-> P(0)
+        [varIdZ]
+        [(chanIdA, [varIdZ])]
+        (cstrAnd (Set.fromList [cstrEqual vexprX vexpr1, cstrEqual vexpr0 vexprZ]))
         (LPEProcInst [(varIdX, vexpr0)])
     lpeInstance2 :: LPEInstance
     lpeInstance2 = ([chanIdA], [(varIdX, vexpr0)], [summand2_1, summand2_2])
@@ -75,43 +69,46 @@ testConstElmBasic = TestCase $ do
 
 testConstElmXYX :: Test
 testConstElmXYX = TestCase $ do
-    maybeResult <- constElmFunc lpeInstance1
-    case maybeResult of
-      Left result -> assertBool (printInputExpectedFound lpeInstance1 lpeInstance2 result) (result==lpeInstance2)
-      Right msg -> assertBool ("Function constElm failed to produce output (" ++ msg ++ ")!") False
+    tryLPEOperation constElm lpeInstance1 lpeInstance2
   where
     summand1_1 :: LPESummand
-    summand1_1 = LPESummand -- A ? z >-> P(x, 1, z)
-        [(chanIdA, [varIdZ])]
-        (vexprTrue)
+    summand1_1 = LPESummand -- A ? __FV1 [__FV1==z] >-> P(x, 1, z)
+        [varIdFV1]
+        [(chanIdA, [varIdFV1])]
+        (cstrEqual vexprFV1 vexprZ)
         (LPEProcInst [(varIdX, vexprX), (varIdY, vexpr1), (varIdZ, vexprZ)])
     summand1_2 :: LPESummand
-    summand1_2 = LPESummand -- A ? z >-> P(y, x, z)
-        [(chanIdA, [varIdZ])]
-        (vexprTrue)
-        (LPEProcInst [(varIdX, vexprY), (varIdY, vexprX), (varIdZ, vexprZ)])
+    summand1_2 = LPESummand -- A ? __FV2 [__FV2==z] >-> P(y, x, __FV2)
+        [varIdFV2]
+        [(chanIdA, [varIdFV2])]
+        (cstrEqual vexprFV2 vexprZ)
+        (LPEProcInst [(varIdX, vexprY), (varIdY, vexprX), (varIdZ, vexprFV2)])
     summand1_3 :: LPESummand
-    summand1_3 = LPESummand -- A ? z >-> P(1, x, 2)
-        [(chanIdA, [varIdZ])]
-        (vexprTrue)
+    summand1_3 = LPESummand -- A ? __FV3 [__FV3==z] >-> P(1, x, 2)
+        [varIdFV3]
+        [(chanIdA, [varIdFV3])]
+        (cstrEqual vexprFV3 vexprZ)
         (LPEProcInst [(varIdX, vexpr1), (varIdY, vexprX), (varIdZ, vexpr2)])
     lpeInstance1 :: LPEInstance
     lpeInstance1 = ([chanIdA], [(varIdX, vexpr1), (varIdY, vexpr1), (varIdZ, vexpr2)], [summand1_1, summand1_2, summand1_3])
     
     summand2_1 :: LPESummand
-    summand2_1 = LPESummand -- A ? __FV1 >-> P()
+    summand2_1 = LPESummand -- A ? __FV1 [__FV1==2] >-> P()
+        [varIdFV1]
         [(chanIdA, [varIdFV1])]
-        (vexprTrue)
+        (cstrEqual vexprFV1 vexpr2)
         (LPEProcInst [])
     summand2_2 :: LPESummand
-    summand2_2 = LPESummand -- A ? __FV2 >-> P()
+    summand2_2 = LPESummand -- A ? __FV2 [__FV2==2] >-> P()
+        [varIdFV2]
         [(chanIdA, [varIdFV2])]
-        (vexprTrue)
+        (cstrEqual vexprFV2 vexpr2)
         (LPEProcInst [])
     summand2_3 :: LPESummand
-    summand2_3 = LPESummand -- A ? __FV3 >-> P()
+    summand2_3 = LPESummand -- A ? __FV3 [__FV3==2] >-> P()
+        [varIdFV3]
         [(chanIdA, [varIdFV3])]
-        (vexprTrue)
+        (cstrEqual vexprFV3 vexpr2)
         (LPEProcInst [])
     lpeInstance2 :: LPEInstance
     lpeInstance2 = ([chanIdA], [], [summand2_1, summand2_2, summand2_3])

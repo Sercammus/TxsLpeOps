@@ -30,43 +30,50 @@ import           LPETypes
 import           LPEPrettyPrint
 
 lpeOpsVersion :: String
-lpeOpsVersion = "0.1.0"
+lpeOpsVersion = "0.2.0"
 
-type LPEOperation = LPEInstance -> String -> TxsDefs.VExpr -> IOC.IOC (Either LPEInstance String)
+-- An LPE operation takes:
+--  - An input LPE;
+--  - An output name (for a file or a new model);
+--  - An invariant (using 'True' should have no effect);
+-- An LPE operation yields either
+--  - A list of (error) messages, in case there was a problem or some other event happened; or
+--  - A new LPE instance.
+type LPEOperation = LPEInstance -> String -> TxsDefs.VExpr -> IOC.IOC (Either [String] LPEInstance)
 
 -- Core method that does the following:
 --  1. Transforms a closed process expression to an LPE instance;
 --  2. Applies the given operation to the LPE instance, which results in a new LPE instance;
 --  3. Transforms the new LPE instance to a process definition with the specified name and
 --     a process expression that creates an instance of this process definition.
-lpeOperations :: [LPEOperation] -> TxsDefs.BExpr -> String -> TxsDefs.VExpr -> IOC.IOC (Either (TxsDefs.BExpr, TxsDefs.ProcId, TxsDefs.ProcDef) String)
+lpeOperations :: [LPEOperation] -> TxsDefs.BExpr -> String -> TxsDefs.VExpr -> IOC.IOC (Either [String] (TxsDefs.BExpr, TxsDefs.ProcId, TxsDefs.ProcDef))
 lpeOperations operations procInst out invariant = do
-    maybeLPEInstance <- toLPEInstance procInst
-    case maybeLPEInstance of
-      Just lpeInstance -> do eitherNewLPEInstance <- lpeOperation operations lpeInstance out invariant
-                             case eitherNewLPEInstance of
-                               Left newLPEInstance -> do temp <- fromLPEInstance newLPEInstance out
-                                                         return (Left temp)
-                               Right msg -> do return (Right msg)
-      Nothing -> do return (Right "Invalid LPE format!")
+    eitherLPEInstance <- toLPEInstance procInst
+    case eitherLPEInstance of
+      Left msgs -> do return (Left msgs)
+      Right lpeInstance -> do eitherNewLPEInstance <- lpeOperation operations lpeInstance out invariant
+                              case eitherNewLPEInstance of
+                                Left msgs -> do return (Left msgs)
+                                Right newLPEInstance -> do temp <- fromLPEInstance newLPEInstance out
+                                                           return (Right temp)
 -- lpeOperations
 
-lpeOperation :: [LPEOperation] -> LPEInstance -> String -> TxsDefs.VExpr -> IOC.IOC (Either LPEInstance String)
-lpeOperation [] lpeInstance _out _invariant = do return (Left lpeInstance)
+lpeOperation :: [LPEOperation] -> LPEInstance -> String -> TxsDefs.VExpr -> IOC.IOC (Either [String] LPEInstance)
+lpeOperation [] lpeInstance _out _invariant = do return (Right lpeInstance)
 lpeOperation (x:xs) lpeInstance out invariant = do
     eitherNewLPEInstance <- x lpeInstance out invariant
     case eitherNewLPEInstance of
-      Left newLPEInstance -> do lpeOperation xs newLPEInstance out invariant
-      Right msg -> do return (Right msg)
+      Left msgs -> do return (Left msgs)
+      Right newLPEInstance -> do lpeOperation xs newLPEInstance out invariant
 -- lpeOperations
 
 discardLPE :: LPEOperation
-discardLPE _lpeInstance _out _invariant = do return (Right "LPE discarded!")
+discardLPE _lpeInstance _out _invariant = do return (Left ["LPE discarded!"])
 
 showLPE :: LPEOperation
 showLPE lpeInstance _out _invariant = do
     IOC.putMsgs [ EnvData.TXS_CORE_ANY (showLPEInstance lpeInstance) ]
-    return (Left lpeInstance)
+    return (Right lpeInstance)
 -- showLPE
 
 

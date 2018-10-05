@@ -102,7 +102,7 @@ getParamSourcesPerSummand (x:xs) params invariant = do
   where
     getParamSources :: LPESummand -> [VarId] -> IOC.IOC (Map.Map VarId TxsDefs.VExpr)
     getParamSources _ [] = do return Map.empty
-    getParamSources summand@(LPESummand _channelOffers guard _) (p:ps) = do
+    getParamSources summand@(LPESummand _channelVars _channelOffers guard _) (p:ps) = do
         ps' <- getParamSources summand ps
         let srcSatExpr = cstrAnd (Set.fromList [guard, invariant])
         srcSolution <- getUniqueSolution srcSatExpr [] [p]
@@ -141,9 +141,9 @@ getUsedParamsPerSummand (x:xs) directlyUsedParamsPerSummand changedParamsPerSumm
       Map.insert x usedPars xs'
   where
     getUsedParams :: LPESummand -> [VarId]
-    getUsedParams summand@(LPESummand _channelOffers _guard LPEStop) =
+    getUsedParams summand@(LPESummand _channelVars _channelOffers _guard LPEStop) =
         Map.findWithDefault [] summand directlyUsedParamsPerSummand
-    getUsedParams summand@(LPESummand _channelOffers _guard (LPEProcInst paramEqs)) =
+    getUsedParams summand@(LPESummand _channelVars _channelOffers _guard (LPEProcInst paramEqs)) =
         let changedPars = Map.findWithDefault [] summand changedParamsPerSummand in
         let assignments = [expr | changedParam <- changedPars, (assignedParam, expr) <- paramEqs, changedParam == assignedParam ] in
         let indirectlyUsedPars = foldl (\soFar assignment -> Set.union soFar (Set.fromList (FreeVar.freeVars assignment))) Set.empty assignments in
@@ -175,7 +175,7 @@ getChangedParamsPerSummand (x:xs) params invariant = do
 -- A parameter that is 'directly used' by a summand is one that occurs in the guard.
 getDirectlyUsedParamsPerSummand :: [LPESummand] -> [VarId] -> Map.Map LPESummand [VarId]
 getDirectlyUsedParamsPerSummand [] _ = Map.empty
-getDirectlyUsedParamsPerSummand (x@(LPESummand _channelOffers guard _):xs) params =
+getDirectlyUsedParamsPerSummand (x@(LPESummand _channelVars _channelOffers guard _):xs) params =
     let guardFreeVars = FreeVar.freeVars guard in
     let directlyUsedPars = Set.intersection (Set.fromList guardFreeVars) (Set.fromList params) in
     let xs' = getDirectlyUsedParamsPerSummand xs params in
@@ -193,8 +193,8 @@ getDirectlyUsedParamsPerSummand (x@(LPESummand _channelOffers guard _):xs) param
 --      p2 is the first element in the pair returned by this function, and
 --      p1 is the variable provided as the second parameter to this function.
 constructDestSatExpr :: LPESummand -> VarId -> TxsDefs.VExpr -> IOC.IOC (VarId, TxsDefs.VExpr)
-constructDestSatExpr (LPESummand _ _ LPEStop) varId _invariant = do return (varId, cstrConst (Cbool False))
-constructDestSatExpr (LPESummand _channelOffers guard (LPEProcInst paramEqs)) varId invariant = do
+constructDestSatExpr (LPESummand _ _ _ LPEStop) varId _invariant = do return (varId, cstrConst (Cbool False))
+constructDestSatExpr (LPESummand _channelVars _channelOffers guard (LPEProcInst paramEqs)) varId invariant = do
     case filter (\(p, _) -> p == varId) paramEqs of
       [(_, v)] -> do varClone <- createFreshVarFromVar varId
                      let varCloneSubst = createVarSubst [(varId, cstrVar varClone)]

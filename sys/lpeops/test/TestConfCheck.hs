@@ -20,7 +20,6 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Maybe as Maybe
 import qualified FreeMonoidX as FMX
-import Control.Monad.State
 import TxsDefs
 import ProcId
 import ChanId
@@ -36,26 +35,19 @@ import LPEOps
 import LPEConfCheck
 import TestUtils
 
-confCheckFunc :: LPEInstance -> IO (Either LPEInstance String)
-confCheckFunc lpeInstance = do
-    env <- createTestEnvC
-    evalStateT (confCheck lpeInstance "" vexprTrue) env
--- confCheckFunc
-
 testConfCheckBasic :: Test
 testConfCheckBasic = TestCase $ do
-    maybeResult <- confCheckFunc lpeInstance1
-    case maybeResult of
-      Left result -> assertBool (printInputExpectedFound lpeInstance1 lpeInstance2 result) (result==lpeInstance2)
-      Right msg -> assertBool ("Function confCheck failed to produce output (" ++ msg ++ ")!") False
+    tryLPEOperation confCheck lpeInstance1 lpeInstance2
   where
     summand1_1 :: LPESummand
     summand1_1 = LPESummand -- A ? [x!=2] >-> P(x+1, y)
+        []
         [(chanIdA, [])]
         (cstrNot (cstrEqual vexprX vexpr2))
         (LPEProcInst [(varIdX, vexprSum vexprX vexpr1), (varIdY, vexprY)])
     summand1_2 :: LPESummand
     summand1_2 = LPESummand -- ISTEP [y!=2] >-> P(x, y+1)
+        []
         [(chanIdIstep, [])]
         (cstrNot (cstrEqual vexprY vexpr2))
         (LPEProcInst [(varIdX, vexprX), (varIdY, vexprSum vexprY vexpr1)])
@@ -64,11 +56,13 @@ testConfCheckBasic = TestCase $ do
     
     summand2_1 :: LPESummand
     summand2_1 = LPESummand -- A ? [x!=2] >-> P(x+1, y)
+        []
         [(chanIdA, [])]
         (cstrNot (cstrEqual vexprX vexpr2))
         (LPEProcInst [(varIdX, vexprSum vexprX vexpr1), (varIdY, vexprY)])
     summand2_2 :: LPESummand
     summand2_2 = LPESummand -- CISTEP [y!=2] >-> P(x, y+1)
+        []
         [(chanIdConfluentIstep, [])]
         (cstrNot (cstrEqual vexprY vexpr2))
         (LPEProcInst [(varIdX, vexprX), (varIdY, vexprSum vexprY vexpr1)])
@@ -76,26 +70,19 @@ testConfCheckBasic = TestCase $ do
     lpeInstance2 = ([chanIdA], [(varIdX, vexpr0), (varIdY, vexpr0)], [summand2_1, summand2_2])
 -- testConfCheckBasic
 
-confElmFunc :: LPEInstance -> IO (Either LPEInstance String)
-confElmFunc lpeInstance = do
-    env <- createTestEnvC
-    evalStateT (confElm lpeInstance "" vexprTrue) env
--- confElmFunc
-
 testConfElmNoChange :: Test
 testConfElmNoChange = TestCase $ do
-    maybeResult <- confElmFunc lpeInstance1
-    case maybeResult of
-      Left result -> assertBool (printInputExpectedFound lpeInstance1 lpeInstance2 result) (result==lpeInstance2)
-      Right msg -> assertBool ("Function confElm failed to produce output (" ++ msg ++ ")!") False
+    tryLPEOperation confElm lpeInstance1 lpeInstance2
   where
     summand1_1 :: LPESummand
     summand1_1 = LPESummand -- A ? [x!=2] >-> P(x+1, y)
+        []
         [(chanIdA, [])]
         (cstrNot (cstrEqual vexprX vexpr2))
         (LPEProcInst [(varIdX, vexprSum vexprX vexpr1), (varIdY, vexprY)])
     summand1_2 :: LPESummand
     summand1_2 = LPESummand -- ISTEP [y!=2] >-> P(2, y)
+        []
         [(chanIdIstep, [])]
         (cstrNot (cstrEqual vexprY vexpr2))
         (LPEProcInst [(varIdX, vexprX), (varIdY, vexprSum vexprY vexpr1)])
@@ -104,11 +91,13 @@ testConfElmNoChange = TestCase $ do
     
     summand2_1 :: LPESummand
     summand2_1 = LPESummand -- A ? [x!=2] >-> P(x+1, y)
+        []
         [(chanIdA, [])]
         (cstrNot (cstrEqual vexprX vexpr2))
         (LPEProcInst [(varIdX, vexprSum vexprX vexpr1), (varIdY, vexprY)])
     summand2_2 :: LPESummand
     summand2_2 = LPESummand -- ISTEP [y!=2] >-> P(2, y)
+        []
         [(chanIdIstep, [])]
         (cstrNot (cstrEqual vexprY vexpr2))
         (LPEProcInst [(varIdX, vexprX), (varIdY, vexprSum vexprY vexpr1)])
@@ -118,18 +107,17 @@ testConfElmNoChange = TestCase $ do
 
 testConfElmBasic :: Test
 testConfElmBasic = TestCase $ do
-    maybeResult <- confElmFunc lpeInstance1
-    case maybeResult of
-      Left result -> assertBool (printInputExpectedFound lpeInstance1 lpeInstance2 result) (result==lpeInstance2)
-      Right msg -> assertBool ("Function confElm failed to produce output (" ++ msg ++ ")!") False
+    tryLPEOperation confElm lpeInstance1 lpeInstance2
   where
     summand1_1 :: LPESummand
     summand1_1 = LPESummand -- A >-> P(x+1, y)
+        []
         [(chanIdA, [])]
         vexprTrue
         (LPEProcInst [(varIdX, vexprSum vexprX vexpr1), (varIdY, vexprY)])
     summand1_2 :: LPESummand
     summand1_2 = LPESummand -- ISTEP >-> P(x, y+1)
+        []
         [(chanIdIstep, [])]
         vexprTrue
         (LPEProcInst [(varIdX, vexprX), (varIdY, vexprSum vexprY vexpr1)])
@@ -138,11 +126,13 @@ testConfElmBasic = TestCase $ do
     
     summand2_1 :: LPESummand
     summand2_1 = LPESummand -- A >-> P(x+1, y+1)
+        []
         [(chanIdA, [])]
         vexprTrue
         (LPEProcInst [(varIdX, vexprSum vexprX vexpr1), (varIdY, vexprSum vexprY vexpr1)])
     summand2_2 :: LPESummand
     summand2_2 = LPESummand -- ISTEP >-> P(x, y+2)
+        []
         [(chanIdIstep, [])]
         vexprTrue
         (LPEProcInst [(varIdX, vexprX), (varIdY, vexprSum vexprY vexpr2)])
@@ -152,18 +142,17 @@ testConfElmBasic = TestCase $ do
 
 testConfElmModulo :: Test
 testConfElmModulo = TestCase $ do
-    maybeResult <- confElmFunc lpeInstance1
-    case maybeResult of
-      Left result -> assertBool (printInputExpectedFound lpeInstance1 lpeInstance2 result) (result==lpeInstance2)
-      Right msg -> assertBool ("Function confElm failed to produce output (" ++ msg ++ ")!") False
+    tryLPEOperation confElm lpeInstance1 lpeInstance2
   where
     summand1_1 :: LPESummand
     summand1_1 = LPESummand -- A >-> P((x+1) % 3, y)
+        []
         [(chanIdA, [])]
         vexprTrue
         (LPEProcInst [(varIdX, cstrModulo (vexprSum vexprX vexpr1) vexpr3), (varIdY, vexprY)])
     summand1_2 :: LPESummand
     summand1_2 = LPESummand -- ISTEP >-> P(x, (y+1) % 3)
+        []
         [(chanIdIstep, [])]
         vexprTrue
         (LPEProcInst [(varIdX, vexprX), (varIdY, cstrModulo (vexprSum vexprY vexpr1) vexpr3)])
@@ -172,11 +161,13 @@ testConfElmModulo = TestCase $ do
     
     summand2_1 :: LPESummand
     summand2_1 = LPESummand -- A >-> P((x+1) % 3, y)
+        []
         [(chanIdA, [])]
         vexprTrue
         (LPEProcInst [(varIdX, cstrModulo (vexprSum vexprX vexpr1) vexpr3), (varIdY, cstrModulo (vexprSum vexprY vexpr1) vexpr3)])
     summand2_2 :: LPESummand
     summand2_2 = LPESummand -- ISTEP >-> P(x, (y+1) % 3)
+        []
         [(chanIdIstep, [])]
         vexprTrue
         (LPEProcInst [(varIdX, vexprX), (varIdY, cstrModulo (vexprSum (cstrModulo (vexprSum vexprY vexpr1) vexpr3) vexpr1) vexpr3)])
