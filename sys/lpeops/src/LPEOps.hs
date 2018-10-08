@@ -31,7 +31,7 @@ import           LPETypes
 import           LPEPrettyPrint
 
 lpeOpsVersion :: String
-lpeOpsVersion = "0.2.0"
+lpeOpsVersion = "0.3.0"
 
 data LPEOp = LPEOpLoop | LPEOp LPEOperation
 
@@ -59,6 +59,9 @@ lpeOperations operations procInst out invariant = do
                                 Left msgs -> do return (Left msgs)
                                 Right [] -> do return (Left ["No output LPE found!"])
                                 Right (newLPEInstance:_) -> do temp <- fromLPEInstance newLPEInstance out
+                                                               if newLPEInstance /= lpeInstance
+                                                               then IOC.putMsgs [ EnvData.TXS_CORE_ANY "LPE instance has been rewritten!" ]
+                                                               else IOC.putMsgs [ EnvData.TXS_CORE_ANY "LPE instance is identical to input!" ]
                                                                return (Right temp)
 -- lpeOperations
 

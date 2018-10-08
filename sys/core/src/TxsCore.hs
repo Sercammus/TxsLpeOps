@@ -193,6 +193,7 @@ import qualified LPE2MCRL2
 import ConcatEither
 
 -- import from valexpr
+import qualified ModelId
 import qualified SortId
 import qualified SortOf
 import Constant
@@ -1195,7 +1196,8 @@ txsLPEOp opChain inName outName invariant = do
                     let tdefs''' = tdefs'' { TxsDefs.modelDefs = Map.insert newModelId newModelDef (TxsDefs.modelDefs tdefs'') }
                     IOC.modifyCS $ \st -> st { IOC.tdefs = tdefs''' }
                     return ["LPE transformation complete; result saved to model " ++ (TxsShow.fshow newModelId) ++ "!"]
-          _ -> return ["Could not find model " ++ inName ++ "!"]
+          _ -> do let definedModelNames = List.intercalate " or " (map (T.unpack . ModelId.name) (Map.keys (TxsDefs.modelDefs tdefs)))
+                  return ["Expected " ++ definedModelNames ++ ", found " ++ inName ++ "!"]
       _ -> do return ["TorXakis core is not initialized!"]
   where
     getModels :: Map.Map TxsDefs.ModelId TxsDefs.ModelDef -> String -> [TxsDefs.ModelDef]

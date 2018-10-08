@@ -150,10 +150,10 @@ isConst _                  = False
 -- | Get the integer value of a constant.
 getIntVal :: ValExpr v -> Integer
 getIntVal (view -> Vconst (Cint i)) = i
-getIntVal (view -> Vconst _)        =
-    error "ValExprImpls.hs - getIntVal - Unexpected Constant"
-getIntVal _                         =
-    error "ValExprImpls.hs - getIntVal - Unexpected ValExpr"
+getIntVal expr@(view -> Vconst _)        =
+    error ("ValExprImpls.hs - getIntVal - Unexpected Constant, namely " ++ (show expr))
+getIntVal expr                         =
+    error ("ValExprImpls.hs - getIntVal - Unexpected ValExpr, namely " ++ (show expr))
 
 -- | Create a constant as a value expression.
 cstrConst :: Constant -> ValExpr v
