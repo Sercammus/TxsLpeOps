@@ -9,6 +9,7 @@ module Main where
 import System.Exit
 import Test.HUnit
 
+import TestClean
 import TestConstElm
 import TestParElm
 import TestDataReset
@@ -18,7 +19,9 @@ import TestConfCheck
 testList :: Test
 testList = TestList
     [
-      TestLabel "constElmBasic"            testConstElmBasic
+      TestLabel "cleanBasic"               testCleanBasic
+    , TestLabel "cleanUnreachable"         testCleanUnreachable
+    , TestLabel "constElmBasic"            testConstElmBasic
     , TestLabel "constElmXYX"              testConstElmXYX
     , TestLabel "parElmBasic"              testParElmBasic
     , TestLabel "parElmXUpperBound"        testParElmXUpperBound

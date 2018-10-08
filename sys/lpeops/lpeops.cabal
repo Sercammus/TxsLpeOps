@@ -87,6 +87,7 @@ test-suite lpeops-test
                       , MCRL2Env
                       , MCRL2PrettyPrint
                       , TestUtils
+                      , TestClean
                       , TestConstElm
                       , TestParElm
                       , TestParReset

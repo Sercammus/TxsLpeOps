@@ -15,8 +15,7 @@ See LICENSE at root directory of this repository.
 -----------------------------------------------------------------------------
 
 module LPEClean (
-cleanLPE,
-containsSummand
+cleanLPE
 ) where
 
 import qualified Control.Monad as Monad

@@ -256,7 +256,6 @@ valExpr2dataExpr' _f (ValExpr.view -> ValExpr.Vconst (Constant.Cany sortId)) = d
     return $ MCRL2Defs.DVariableRef newGlobal
 valExpr2dataExpr' _f (ValExpr.view -> ValExpr.Vvar var) = do
     (_varName, translatedVar) <- getRegisteredVar var
-    --liftIO $ putStrLn ("Tried to resolve variable " ++ (show var) ++ " -> " ++ (Text.unpack _varName) ++ "::" ++ (show translatedVar))
     return $ MCRL2Defs.DVariableRef translatedVar
 valExpr2dataExpr' f (ValExpr.view -> ValExpr.Vequal lhs rhs) = do
     translatedLhs <- f lhs
