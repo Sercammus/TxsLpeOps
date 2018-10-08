@@ -1210,17 +1210,18 @@ txsLPEOp opChain inName outName invariant = do
           [] -> [[x]] -- (Should not happen, but anyway.)
           (y:ys) -> (x:y):ys
     
-    getLPEOperation :: String -> Either [String] [LPEOps.LPEOperation]
+    getLPEOperation :: String -> Either [String] [LPEOps.LPEOp]
     getLPEOperation opName = case opName of
-                               "stop" -> Right [LPEOps.discardLPE]
-                               "show" -> Right [LPEOps.showLPE]
-                               "clean" -> Right [LPEClean.cleanLPE]
-                               "cstelm" -> Right [LPEConstElm.constElm]
-                               "parelm" -> Right [LPEParElm.parElm]
-                               "datareset" -> Right [LPEDataReset.dataReset]
-                               "parreset" -> Right [LPEParReset.parReset]
-                               "confelm" -> Right [LPEConfCheck.confElm]
-                               "mcrl2" -> Right [LPE2MCRL2.lpe2mcrl2]
+                               "stop" -> Right [LPEOps.LPEOp LPEOps.discardLPE]
+                               "show" -> Right [LPEOps.LPEOp LPEOps.showLPE]
+                               "loop" -> Right [LPEOps.LPEOpLoop]
+                               "clean" -> Right [LPEOps.LPEOp LPEClean.cleanLPE]
+                               "cstelm" -> Right [LPEOps.LPEOp LPEConstElm.constElm]
+                               "parelm" -> Right [LPEOps.LPEOp LPEParElm.parElm]
+                               "datareset" -> Right [LPEOps.LPEOp LPEDataReset.dataReset]
+                               "parreset" -> Right [LPEOps.LPEOp LPEParReset.parReset]
+                               "confelm" -> Right [LPEOps.LPEOp LPEConfCheck.confElm]
+                               "mcrl2" -> Right [LPEOps.LPEOp LPE2MCRL2.lpe2mcrl2]
                                _ -> Left ["Unknown LPE operation (" ++ opName ++ ")!"]
 --txsLPEOp
 

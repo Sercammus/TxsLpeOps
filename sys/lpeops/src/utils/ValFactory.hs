@@ -14,7 +14,6 @@ See LICENSE at root directory of this repository.
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE ViewPatterns        #-}
 module ValFactory (
 sort2defaultValue
 ) where
@@ -32,17 +31,21 @@ import qualified Constant
 import qualified CstrId
 
 sort2defaultValue :: SortId.SortId -> IOC.IOC TxsDefs.VExpr
-sort2defaultValue sortId =
-    if sortId == SortId.sortIdBool then do return (ValExpr.cstrConst (Constant.Cbool False)) else
-    if sortId == SortId.sortIdInt then do return (ValExpr.cstrConst (Constant.Cint 0)) else
-    if sortId == SortId.sortIdString then do return (ValExpr.cstrConst (Constant.Cstring (Text.pack ""))) else
-    if sortId == SortId.sortIdRegex then do return (ValExpr.cstrConst (Constant.Cstring (Text.pack ""))) else
-      do
+sort2defaultValue sortId
+    | sortId == SortId.sortIdBool = do
+        return (ValExpr.cstrConst (Constant.Cbool False))
+    | sortId == SortId.sortIdInt = do
+        return (ValExpr.cstrConst (Constant.Cint 0))
+    | sortId == SortId.sortIdString = do
+        return (ValExpr.cstrConst (Constant.Cstring (Text.pack "")))
+    | sortId == SortId.sortIdRegex = do
+        return (ValExpr.cstrConst (Constant.Cstring (Text.pack "")))
+    | otherwise = do
         cstrDefs <- gets (TxsDefs.cstrDefs . IOC.tdefs . IOC.state)
-        case [ cstrId | cstrId <- Map.keys cstrDefs, (CstrId.cstrsort cstrId) == sortId ] of
+        case [ cstrId | cstrId <- Map.keys cstrDefs, CstrId.cstrsort cstrId == sortId ] of
           [cstrId] -> do generatedArgs <- Monad.mapM sort2defaultValue (CstrId.cstrargs cstrId)
                          return (ValExpr.cstrCstr cstrId generatedArgs)
-          _ -> do IOC.putMsgs [ EnvData.TXS_CORE_SYSTEM_ERROR ("Failed to generate a default value for " ++ (show sortId)) ]
+          _ -> do IOC.putMsgs [ EnvData.TXS_CORE_SYSTEM_ERROR ("Failed to generate a default value for " ++ show sortId) ]
                   return (ValExpr.cstrConst (Constant.Cany sortId))
 -- sort2defaultValue
 

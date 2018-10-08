@@ -36,10 +36,7 @@ import VarId
 -- Creates a variable of the specified sort, using the specified string as part of the name.
 createFreshVar :: SortId.SortId -> IOC.IOC VarId.VarId
 createFreshVar sort = do
-    varUnid <- IOC.newUnid
-    let idAsInt = Id._id varUnid
-    let absId = if idAsInt >= 0 then idAsInt else -idAsInt
-    return VarId.VarId { VarId.name = Text.pack ("__FV" ++ (show absId)), VarId.unid = varUnid, VarId.varsort = sort }
+    createFreshVarFromPrefix "__FV" sort
 -- createVar
 
 -- Creates a variable of the specified sort, using the specified string as part of the name.
@@ -48,13 +45,12 @@ createFreshVarFromPrefix prefix sort = do
     varUnid <- IOC.newUnid
     let idAsInt = Id._id varUnid
     let absId = if idAsInt >= 0 then idAsInt else -idAsInt
-    return VarId.VarId { VarId.name = Text.pack (prefix ++ (show absId)), VarId.unid = varUnid, VarId.varsort = sort }
+    return VarId.VarId { VarId.name = Text.pack (prefix ++ show absId), VarId.unid = varUnid, VarId.varsort = sort }
 -- createFreshVarFromPrefix
 
 createFreshVarFromVar :: VarId -> IOC.IOC VarId.VarId
 createFreshVarFromVar varId = do
-    freshVar <- createFreshVarFromPrefix (Text.unpack (name varId)) (SortOf.sortOf varId)
-    return freshVar
+    createFreshVarFromPrefix (Text.unpack (name varId)) (SortOf.sortOf varId)
 -- createFreshVarFromVar
 
 createFreshIntVar :: IOC.IOC VarId.VarId

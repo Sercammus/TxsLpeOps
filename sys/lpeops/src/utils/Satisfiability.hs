@@ -167,7 +167,7 @@ showSolution :: SolveDefs.SolveProblem VarId -> String
 showSolution SolveDefs.Unsolvable = "Unsolvable"
 showSolution SolveDefs.UnableToSolve = "UnableToSolve"
 showSolution (SolveDefs.Solved solMap) =
-    let f = \(p, v) -> (Text.unpack (VarId.name p)) ++ " := " ++ (showValExpr (cstrConst v)) in
+    let f (p, v) = (Text.unpack (VarId.name p)) ++ " := " ++ (showValExpr (cstrConst v)) in
       "Solved [" ++ (separatedList (map f (Map.toList solMap)) ", ") ++ "]"
   where
     separatedList :: [String] -> String -> String
@@ -187,7 +187,7 @@ anyElm expr = visitValExpr anyElmVisitorM expr
 -- anyElm
 
 createVarSubst :: [(VarId, TxsDefs.VExpr)] -> (TxsDefs.VExpr -> TxsDefs.VExpr)
-createVarSubst substEqs = (\e -> varSubst substEqs (e :: TxsDefs.VExpr))
+createVarSubst substEqs e = varSubst substEqs (e :: TxsDefs.VExpr)
 
 -- Substitutes variables in a boolean expression while avoiding invalid subexpressions.
 -- This is useful when substituting into expressions that will be SAT-checked:

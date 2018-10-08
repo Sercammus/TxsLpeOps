@@ -31,6 +31,7 @@ import           Satisfiability
 import           LPEPrettyPrint
 import           VarId
 import           ValExpr
+import           LPESuccessors
 
 -- LPE rewrite method.
 -- Eliminates parameters that do not contribute to the behavior of a process from an LPE.
@@ -38,28 +39,12 @@ import           ValExpr
 parReset :: LPEOperation
 parReset lpeInstance@((_channels, paramEqs, summands)) _out invariant = do
     IOC.putMsgs [ EnvData.TXS_CORE_ANY "Identifying successors..." ]
-    immediateSuccessors <- Monad.mapM (getImmediateSuccessors summands invariant) summands
-    let successorsPerSummand = zipWith (\s i -> (s, i, map fst paramEqs)) summands immediateSuccessors
+    possibleSuccessors <- Monad.mapM (getPossibleSuccessors summands invariant) summands
+    let successorsPerSummand = zipWith (\s i -> (s, i, map fst paramEqs)) summands possibleSuccessors
     IOC.putMsgs [ EnvData.TXS_CORE_ANY "Analyzing control flow..." ]
     newLPEInstance <- parResetLoop lpeInstance invariant successorsPerSummand
     return (Right newLPEInstance)
 -- parReset
-
--- Selects all potential successors summands of a given summand from a list with all summands.
--- (In actuality, an overapproximation of all potential successors is selected, namely those
--- whose guard can be satisfied after the guard of the current summand has been satisfied and
--- after the substitutions of the process recursion have taken place.)
-getImmediateSuccessors :: [LPESummand] -> TxsDefs.VExpr -> LPESummand -> IOC.IOC [LPESummand]
-getImmediateSuccessors _ _ (LPESummand _ _ _ LPEStop) = do return []
-getImmediateSuccessors allSummands invariant (LPESummand _channelVars _channelOffers guard (LPEProcInst paramEqs)) = do
-    immediateSuccessors <- Monad.foldM addSummandIfImmediateSuccessor [] allSummands
-    return $ immediateSuccessors
-  where
-    addSummandIfImmediateSuccessor :: [LPESummand] -> LPESummand -> IOC.IOC [LPESummand]
-    addSummandIfImmediateSuccessor soFar summand@(LPESummand _ _ g _) = do
-      sat <- isSatisfiable (cstrAnd (Set.fromList [invariant, guard, varSubst paramEqs g]))
-      return $ if sat then soFar ++ [summand] else soFar
--- getImmediateSuccessors
 
 -- Updates the information collected about summands, in particular their lists of used variables,
 -- until the information no longer changes.

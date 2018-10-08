@@ -33,6 +33,7 @@ import           LPEOps
 import           Satisfiability
 import           ValExpr
 import           Constant
+import           LPESuccessors
 
 chanIdConfluentIstep :: ChanId
 chanIdConfluentIstep = ChanId (Text.pack "CISTEP") 969 []
@@ -123,18 +124,4 @@ confElm (channels, paramEqs, summands) _out invariant = do
               LPESummand chanVars chanOffers g1 (LPEProcInst [ (p, substitution v) | (p, v) <- eqs2 ])
           LPESummand _ _ _ LPEStop -> summand
 -- confElm
-
--- Selects all summands from a given list that are definitely successors of a given summand.
--- The result is an underapproximation!
-getDefiniteSuccessors :: [LPESummand] -> TxsDefs.VExpr -> LPESummand -> IOC.IOC [LPESummand]
-getDefiniteSuccessors _ _ (LPESummand _ _ _ LPEStop) = do return []
-getDefiniteSuccessors allSummands invariant (LPESummand _channelVars _channelOffers guard (LPEProcInst paramEqs)) = do
-    immediateSuccessors <- Monad.foldM addSummandIfDefiniteSuccessor [] allSummands
-    return $ immediateSuccessors
-  where
-    addSummandIfDefiniteSuccessor :: [LPESummand] -> LPESummand -> IOC.IOC [LPESummand]
-    addSummandIfDefiniteSuccessor soFar summand@(LPESummand _ _ g _) = do
-      taut <- isTautology (cstrAnd (Set.fromList [invariant, guard, varSubst paramEqs g]))
-      return $ if taut then soFar ++ [summand] else soFar
--- getDefiniteSuccessors
 
