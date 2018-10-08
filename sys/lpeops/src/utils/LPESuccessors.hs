@@ -15,6 +15,7 @@ See LICENSE at root directory of this repository.
 -----------------------------------------------------------------------------
 
 module LPESuccessors (
+getPossiblePredecessors,
 getPossibleSuccessors,
 getDefiniteSuccessors
 ) where
@@ -27,6 +28,18 @@ import           LPEOps
 import           Satisfiability
 import           ValExpr
 
+getPossiblePredecessors :: [LPESummand] -> TxsDefs.VExpr -> LPESummand -> IOC.IOC [LPESummand]
+getPossiblePredecessors allSummands invariant (LPESummand _channelVars _channelOffers guard _procInst) = do
+    predecessors <- Monad.foldM addSummandIfPossiblePredecessor [] allSummands
+    return $ predecessors
+  where
+    addSummandIfPossiblePredecessor :: [LPESummand] -> LPESummand -> IOC.IOC [LPESummand]
+    addSummandIfPossiblePredecessor soFar (LPESummand _ _ _ LPEStop) = do return soFar
+    addSummandIfPossiblePredecessor soFar summand@(LPESummand _ _ g (LPEProcInst paramEqs)) = do
+      sat <- isSatisfiable (cstrAnd (Set.fromList [invariant, g, varSubst paramEqs guard]))
+      return $ if sat then soFar ++ [summand] else soFar
+-- getPossibleSuccessors
+
 -- Selects all potential successors summands of a given summand from a list with all summands.
 -- (In actuality, an overapproximation of all potential successors is selected, namely those
 -- whose guard can be satisfied after the guard of the current summand has been satisfied and
@@ -34,8 +47,8 @@ import           ValExpr
 getPossibleSuccessors :: [LPESummand] -> TxsDefs.VExpr -> LPESummand -> IOC.IOC [LPESummand]
 getPossibleSuccessors _ _ (LPESummand _ _ _ LPEStop) = do return []
 getPossibleSuccessors allSummands invariant (LPESummand _channelVars _channelOffers guard (LPEProcInst paramEqs)) = do
-    immediateSuccessors <- Monad.foldM addSummandIfPossibleSuccessor [] allSummands
-    return $ immediateSuccessors
+    successors <- Monad.foldM addSummandIfPossibleSuccessor [] allSummands
+    return $ successors
   where
     addSummandIfPossibleSuccessor :: [LPESummand] -> LPESummand -> IOC.IOC [LPESummand]
     addSummandIfPossibleSuccessor soFar summand@(LPESummand _ _ g _) = do
@@ -48,8 +61,8 @@ getPossibleSuccessors allSummands invariant (LPESummand _channelVars _channelOff
 getDefiniteSuccessors :: [LPESummand] -> TxsDefs.VExpr -> LPESummand -> IOC.IOC [LPESummand]
 getDefiniteSuccessors _ _ (LPESummand _ _ _ LPEStop) = do return []
 getDefiniteSuccessors allSummands invariant (LPESummand _channelVars _channelOffers guard (LPEProcInst paramEqs)) = do
-    immediateSuccessors <- Monad.foldM addSummandIfDefiniteSuccessor [] allSummands
-    return $ immediateSuccessors
+    successors <- Monad.foldM addSummandIfDefiniteSuccessor [] allSummands
+    return $ successors
   where
     addSummandIfDefiniteSuccessor :: [LPESummand] -> LPESummand -> IOC.IOC [LPESummand]
     addSummandIfDefiniteSuccessor soFar summand@(LPESummand _ _ g _) = do

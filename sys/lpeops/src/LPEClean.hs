@@ -27,26 +27,36 @@ import qualified ChanId
 import LPEOps
 import Satisfiability
 import ValExpr
+import LPESuccessors
 
+-- Removes duplicate summands and summands that are unreachable by all other (!) summands
+-- (so basically we do a partial, symbolic reachability analysis).
 cleanLPE :: LPEOperation
-cleanLPE (channels, paramEqs, summands) _out invariant = do
+cleanLPE (channels, initParamEqs, summands) _out invariant = do
     uniqueSummands <- Monad.foldM addSummandIfUnique [] summands
-    satGuardSummands <- Monad.foldM addSummandIfSatGuard [] uniqueSummands
-    return (Right (channels, paramEqs, satGuardSummands))
+    predecessorSummands <- Monad.foldM addSummandIfPredecessor [] uniqueSummands
+    return (Right (channels, initParamEqs, predecessorSummands))
   where
     addSummandIfUnique :: LPESummands -> LPESummand -> IOC.IOC LPESummands
     addSummandIfUnique soFar candidate = do
-      found <- containsSummand soFar candidate
-      if found
-      then do return soFar
-      else do return (candidate:soFar)
+        found <- containsSummand soFar candidate
+        if found
+        then do return soFar
+        else do return (candidate:soFar)
     
-    addSummandIfSatGuard :: LPESummands -> LPESummand -> IOC.IOC LPESummands
-    addSummandIfSatGuard soFar candidate@(LPESummand _channelVars _channelOffers guard _paramEqs) = do
-      sat <- isSatisfiable (cstrAnd (Set.fromList [invariant, guard]))
-      if sat
-      then do return (candidate:soFar)
-      else do return soFar
+    addSummandIfPredecessor :: LPESummands -> LPESummand -> IOC.IOC LPESummands
+    addSummandIfPredecessor soFar candidate@(LPESummand _channelVars _channelOffers guard _paramEqs) = do
+        -- Check if the summand can be reached via the initial state:
+        sat <- isSatisfiable (cstrAnd (Set.fromList [invariant, varSubst initParamEqs guard]))
+        if sat
+        then do return (candidate:soFar)
+        else do -- Check which summands could possible enable this summand:
+                predecessors <- getPossiblePredecessors summands invariant candidate
+                -- If the summand is only enabled by itself, it can still be safely deleted:
+                let predecessorsSet = Set.delete candidate (Set.fromList predecessors)
+                if predecessorsSet /= Set.empty
+                then do return (candidate:soFar)
+                else do return soFar
 -- cleanLPE
 
 containsSummand :: LPESummands -> LPESummand -> IOC.IOC Bool
