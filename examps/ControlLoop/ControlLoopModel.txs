@@ -51,7 +51,7 @@ PROCDEF produceLoop [ In_Material           :: Int
     NI
 ENDDEF
 
-PROCDEF measure [ In_Material   :: Int
+PROCDEF measure_ORIGINAL [ In_Material   :: Int
                 ; Out_Report    :: MeasureReport
                 ; Out_Material  :: Int
                 ]( ) ::=
@@ -63,6 +63,22 @@ PROCDEF measure [ In_Material   :: Int
                         Out_Material ! id 
                     >-> measure [ In_Material, Out_Report, Out_Material ] ()
                 )
+        )
+ENDDEF
+
+PROCDEF measure [ In_Material   :: Int
+                ; Out_Report    :: MeasureReport
+                ; Out_Material  :: Int
+                ]( ) ::=
+        In_Material ? id
+    >-> (
+           (
+               Out_Report ? mr [[ id(mr) == id ]] >-> EXIT
+             |||
+               Out_Material ! id >-> EXIT
+            ) >>> (
+                measure [ In_Material, Out_Report, Out_Material ] ( )
+            )
         )
 ENDDEF
 
@@ -119,4 +135,7 @@ MODELDEF Model ::=
 
     BEHAVIOUR
         model [In_Material, Correction, ProduceReport, Material, MeasureReport, Out_Material]()
+        -- correct [ ProduceReport, MeasureReport, Correction ] ( ) -- WORKS
+        -- measure [ Material, MeasureReport, Out_Material ] ( ) -- WORKS
+        -- produce [ In_Material, Correction, Material, ProduceReport ] ( ) -- WORKS
 ENDDEF
