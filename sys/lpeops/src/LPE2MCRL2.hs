@@ -326,8 +326,8 @@ valExpr2dataExpr' f (ValExpr.view -> ValExpr.Vfunc funcId paramValues) = do
     translatedParamValues <- Monad.mapM f paramValues
     return $ MCRL2Defs.DMappingRef mappingName translatedParamValues
 valExpr2dataExpr' f (ValExpr.view -> ValExpr.Vpredef _predefKind funcId _paramValues) = do -- TODO what is Vpredef exactly?
-    defaultValue <- lift $ sort2defaultValue (FuncId.funcsort funcId)
-    translatedDefaultValue <- f defaultValue
+    tdefs <- gets txsdefs
+    translatedDefaultValue <- f (sort2defaultValue tdefs (FuncId.funcsort funcId))
     return translatedDefaultValue
 valExpr2dataExpr' _f _ = do return $ MCRL2Defs.DBool False
 -- valExpr2dataExpr'

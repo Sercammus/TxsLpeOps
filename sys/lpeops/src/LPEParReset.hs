@@ -67,12 +67,14 @@ resetParamsInSummand (_, initParamEqs, summands) invariant successorsPerSummand 
                          then do return summand -- (All variables are used, apparently, so do not touch the summand.)
                          else do let nonSuccessors = Set.toList ((Set.fromList summands) Set.\\ (Set.fromList sucs))
                                  let newParamEqs = [ (p1, if p1 `elem` uvars then v2 else v1) | (p1, v1) <- initParamEqs, (p2, v2) <- paramEqs, p1 == p2 ]
-                                 let smd2constraint = \(LPESummand _ _ g _) -> cstrAnd (Set.fromList [invariant, guard, varSubst newParamEqs g])
+                                 (tdefs, varSubst) <- createVarSubst newParamEqs
+                                 let smd2constraint = \(LPESummand _ _ g _) -> cstrAnd (Set.fromList [invariant, guard, varSubst g])
                                  notSat <- areNotSatisfiable (map smd2constraint nonSuccessors)
+                                 restoreTdefs tdefs
                                  if notSat
                                  then do printNewParamEqs newParamEqs
                                          return (LPESummand channelVars channelOffers guard (LPEProcInst newParamEqs))
-                                 else  do return summand
+                                 else do return summand
       _ -> do return summand
   where
     printNewParamEqs :: LPEParamEqs -> IOC.IOC ()

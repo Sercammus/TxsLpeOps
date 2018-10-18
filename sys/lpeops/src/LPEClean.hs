@@ -18,10 +18,10 @@ module LPEClean (
 cleanLPE
 ) where
 
-import qualified Control.Monad as Monad
-import qualified EnvCore as IOC
-import qualified Data.List as List
-import qualified Data.Set as Set
+import qualified Data.List           as List
+import qualified Control.Monad       as Monad
+import qualified Data.Set            as Set
+import qualified EnvCore             as IOC
 import qualified ChanId
 import LPEOps
 import Satisfiability
@@ -46,7 +46,9 @@ cleanLPE (channels, initParamEqs, summands) _out invariant = do
     addSummandIfPredecessor :: LPESummands -> LPESummand -> IOC.IOC LPESummands
     addSummandIfPredecessor soFar candidate@(LPESummand _channelVars _channelOffers guard _paramEqs) = do
         -- Check if the summand can be reached via the initial state:
-        sat <- isSatisfiable (cstrAnd (Set.fromList [invariant, varSubst initParamEqs guard]))
+        (tdefs, varSubst) <- createVarSubst initParamEqs
+        sat <- isSatisfiable (cstrAnd (Set.fromList [invariant, varSubst guard]))
+        restoreTdefs tdefs
         if sat
         then do return (candidate:soFar)
         else do -- Check which summands could possible enable this summand:
@@ -77,9 +79,10 @@ isEquivalentSummand (LPESummand _vars1 chans1 guard1 LPEStop) (LPESummand _vars2
     then do return False
     else do let chanVars1 = concat (map snd sortedChans1)
             let chanVars2 = concat (map snd sortedChans2)
-            let chanVarSubst = createVarSubst (zipWith (\cv1 cv2 -> (cv2, cstrVar cv1)) chanVars1 chanVars2)
+            (tdefs, chanVarSubst) <- createVarSubst (zipWith (\cv1 cv2 -> (cv2, cstrVar cv1)) chanVars1 chanVars2)
             let guardEq = cstrEqual guard1 (chanVarSubst guard2)
             taut <- isTautology guardEq
+            restoreTdefs tdefs
             return taut
 isEquivalentSummand (LPESummand _vars1 chans1 guard1 (LPEProcInst paramEqs1)) (LPESummand _vars2 chans2 guard2 (LPEProcInst paramEqs2)) = do
     let sortedChans1 = List.sortOn (ChanId.unid . fst) chans1
@@ -88,10 +91,11 @@ isEquivalentSummand (LPESummand _vars1 chans1 guard1 (LPEProcInst paramEqs1)) (L
     then do return False
     else do let chanVars1 = concat (map snd sortedChans1)
             let chanVars2 = concat (map snd sortedChans2)
-            let chanVarSubst = createVarSubst (zipWith (\cv1 cv2 -> (cv2, cstrVar cv1)) chanVars1 chanVars2)
+            (tdefs, chanVarSubst) <- createVarSubst (zipWith (\cv1 cv2 -> (cv2, cstrVar cv1)) chanVars1 chanVars2)
             let guardEq = cstrEqual guard1 (chanVarSubst guard2)
             let procInstEqs = zipWith (\(_, v1) (_, v2) -> cstrEqual v1 (chanVarSubst v2)) paramEqs1 paramEqs2
             taut <- isTautology (cstrAnd (Set.fromList (guardEq:procInstEqs)))
+            restoreTdefs tdefs
             return taut
 -- isEquivalentSummand
 

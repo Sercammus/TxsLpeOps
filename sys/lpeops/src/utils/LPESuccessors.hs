@@ -36,7 +36,9 @@ getPossiblePredecessors allSummands invariant (LPESummand _channelVars _channelO
     addSummandIfPossiblePredecessor :: [LPESummand] -> LPESummand -> IOC.IOC [LPESummand]
     addSummandIfPossiblePredecessor soFar (LPESummand _ _ _ LPEStop) = do return soFar
     addSummandIfPossiblePredecessor soFar summand@(LPESummand _ _ g (LPEProcInst paramEqs)) = do
-      sat <- isSatisfiable (cstrAnd (Set.fromList [invariant, g, varSubst paramEqs guard]))
+      (tdefs, varSubst) <- createVarSubst paramEqs
+      sat <- isSatisfiable (cstrAnd (Set.fromList [invariant, g, varSubst guard]))
+      restoreTdefs tdefs
       return $ if sat then soFar ++ [summand] else soFar
 -- getPossibleSuccessors
 
@@ -52,7 +54,9 @@ getPossibleSuccessors allSummands invariant (LPESummand _channelVars _channelOff
   where
     addSummandIfPossibleSuccessor :: [LPESummand] -> LPESummand -> IOC.IOC [LPESummand]
     addSummandIfPossibleSuccessor soFar summand@(LPESummand _ _ g _) = do
-      sat <- isSatisfiable (cstrAnd (Set.fromList [invariant, guard, varSubst paramEqs g]))
+      (tdefs, varSubst) <- createVarSubst paramEqs
+      sat <- isSatisfiable (cstrAnd (Set.fromList [invariant, guard, varSubst g]))
+      restoreTdefs tdefs
       return $ if sat then soFar ++ [summand] else soFar
 -- getPossibleSuccessors
 
@@ -66,7 +70,9 @@ getDefiniteSuccessors allSummands invariant (LPESummand _channelVars _channelOff
   where
     addSummandIfDefiniteSuccessor :: [LPESummand] -> LPESummand -> IOC.IOC [LPESummand]
     addSummandIfDefiniteSuccessor soFar summand@(LPESummand _ _ g _) = do
-      taut <- isTautology (cstrAnd (Set.fromList [invariant, guard, varSubst paramEqs g]))
+      (tdefs, varSubst) <- createVarSubst paramEqs
+      taut <- isTautology (cstrAnd (Set.fromList [invariant, guard, varSubst g]))
+      restoreTdefs tdefs
       return $ if taut then soFar ++ [summand] else soFar
 -- getDefiniteSuccessors
 

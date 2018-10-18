@@ -18,34 +18,48 @@ module ValFactory (
 sort2defaultValue
 ) where
 
-import qualified Control.Monad as Monad
-import           Control.Monad.State hiding (state)
-import qualified EnvCore as IOC
+import qualified Data.List as List
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import qualified Data.Text as Text
-import qualified EnvData
 import qualified TxsDefs
 import qualified ValExpr
 import qualified SortId
 import qualified Constant
 import qualified CstrId
 
-sort2defaultValue :: SortId.SortId -> IOC.IOC TxsDefs.VExpr
-sort2defaultValue sortId
-    | sortId == SortId.sortIdBool = do
-        return (ValExpr.cstrConst (Constant.Cbool False))
-    | sortId == SortId.sortIdInt = do
-        return (ValExpr.cstrConst (Constant.Cint 0))
-    | sortId == SortId.sortIdString = do
-        return (ValExpr.cstrConst (Constant.Cstring (Text.pack "")))
-    | sortId == SortId.sortIdRegex = do
-        return (ValExpr.cstrConst (Constant.Cstring (Text.pack "")))
-    | otherwise = do
-        cstrDefs <- gets (TxsDefs.cstrDefs . IOC.tdefs . IOC.state)
-        case [ cstrId | cstrId <- Map.keys cstrDefs, CstrId.cstrsort cstrId == sortId ] of
-          [cstrId] -> do generatedArgs <- Monad.mapM sort2defaultValue (CstrId.cstrargs cstrId)
-                         return (ValExpr.cstrCstr cstrId generatedArgs)
-          _ -> do IOC.putMsgs [ EnvData.TXS_CORE_SYSTEM_ERROR ("Failed to generate a default value for " ++ show sortId) ]
-                  return (ValExpr.cstrConst (Constant.Cany sortId))
+sort2defaultValue :: TxsDefs.TxsDefs -> SortId.SortId -> TxsDefs.VExpr
+sort2defaultValue tdefs sortId
+    | sortId == SortId.sortIdBool =
+        (ValExpr.cstrConst (Constant.Cbool False))
+    | sortId == SortId.sortIdInt =
+        (ValExpr.cstrConst (Constant.Cint 0))
+    | sortId == SortId.sortIdString =
+        (ValExpr.cstrConst (Constant.Cstring (Text.pack "")))
+    | sortId == SortId.sortIdRegex =
+        (ValExpr.cstrConst (Constant.Cstring (Text.pack "")))
+    | otherwise =
+        -- Use any non-recursive constructor of this sort to express a value of this sort:
+        case [ cstrId | cstrId <- Map.keys (TxsDefs.cstrDefs tdefs), CstrId.cstrsort cstrId == sortId, not(isRecursiveCstr tdefs cstrId) ] of
+          (cstrId:_) -> ValExpr.cstrCstr cstrId (map (sort2defaultValue tdefs) (CstrId.cstrargs cstrId))
+          [] -> error ("Failed to generate a default value for " ++ show sortId ++ " (available={" ++ (List.intercalate ", " (map show (Map.keys (TxsDefs.cstrDefs tdefs)))) ++ "})!")
 -- sort2defaultValue
+
+isRecursiveCstr :: TxsDefs.TxsDefs -> CstrId.CstrId -> Bool
+isRecursiveCstr tdefs cstrId = List.or (map (isRecursiveSort tdefs Set.empty) (CstrId.cstrargs cstrId))
+-- isRecursiveCstr
+
+isRecursiveSort :: TxsDefs.TxsDefs -> Set.Set SortId.SortId -> SortId.SortId -> Bool
+isRecursiveSort tdefs beenHere sortId
+    | sortId == SortId.sortIdBool = False
+    | sortId == SortId.sortIdInt = False
+    | sortId == SortId.sortIdString = False
+    | sortId == SortId.sortIdRegex = False
+    | otherwise =
+        let sortCstrs = [ cstrId | cstrId <- Map.keys (TxsDefs.cstrDefs tdefs), CstrId.cstrsort cstrId == sortId ] in
+        let sortCstrParamSorts = concat (map CstrId.cstrargs sortCstrs) in
+          (Set.member sortId beenHere) || (List.or (map (isRecursiveSort tdefs (Set.insert sortId beenHere)) sortCstrParamSorts))
+-- isRecursiveSort
+
+
 

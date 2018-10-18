@@ -49,8 +49,9 @@ constElmLoop :: LPEInstance          -- LPE from which constants should be elimi
              -> [VarId]              -- 'Marked' parameters; that is, process parameters that (for now) are assumed to be constant.
              -> IOC.IOC LPEInstance  -- Resulting LPE.
 constElmLoop lpeInstance@(_channels, paramEqs, summands) invariant markedParams = do
-    let rho = createVarSubst [(p, v) | p <- markedParams, (q, v) <- paramEqs, p == q]
+    (tdefs, rho) <- createVarSubst [(p, v) | p <- markedParams, (q, v) <- paramEqs, p == q]
     newMarkedParams <- constElmPerSummand summands invariant rho markedParams
+    restoreTdefs tdefs
     if newMarkedParams == markedParams
     then do removeParsFromLPE markedParams lpeInstance
     else constElmLoop lpeInstance invariant newMarkedParams

@@ -20,9 +20,9 @@ confCheck,
 confElm
 ) where
 
-import qualified Control.Monad       as Monad
 import qualified Data.List           as List
 import qualified Data.Map            as Map
+import qualified Control.Monad       as Monad
 import qualified Data.Set            as Set
 import qualified Data.Text           as Text
 import qualified EnvCore             as IOC
@@ -81,8 +81,8 @@ checkConfluenceCondition (summand1@(LPESummand _channelVars1 _channelOffers1 gua
     then do return True
     else do -- Create functions that can do the required substitutions in a convenient manner.
             -- For the entire condition, these functions should only be computed once!
-            let g1 = createVarSubst paramEqs1
-            let g2 = createVarSubst paramEqs2
+            (tdefs, g1) <- createVarSubst paramEqs1
+            (    _, g2) <- createVarSubst paramEqs2
             
             -- a1 == a1[g1] && ... && an == an[g1]
             let channelArgEqs = map (\channelVar -> cstrEqual channelVar (g1 channelVar)) (map cstrVar channelVars2)
@@ -100,6 +100,7 @@ checkConfluenceCondition (summand1@(LPESummand _channelVars1 _channelOffers1 gua
             
             -- Is the confluence condition a tautology?
             taut <- isTautology (cstrAnd (Set.fromList [invariant, confluenceCondition]))
+            restoreTdefs tdefs
             return taut
 -- checkConfluenceCondition
 

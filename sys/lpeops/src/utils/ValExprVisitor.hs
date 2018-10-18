@@ -31,6 +31,9 @@ import ValExpr
 import FuncDef
 import FuncId
 
+import qualified Data.List as List
+import qualified Debug.Trace as Trace
+
 -- Function that applies a visitor pattern to the given value expression.
 -- Children are always evaluated before the parent, and the result is a composition
 -- that is dependent on the evaluated children and the parent.
@@ -120,7 +123,7 @@ defaultValExprVisitor [(cond, _), (vexp1, _), (vexp2, _)] _expr@(view -> Vite{})
 defaultValExprVisitor [(t, _), (n, _)] _expr@(view -> Vdivide _ _) = cstrDivide t n
 defaultValExprVisitor [(t, _), (n, _)] _expr@(view -> Vmodulo _ _) = cstrModulo t n
 defaultValExprVisitor [(v, _)] _expr@(view -> Vgez _) = cstrGEZ v
-defaultValExprVisitor vexps _expr@(view -> Vsum _) = cstrSum (FMX.fromOccurListT vexps)
+defaultValExprVisitor vexps _expr@(view -> Vsum _) = Trace.traceStack ("SUM.CSTR = " ++ (List.intercalate ", " (map show vexps))) (cstrSum (FMX.fromOccurListT vexps))
 defaultValExprVisitor vexps _expr@(view -> Vproduct _) = cstrProduct (FMX.fromOccurListT vexps)
 defaultValExprVisitor [(vexp1, _), (vexp2, _)] _expr@(view -> Vequal _ _) = cstrEqual vexp1 vexp2
 defaultValExprVisitor vexps _expr@(view -> Vand _) = cstrAnd (Set.fromList (map fst vexps))

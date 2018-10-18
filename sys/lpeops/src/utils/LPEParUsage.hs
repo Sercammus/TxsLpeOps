@@ -107,7 +107,8 @@ getParamSourcesPerSummand (x:xs) params invariant = do
         let srcSatExpr = cstrAnd (Set.fromList [guard, invariant])
         srcSolution <- getUniqueSolution srcSatExpr [] [p]
         case srcSolution of
-          Just srcSolMap -> do return (Map.insert p (extractVExprFromMap p srcSolMap) ps')
+          Just (tdefs, srcSolMap) -> do restoreTdefs tdefs
+                                        return (Map.insert p (extractVExprFromMap p srcSolMap) ps')
           Nothing -> do return ps'
 -- getParamSourcesPerSummand
 
@@ -125,7 +126,8 @@ getParamDestinationsPerSummand (x:xs) params invariant = do
         (destVar, destSatExpr) <- constructDestSatExpr summand p invariant
         destSolution <- getUniqueSolution destSatExpr [] [destVar]
         case destSolution of
-          Just destSolMap -> do return (Map.insert p (extractVExprFromMap destVar destSolMap) ps')
+          Just (tdefs, destSolMap) -> do restoreTdefs tdefs
+                                         return (Map.insert p (extractVExprFromMap destVar destSolMap) ps')
           Nothing -> do return ps'
 -- getParamDestinationsPerSummand
 
@@ -197,9 +199,10 @@ constructDestSatExpr (LPESummand _ _ _ LPEStop) varId _invariant = do return (va
 constructDestSatExpr (LPESummand _channelVars _channelOffers guard (LPEProcInst paramEqs)) varId invariant = do
     case filter (\(p, _) -> p == varId) paramEqs of
       [(_, v)] -> do varClone <- createFreshVarFromVar varId
-                     let varCloneSubst = createVarSubst [(varId, cstrVar varClone)]
+                     (tdefs, varCloneSubst) <- createVarSubst [(varId, cstrVar varClone)]
                      let result = cstrAnd (Set.fromList ([guard, invariant, varCloneSubst invariant, cstrEqual (cstrVar varClone) v]))
                      -- IOC.putMsgs [ EnvData.TXS_CORE_ANY ("destSatExpr for " ++ (Text.unpack (VarId.name varId)) ++ "/" ++ (Text.unpack (VarId.name varClone)) ++ " is " ++ (showValExpr result)) ]
+                     restoreTdefs tdefs
                      return (varClone, result)
       _ -> do return (varId, cstrConst (Cbool False))
 -- constructDestSatExpr
