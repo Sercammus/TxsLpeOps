@@ -54,6 +54,76 @@ import ValExprVisitor
 import VarFactory
 import ValFactory
 
+-- Doing substitutions in expressions may result in (partially) undefined expressions!
+-- (In particular, imagine substituting a constructor in an incompatible field access function.)
+-- To handle this, each expression carries additional information, namely
+-- a list of 'undefined variables', which are variables that represent undefined sub-expressions:
+type UndefVExpr = (TxsDefs.VExpr, [VarId])
+
+-- Manipulating expressions (e.g. substituting before SAT-solving) may require helper variables.
+-- These variables are added to the TorXakis definitions in the environment of the monad.
+-- To undo these additions, pass the original definitions to the following helper method:
+restoreTdefs :: TxsDefs.TxsDefs -> IOC.IOC ()
+restoreTdefs tdefs = do
+    state <- MonadState.gets IOC.state
+    let newState = state { IOC.tdefs = tdefs }
+    MonadState.modify (\env -> env { IOC.state = newState })
+-- restoreTdefs
+
+-- Eliminates occurrences of 'ANY <sort>' by substituting fresh, free variables.
+-- Also returns the previous TorXakis definitions (so that they can be restored afterwards, see above).
+eliminateAny :: UndefVExpr -> IOC.IOC (TxsDefs.TxsDefs, UndefVExpr)
+eliminateAny (expr, undefs) = do
+    tdefs <- MonadState.gets (IOC.tdefs . IOC.state)
+    newExpr <- visitValExprM anyElmVisitorM id Monad.Identity expr
+    return (tdefs, (newExpr, undefs))
+  where
+    anyElmVisitorM :: [(TxsDefs.VExpr, Integer)] -> (TxsDefs.VExpr -> TxsDefs.VExpr) -> (TxsDefs.VExpr -> IOC.IOC TxsDefs.VExpr) -> TxsDefs.VExpr -> IOC.IOC TxsDefs.VExpr
+    anyElmVisitorM subExps _ _ (view -> Vconst (Cany sort)) = do
+        do varId <- createFreshVar sort
+           return (cstrVar varId)
+    anyElmVisitorM subExps g h parentExpr = defaultValExprVisitorM subExps g h parentExpr
+-- eliminateAny
+
+-- Applies a substitution to the given expression, introducing 'undefined variables' (as defined above) where necessary.
+-- Also returns the previous TorXakis definitions (so that they can be restored afterwards):
+doVarSubst :: [(VarId, UndefVExpr)] -> UndefVExpr -> IOC.IOC (TxsDefs.TxsDefs, UndefVExpr)
+doVarSubst substEqs expr = do
+    tdefs <- MonadState.gets (IOC.tdefs . IOC.state)
+    (newExprs <- Monad.mapM eliminateAny (map snd substEqs)
+    let newSubstEqs = zip (map fst substEqs) (map snd newExprs)
+    newExpr <- visitValExprM substVisitor fst buildUndefVExpr expr
+    return (tdefs, newExpr)
+  where
+    buildUndefVExpr :: TxsDefs.VExpr -> IOC.IOC UndefVExpr
+    buildUndefVExpr v = do return (v, [])
+    
+    substVisitor :: [(UndefVExpr, Integer)] -> (UndefVExpr -> TxsDefs.VExpr) -> (TxsDefs.VExpr -> IOC.IOC UndefVExpr) -> UndefVExpr -> IOC.IOC UndefVExpr
+    -- If we find a variable, substitute it (only if it is present in substEqs, of course):
+    substVisitor _ _ _ ((view -> Vvar varId), undefs) =
+        case [(v, us) | (p, (v, us)) <- substEqs, p == varId] of
+          [(v, us)] -> do return (v, undefs ++ us)
+          _ -> do return (cstrVar varId, undefs)
+    -- An expression that accesses a non-existent field (possible when using an accessor on the wrong constructor sort)
+    -- means that we introduce a new 'undefined variable':
+    substVisitor [((subExpr@(view -> Vcstr c1 _fields), undefs1), _)] _ _ ((view -> Vaccess c2 p _vexp), undefs2) =
+        if c1 == c2
+        then do return (cstrAccess c2 p subExpr, undefs1 ++ undefs2)
+        else do varId <- createFreshVar ((CstrId.cstrargs c1) !! p)
+                return (cstrVar varId, undefs2 ++ [varId])
+    -- Constructors exist in constant and non-constant forms.
+    -- We do the same here as above, but for the constant form:
+    substVisitor [((subExpr@(view -> Vconst (Ccstr c1 _fields)), undefs1), _)] _ _ ((view -> Vaccess c2 p _vexp), undefs2) =
+        if c1 == c2
+        then do return (cstrAccess c2 p subExpr, undefs1 ++ undefs2)
+        else do varId <- createFreshVar ((CstrId.cstrargs c1) !! p)
+                return (cstrVar varId, undefs2 ++ [varId])
+    -- In other cases, the parent expression inherits undefined variables from its sub-expressions:
+    substVisitor subExps g h (parentExpr, undefs) = do
+        parentExpr' <- defaultValExprVisitorM subExps g h (parentExpr, undefs)
+        return (parentExpr', undefs ++ (concat (map snd subExps)))
+-- doVarSubst
+
 -- Checks if the specified expression cannot be false.
 isTautology :: TxsDefs.VExpr -> IOC.IOC Bool
 isTautology expression = isNotSatisfiable (cstrNot expression)
@@ -86,7 +156,7 @@ areSatisfiable expressions = do sat <- Monad.mapM isSatisfiable expressions
 -- areSatisfiable
 
 -- Checks if none of the specified expressions not be true.
--- Note that each expression is considered in a vacuum, e.g. input [X == 0, X == 1, false] would yield false!
+-- Note that each expression is considered in a vacuum, e.g. input [X == 0, false] would yield false!
 areNotSatisfiable :: [TxsDefs.VExpr] -> IOC.IOC Bool
 areNotSatisfiable expressions = do sat <- Monad.mapM isNotSatisfiable expressions
                                    return (List.and sat)
@@ -183,75 +253,10 @@ showSolution (SolveDefs.Solved solMap) =
     separatedList (x1:x2:xs) separator = x1 ++ separator ++ (separatedList (x2:xs) separator)
 -- showSolution
 
-restoreTdefs :: TxsDefs.TxsDefs -> IOC.IOC ()
-restoreTdefs tdefs = do
-    state <- MonadState.gets IOC.state
-    let newState = state { IOC.tdefs = tdefs }
-    MonadState.modify (\env -> env { IOC.state = newState })
--- restoreTdefs
 
--- Eliminates occurrences of ANY by substituting them for fresh, free variables.
--- Returns the current 
-eliminateAny :: TxsDefs.VExpr -> IOC.IOC (TxsDefs.TxsDefs, TxsDefs.VExpr)
-eliminateAny expr = do
-    tdefs <- MonadState.gets (IOC.tdefs . IOC.state)
-    newExpr <- visitValExpr anyElmVisitorM expr
-    return (tdefs, newExpr)
-  where
-    anyElmVisitorM :: [(IOC.IOC TxsDefs.VExpr, Integer)] -> TxsDefs.VExpr -> IOC.IOC TxsDefs.VExpr
-    anyElmVisitorM _ (view -> Vconst (Cany sort)) = do varId <- createFreshVar sort
-                                                       return (cstrVar varId)
-    anyElmVisitorM vexps parentExpr = defaultValExprVisitorM vexps parentExpr
--- eliminateAny
 
-doVarSubst :: [(VarId, TxsDefs.VExpr)] -> TxsDefs.VExpr -> IOC.IOC (TxsDefs.TxsDefs, TxsDefs.VExpr)
-doVarSubst substEqs expr = do
-    (tdefs, vs) <- createVarSubst substEqs
-    return (tdefs, vs expr)
--- doVarSubst
 
-createVarSubst :: [(VarId, TxsDefs.VExpr)] -> IOC.IOC (TxsDefs.TxsDefs, TxsDefs.VExpr -> TxsDefs.VExpr)
-createVarSubst substEqs = do
-    tdefs <- MonadState.gets (IOC.tdefs . IOC.state)
-    newExprs <- Monad.mapM eliminateAny (map snd substEqs)
-    let newSubstEqs = zip (map fst substEqs) (map snd newExprs)
-    tdefs' <- MonadState.gets (IOC.tdefs . IOC.state)
-    return (tdefs, varSubst tdefs' newSubstEqs)
--- createVarSubst
 
--- Substitutes variables in a boolean expression while avoiding invalid subexpressions.
--- This is useful when substituting into expressions that will be SAT-checked:
-varSubst :: TxsDefs.TxsDefs -> [(VarId, TxsDefs.VExpr)] -> TxsDefs.VExpr -> TxsDefs.VExpr
-varSubst tdefs substEqs expr =
-    let (valid, result) = visitValExpr substVisitor expr in
-      if valid
-      then result
-      else (cstrConst (Cbool False))
-  where
-    substVisitor :: [((Bool, TxsDefs.VExpr), Integer)] -> TxsDefs.VExpr -> (Bool, TxsDefs.VExpr)
-    -- If we find a variable, substitute it (only if it is present in substEqs, of course):
-    substVisitor _ (view -> Vvar varId) =
-        case [v | (p, v) <- substEqs, p == varId] of
-          [v] -> (True, v)
-          _ -> (True, cstrVar varId)
-    -- An expression that accesses a non-existent field (possible when using an accessor on the wrong constructor sort)
-    -- means that we substitute a default value (we *have* to give back something).
-    -- Furthermore, the entire equation is marked as unsatisfiable:
-    substVisitor [((valid, subExpr@(view -> Vcstr c2 _fields)), _)] (view -> Vaccess c1 p _vexp) =
-        if c1 == c2
-        then (valid, cstrAccess c1 p subExpr)
-        else (False, sort2defaultValue tdefs ((CstrId.cstrargs c1) !! p))
-    -- Constructors exist in constant and non-constant forms.
-    -- We do the same here as above, but for the constant form:
-    substVisitor [((valid, subExpr@(view -> Vconst (Ccstr c2 _fields))), _)] (view -> Vaccess c1 p _vexp) =
-        if c1 == c2
-        then (valid, cstrAccess c1 p subExpr)
-        else (False, sort2defaultValue tdefs ((CstrId.cstrargs c1) !! p))
-    -- In other cases, the parent expression is unsatisfiable if the children are unsatisfiable:
-    substVisitor vexps parentExpr =
-        let fsts = map fst vexps in
-        let params = zip (map snd fsts) (map snd vexps) in
-          (List.and (map fst fsts), defaultValExprVisitor params parentExpr)
--- varSubst
+
 
 
