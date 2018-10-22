@@ -51,82 +51,16 @@ import ValExpr
 import CstrId
 import LPEPrettyPrint
 import LPETypes
-import ValExprVisitorM
+import ValExprVisitor
 import VarFactory
 import ValFactory
 
--- Doing substitutions in expressions may result in (partially) undefined expressions!
--- (In particular, imagine substituting a constructor in an incompatible field access function.)
--- To handle this, each expression carries additional information, namely
--- a list of 'undefined variables', which are variables that represent undefined sub-expressions:
-type UndefVExpr = (TxsDefs.VExpr, [VarId])
 
--- Manipulating expressions (e.g. substituting before SAT-solving) may require helper variables.
--- These variables are added to the TorXakis definitions in the environment of the monad.
--- To undo these additions, pass the original definitions to the following helper method:
-restoreTdefs :: TxsDefs.TxsDefs -> IOC.IOC ()
-restoreTdefs tdefs = do
-    state <- MonadState.gets IOC.state
-    let newState = state { IOC.tdefs = tdefs }
-    MonadState.modify (\env -> env { IOC.state = newState })
--- restoreTdefs
 
--- Eliminates occurrences of 'ANY <sort>' by substituting fresh, free variables.
--- Also returns the previous TorXakis definitions (so that they can be restored afterwards, see above).
-eliminateAny :: UndefVExpr -> IOC.IOC (TxsDefs.TxsDefs, UndefVExpr)
-eliminateAny (expr, undefs) = do
-    tdefs <- MonadState.gets (IOC.tdefs . IOC.state)
-    newExpr <- visitValExprM anyElmVisitorM id buildVExpr expr
-    return (tdefs, (newExpr, undefs))
-  where
-    buildVExpr :: TxsDefs.VExpr -> IOC.IOC TxsDefs.VExpr
-    buildVExpr v = do return v
-    
-    anyElmVisitorM :: [(TxsDefs.VExpr, Integer)] -> (TxsDefs.VExpr -> TxsDefs.VExpr) -> (TxsDefs.VExpr -> IOC.IOC TxsDefs.VExpr) -> TxsDefs.VExpr -> IOC.IOC TxsDefs.VExpr
-    anyElmVisitorM subExps _ _ (view -> Vconst (Cany sort)) = do
-        do varId <- createFreshVar sort
-           return (cstrVar varId)
-    anyElmVisitorM subExps g h parentExpr = defaultValExprVisitorM subExps g h parentExpr
--- eliminateAny
-
--- Applies a substitution to the given expression, introducing 'undefined variables' (as defined above) where necessary.
--- Also returns the previous TorXakis definitions (so that they can be restored afterwards):
-doVarSubst :: [(VarId, UndefVExpr)] -> UndefVExpr -> IOC.IOC (TxsDefs.TxsDefs, UndefVExpr)
-doVarSubst substEqs (expr, undefs) = do
-    tdefs <- MonadState.gets (IOC.tdefs . IOC.state)
-    newExprs <- Monad.mapM eliminateAny (map snd substEqs)
-    let newSubstEqs = zip (map fst substEqs) (map snd newExprs)
-    (newExpr, newUndefs) <- visitValExprM substVisitor fst buildUndefVExpr expr
-    return (tdefs, (newExpr, undefs ++ newUndefs))
-  where
-    buildUndefVExpr :: TxsDefs.VExpr -> IOC.IOC UndefVExpr
-    buildUndefVExpr v = do return (v, [])
-    
-    substVisitor :: [(UndefVExpr, Integer)] -> (UndefVExpr -> TxsDefs.VExpr) -> (TxsDefs.VExpr -> IOC.IOC UndefVExpr) -> UndefVExpr -> IOC.IOC UndefVExpr
-    -- If we find a variable, substitute it (only if it is present in substEqs, of course):
-    substVisitor _ _ _ ((view -> Vvar varId), undefs) =
-        case [(v, us) | (p, (v, us)) <- substEqs, p == varId] of
-          [(v, us)] -> do return (v, undefs ++ us)
-          _ -> do return (cstrVar varId, undefs)
-    -- An expression that accesses a non-existent field (possible when using an accessor on the wrong constructor sort)
-    -- means that we introduce a new 'undefined variable':
-    substVisitor [((subExpr@(view -> Vcstr c1 _fields), undefs1), _)] _ _ ((view -> Vaccess c2 p _vexp), undefs2) =
-        if c1 == c2
-        then do return (cstrAccess c2 p subExpr, undefs1 ++ undefs2)
-        else do varId <- createFreshVar ((CstrId.cstrargs c1) !! p)
-                return (cstrVar varId, undefs2 ++ [varId])
-    -- Constructors exist in constant and non-constant forms.
-    -- We do the same here as above, but for the constant form:
-    substVisitor [((subExpr@(view -> Vconst (Ccstr c1 _fields)), undefs1), _)] _ _ ((view -> Vaccess c2 p _vexp), undefs2) =
-        if c1 == c2
-        then do return (cstrAccess c2 p subExpr, undefs1 ++ undefs2)
-        else do varId <- createFreshVar ((CstrId.cstrargs c1) !! p)
-                return (cstrVar varId, undefs2 ++ [varId])
-    -- In other cases, the parent expression inherits undefined variables from its sub-expressions:
-    substVisitor subExps g h (parentExpr, undefs) = do
-        (parentExpr', undefs') <- defaultValExprVisitorM subExps g h (parentExpr, undefs)
-        return (parentExpr', undefs ++ undefs' ++ (concat (map (snd . fst) subExps)))
--- doVarSubst
+constToUndefExprSolution :: SolveDefs.SolveProblem VarId -> Solution
+constToUndefExprSolution (SolveDefs.Solved solMap) = Solution (Map.map (\c -> (cstrConst c, Set.empty)) solMap)
+constToUndefExprSolution SolveDefs.Unsolvable = Unsolvable
+constToUndefExprSolution SolveDefs.UnableToSolve = UnableToSolve
 
 extractVExprFromSolMap :: VarId -> Map.Map VarId Constant -> Constant
 extractVExprFromSolMap varId m = Map.findWithDefault (Cany (SortOf.sortOf varId)) varId m
@@ -134,7 +68,7 @@ extractVExprFromSolMap varId m = Map.findWithDefault (Cany (SortOf.sortOf varId)
 -- Frequently used method; code is modified code from TxsCore (with several safety checks removed!!).
 -- Attempts to find a solution for the given expression.
 -- If a solution is found, it consists of a map with one value for each of the specified variables.
-getSomeSolution :: UndefVExpr -> [VarId] -> IOC.IOC (SolveDefs.SolveProblem VarId)
+getSomeSolution :: UndefVExpr -> [VarId] -> IOC.IOC Solution
 getSomeSolution (expr, undefs) variables =
     if SortOf.sortOf expr /= SortId.sortIdBool
     then do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("Value expression must be of sort Bool (" ++ (show expr) ++ ")!") ]
@@ -144,8 +78,9 @@ getSomeSolution (expr, undefs) variables =
             let freeVars1 = Set.toList (Set.fromList ((FreeVar.freeVars expr1) ++ variables))
             let assertions1 = Solve.add expr1 Solve.empty
             (sol1, _) <- MonadState.lift $ MonadState.runStateT (Solve.solve freeVars1 assertions1) smtEnv
-            case sol1 of
-              SolveDefs.Solved solMap ->
+            let valExprSol1 = constToValExprSolution sol1
+            case valExprSol1 of
+              Solution solMap ->
                 do let freeVars2 = undefs
                    let solvedVars = Set.toList ((Set.fromList freeVars1) Set.\\ (Set.fromList freeVars2))
                    let solvedParamEqs = map (\v -> (v, (extractVExprFromMap v solMap, []))) solvedVars

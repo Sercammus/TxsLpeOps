@@ -37,23 +37,21 @@ removeParsFromLPE [] lpeInstance = do
 removeParsFromLPE targetParams (channels, paramEqs, summands) = do
     IOC.putMsgs [ EnvData.TXS_CORE_ANY "Removing the following LPE parameters:" ]
     Monad.mapM_ (\p -> IOC.putMsgs [ EnvData.TXS_CORE_ANY ("\t" ++ (Text.unpack (VarId.name p))) ]) targetParams
-    let newParamEqs = [(p, v) | (p, v) <- paramEqs, not (p `elem` targetParams)]
-    newSummands <- Monad.foldM removeParsFromSummand [] summands
+    let newParamEqs = Map.restrictKeys (Set.fromList targetParams) paramEqs
+    let rho = \e -> Subst.subst (Map.fromList [(p, v) | (p, v) <- paramEqs, p `elem` targetParams]) Map.empty (e :: TxsDefs.VExpr)
+    newSummands <- Monad.mapM removeParsFromSummand summands
     return (channels, newParamEqs, newSummands)
   where
-    -- Substitution only for the parameters that are being eliminated:
-    rho = \e -> Subst.subst (Map.fromList [(p, v) | (p, v) <- paramEqs, p `elem` targetParams]) Map.empty (e :: TxsDefs.VExpr)
-    
-    -- Eliminates parameters from a series of parameter instantiations:
-    removeParsFromProcInst :: LPEProcInst -> LPEProcInst
-    removeParsFromProcInst LPEStop = LPEStop
-    removeParsFromProcInst (LPEProcInst eqs) = LPEProcInst [(p, rho v) | (p, v) <- eqs, not (p `elem` targetParams)]
-    
     -- Eliminates parameters from a summand.
     -- Note that channel variables are always fresh, and therefore do not have to be substituted:
-    removeParsFromSummand :: LPESummands -> LPESummand -> IOC.IOC LPESummands
-    removeParsFromSummand soFar (LPESummand channelVars channelOffers guard procInst) = do
-        return (soFar ++ [LPESummand channelVars channelOffers (rho guard) (removeParsFromProcInst procInst)])
+    removeParsFromSummand :: LPESummand -> IOC.IOC LPESummand
+    removeParsFromSummand (LPESummand channelVars channelOffers guard procInst) = do
+        return (LPESummand channelVars channelOffers (rho guard) (removeParsFromProcInst procInst))
+    
+    -- Eliminates parameters from a process instantiation:
+    removeParsFromProcInst :: LPEProcInst -> LPEProcInst
+    removeParsFromProcInst (LPEProcInst eqs) = LPEProcInst (Map.restrictKeys (Set.fromList targetParams) paramEqs)
+    removeParsFromProcInst LPEStop = LPEStop
 -- removeParsFromLPE
 
 

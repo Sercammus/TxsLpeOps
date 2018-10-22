@@ -25,6 +25,7 @@ showLPEInstance
 ) where
 
 import qualified Data.List as List
+import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified FreeMonoidX as FMX
@@ -97,12 +98,15 @@ showHiddenVars :: [VarId] -> String
 showHiddenVars [] = ""
 showHiddenVars hiddenVars = "(" ++ (List.intercalate ", " (map (\v -> Text.unpack (VarId.name v)) hiddenVars)) ++ ") "
 
-showLPEParamEq :: LPEParamEq -> String
+showLPEParamEq :: (VarId, TxsDefs.VExpr) -> String
 showLPEParamEq (varId, expr) = (Text.unpack (VarId.name varId)) ++ " = " ++ (showValExpr expr)
+
+showLPEParamEqs :: LPEParamEqs -> String
+showLPEParamEqs paramEqs = List.intercalate ", " (map showLPEParamEq (Map.toList paramEqs))
 
 showProcInst :: LPEProcInst -> String
 showProcInst LPEStop = "STOP"
-showProcInst (LPEProcInst paramEqs) = "LPE(" ++ (List.intercalate ", " (map showLPEParamEq paramEqs)) ++ ")"
+showProcInst (LPEProcInst paramEqs) = "LPE(" ++ (showLPEParamEqs paramEqs) ++ ")"
 
 showLPESummand :: LPESummand -> String
 showLPESummand (LPESummand channelVars channelOffers guard procInst) =
@@ -120,7 +124,7 @@ showChanDecl chanId =
 showLPEInstance :: LPEInstance -> String
 showLPEInstance (chanIds, initParamEqs, summands) =
     "LPE[" ++ (List.intercalate "; " (map showChanDecl chanIds)) ++ "] (" ++
-    (List.intercalate ", " (map showLPEParamEq initParamEqs)) ++ ") ::=\n        " ++
+    (showLPEParamEqs initParamEqs) ++ ") ::=\n        " ++
     (List.intercalate "\n     ## " (map showLPESummand summands)) ++ "\n;"
 -- showLPEInstance
 

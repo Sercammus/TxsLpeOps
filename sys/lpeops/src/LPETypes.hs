@@ -22,10 +22,8 @@ LPESummands,
 LPEProcInst(..),
 LPEChannelOffer,
 LPEChannelOffers,
-LPEParamEq,
 LPEParamEqs,
-extractVExprFromMap,
-extractVExprFromParamEqs,
+paramEqsLookup,
 toLPEInstance,
 fromLPEInstance
 ) where
@@ -73,22 +71,11 @@ type LPEChannelOffers = [LPEChannelOffer]
 -- Convenience type.
 -- Relates a parameter with the (initial) value of that parameter
 -- (in the case of a particular process instantiation).
-type LPEParamEq = (VarId, TxsDefs.VExpr)
-type LPEParamEqs = [LPEParamEq]
+type LPEParamEqs = Map.Map VarId TxsDefs.VExpr
 
--- Extracts the data expression that corresponds with the specified variable from a map.
--- The variable should be in the specified map (unchecked precondition!);
--- however, if the variable is not found the function returns ANY <variable sort>.
-extractVExprFromMap :: VarId -> Map.Map VarId TxsDefs.VExpr -> TxsDefs.VExpr
-extractVExprFromMap varId m = Map.findWithDefault (cstrConst (Cany (SortOf.sortOf varId))) varId m
+paramEqsLookup :: [VarId] -> LPEParamEqs -> [TxsDefs.VExpr]
+paramEqsLookup orderedParams paramEqs = map (\p -> paramEqs Map.! p) orderedParams
 
--- Extracts the data expression that corresponds with the specified parameter from a number of parameter equations.
--- One of the equations should have the specified parameter on the left-hand side;
--- however, if the parameter is not found the function returns ANY <parameter sort>.
-extractVExprFromParamEqs :: VarId -> LPEParamEqs -> TxsDefs.VExpr
-extractVExprFromParamEqs varId paramEqs = extractVExprFromMap varId (Map.fromList paramEqs)
-
--- Exposed function.
 -- Constructs an LPEInstance from a process expression (unless there is a problem).
 -- The process expression should be the instantiation of a process that is already linear.
 toLPEInstance :: TxsDefs.BExpr                          -- Process instantiation.
@@ -154,8 +141,8 @@ getChannelOffer params (TxsDefs.Offer { TxsDefs.chanid = chanid, TxsDefs.chanoff
 
 -- Helper function.
 -- Creates parameter equations from the specified variables and expressions (unless there are problems):
-getParamEqs :: [VarId] -> [TxsDefs.VExpr] -> Either [String] [LPEParamEq]
-getParamEqs [] [] = Right []
+getParamEqs :: [VarId] -> [TxsDefs.VExpr] -> Either [String] LPEParamEqs
+getParamEqs [] [] = Right Map.empty
 getParamEqs (x:_) [] = Left ["Too few expressions, " ++ (Text.unpack (VarId.name x)) ++ " is unassigned!"]
 getParamEqs [] (x:_) = Left ["Too many expressions, found '" ++ (TxsShow.fshow x) ++ "'!"]
 getParamEqs (x:params) (y:paramValues) =
@@ -165,42 +152,40 @@ getParamEqs (x:params) (y:paramValues) =
                    else Left msgs
       Right eqs -> if (SortOf.sortOf x) /= (SortOf.sortOf y)
                    then Left ["Mismatching sorts, found " ++ (Text.unpack (VarId.name x)) ++ " and " ++ (TxsShow.fshow y) ++ "!"]
-                   else Right ((x, y):eqs)
+                   else Right (Map.insert x y eqs)
 -- getParamEqs
 
--- Exposed method.
 -- Constructs a process expression and a process definition from an LPEInstance (unless there is a problem).
 -- The process expression creates an instance of the process definition.
 fromLPEInstance :: LPEInstance -> String -> IOC.IOC (TxsDefs.BExpr, TxsDefs.ProcId, TxsDefs.ProcDef)
 fromLPEInstance (chans, paramEqs, summands) procName = do
-    let newProcParams = map fst paramEqs
+    let orderedParams = Map.keys paramEqs
     newProcUnid <- IOC.newUnid
     let newProcId = TxsDefs.ProcId { ProcId.name = (Text.pack procName)
                                    , ProcId.unid = newProcUnid
                                    , ProcId.procchans = map (ProcId.ChanSort . ChanId.chansorts) chans
-                                   , ProcId.procvars = map (VarId.varsort) newProcParams
+                                   , ProcId.procvars = map (VarId.varsort) orderedParams
                                    , ProcId.procexit = ProcId.NoExit }
-    let newProcInit = TxsDefs.procInst newProcId chans (map snd paramEqs)
-    let newProcDef = TxsDefs.ProcDef chans newProcParams (TxsDefs.choice (Set.fromList (summandIterator summands newProcId)))
+    let newProcInit = TxsDefs.procInst newProcId chans (paramEqsLookup orderedParams paramEqs)
+    let newProcBody = TxsDefs.choice (Set.fromList (map (summandToBExpr newProcId orderedParams) summands))
+    let newProcDef = TxsDefs.ProcDef chans orderedParams newProcBody
     return (newProcInit, newProcId, newProcDef)
   where
       -- Constructs a process expression from a summand:
-      summandIterator :: [LPESummand] -> TxsDefs.ProcId -> [TxsDefs.BExpr]
-      summandIterator [] _ = []
-      summandIterator (summand:xs) lpeProcId =
-          case summand of
-            LPESummand chanVars chanOffers gd inst -> let usedChanVars = concat (map snd chanOffers) in
-                                                      let hiddenChanVars = (Set.fromList chanVars) Set.\\ (Set.fromList usedChanVars) in
-                                                      let actPref = TxsDefs.ActOffer { TxsDefs.offers = Set.fromList (map fromOfferToOffer chanOffers), TxsDefs.constraint = gd, TxsDefs.hiddenvars = hiddenChanVars } in
-                                                        case inst of
-                                                          LPEStop -> (TxsDefs.actionPref actPref TxsDefs.stop):(summandIterator xs lpeProcId)
-                                                          LPEProcInst eqs -> let procInst = TxsDefs.procInst lpeProcId chans (map snd eqs) in
-                                                                               (TxsDefs.actionPref actPref procInst):(summandIterator xs lpeProcId)
-      -- summandIterator
+      summandToBExpr :: TxsDefs.ProcId -> [VarId] -> LPESummand -> TxsDefs.BExpr
+      summandToBExpr lpeProcId lpeOrderedParams (LPESummand chanVars chanOffers gd inst) =
+          let usedChanVars = concat (map snd chanOffers) in
+          let hiddenChanVars = (Set.fromList chanVars) Set.\\ (Set.fromList usedChanVars) in
+          let actPref = TxsDefs.ActOffer { TxsDefs.offers = Set.fromList (map offerToOffer chanOffers), TxsDefs.constraint = gd, TxsDefs.hiddenvars = hiddenChanVars } in
+            case inst of
+              LPEStop -> TxsDefs.actionPref actPref TxsDefs.stop
+              LPEProcInst eqs -> let procInst = TxsDefs.procInst lpeProcId chans (paramEqsLookup lpeOrderedParams eqs) in
+                                   TxsDefs.actionPref actPref procInst
+      -- summandToBExpr
       
       -- Constructs an offer from an offer:
-      fromOfferToOffer :: LPEChannelOffer -> TxsDefs.Offer
-      fromOfferToOffer (chanId, chanVars) = TxsDefs.Offer { TxsDefs.chanid = chanId, TxsDefs.chanoffers = [TxsDefs.Quest var | var <- chanVars] }
+      offerToOffer :: LPEChannelOffer -> TxsDefs.Offer
+      offerToOffer (chanId, chanVars) = TxsDefs.Offer { TxsDefs.chanid = chanId, TxsDefs.chanoffers = [TxsDefs.Quest var | var <- chanVars] }
 -- fromLPEInstance
 
 
