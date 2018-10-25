@@ -33,6 +33,7 @@ import qualified Data.Text           as Text
 import qualified EnvCore             as IOC
 -- import qualified EnvData
 import qualified FreeVar
+import qualified SolveDefs
 import qualified TxsDefs
 import           LPEOps
 import           LPEPrettyPrint
@@ -104,12 +105,10 @@ getParamSourcesPerSummand (x:xs) params invariant = do
     getParamSources _ [] = do return Map.empty
     getParamSources summand@(LPESummand _channelVars _channelOffers guard _) (p:ps) = do
         ps' <- getParamSources summand ps
-        let srcSatExpr = cstrAnd (Set.fromList [guard, invariant])
-        srcSolution <- getUniqueSolution srcSatExpr [] [p]
+        srcSolution <- getUniqueSolution guard invariant [] [p]
         case srcSolution of
-          Just (tdefs, srcSolMap) -> do restoreTdefs tdefs
-                                        return (Map.insert p (extractVExprFromMap p srcSolMap) ps')
-          Nothing -> do return ps'
+          SolveDefs.Solved srcSolMap -> do return (Map.insert p (cstrConst (srcSolMap Map.! p)) ps')
+          _ -> do return ps'
 -- getParamSourcesPerSummand
 
 getParamDestinationsPerSummand :: [LPESummand] -> [VarId] -> TxsDefs.VExpr -> IOC.IOC (Map.Map LPESummand (Map.Map VarId TxsDefs.VExpr))
@@ -124,11 +123,10 @@ getParamDestinationsPerSummand (x:xs) params invariant = do
     getParamDestinations summand (p:ps) = do
         ps' <- getParamDestinations summand ps
         (destVar, destSatExpr) <- constructDestSatExpr summand p invariant
-        destSolution <- getUniqueSolution destSatExpr [] [destVar]
+        destSolution <- getUniqueSolution destSatExpr invariant [] [destVar]
         case destSolution of
-          Just (tdefs, destSolMap) -> do restoreTdefs tdefs
-                                         return (Map.insert p (extractVExprFromMap destVar destSolMap) ps')
-          Nothing -> do return ps'
+          SolveDefs.Solved destSolMap -> do return (Map.insert p (cstrConst (destSolMap Map.! destVar)) ps')
+          _ -> do return ps'
 -- getParamDestinationsPerSummand
 
 -- Finds the parameters that are 'used' by the specified summands.
@@ -147,11 +145,10 @@ getUsedParamsPerSummand (x:xs) directlyUsedParamsPerSummand changedParamsPerSumm
         Map.findWithDefault [] summand directlyUsedParamsPerSummand
     getUsedParams summand@(LPESummand _channelVars _channelOffers _guard (LPEProcInst paramEqs)) =
         let changedPars = Map.findWithDefault [] summand changedParamsPerSummand in
-        let assignments = [expr | changedParam <- changedPars, (assignedParam, expr) <- paramEqs, changedParam == assignedParam ] in
-        let indirectlyUsedPars = foldl (\soFar assignment -> Set.union soFar (Set.fromList (FreeVar.freeVars assignment))) Set.empty assignments in
+        let assignments = map (paramEqs Map.!) changedPars in
+        let indirectlyUsedPars = Set.unions (map (Set.fromList . FreeVar.freeVars) assignments) in
         let directlyUsedPars = Set.fromList (Map.findWithDefault [] summand directlyUsedParamsPerSummand) in
-        let params = Set.fromList (map fst paramEqs) in
-          Set.toList (Set.intersection params (Set.union indirectlyUsedPars directlyUsedPars))
+          Set.toList (Set.intersection (Map.keysSet paramEqs) (Set.union indirectlyUsedPars directlyUsedPars))
 -- getUsedParamsPerSummand
 
 -- Finds the parameters that are changed by a summand, for all specified summands.
@@ -167,7 +164,7 @@ getChangedParamsPerSummand (x:xs) params invariant = do
     getChangedParams summand (p:ps) = do
         furtherChangedParams <- getChangedParams summand ps
         (destVar, destSatExpr) <- constructDestSatExpr summand p invariant
-        taut <- isTautology (cstrITE destSatExpr (cstrEqual (cstrVar destVar) (cstrVar p)) (cstrConst (Cbool True)))
+        taut <- isTautology (cstrITE destSatExpr (cstrEqual (cstrVar destVar) (cstrVar p)) (cstrConst (Cbool True))) invariant
         if taut
         then do return furtherChangedParams
         else do return (p:furtherChangedParams)
@@ -196,14 +193,11 @@ getDirectlyUsedParamsPerSummand (x@(LPESummand _channelVars _channelOffers guard
 --      p1 is the variable provided as the second parameter to this function.
 constructDestSatExpr :: LPESummand -> VarId -> TxsDefs.VExpr -> IOC.IOC (VarId, TxsDefs.VExpr)
 constructDestSatExpr (LPESummand _ _ _ LPEStop) varId _invariant = do return (varId, cstrConst (Cbool False))
-constructDestSatExpr (LPESummand _channelVars _channelOffers guard (LPEProcInst paramEqs)) varId invariant = do
-    case filter (\(p, _) -> p == varId) paramEqs of
-      [(_, v)] -> do varClone <- createFreshVarFromVar varId
-                     (tdefs, varCloneSubst) <- createVarSubst [(varId, cstrVar varClone)]
-                     let result = cstrAnd (Set.fromList ([guard, invariant, varCloneSubst invariant, cstrEqual (cstrVar varClone) v]))
-                     -- IOC.putMsgs [ EnvData.TXS_CORE_ANY ("destSatExpr for " ++ (Text.unpack (VarId.name varId)) ++ "/" ++ (Text.unpack (VarId.name varClone)) ++ " is " ++ (showValExpr result)) ]
-                     restoreTdefs tdefs
-                     return (varClone, result)
-      _ -> do return (varId, cstrConst (Cbool False))
+constructDestSatExpr (LPESummand _channelVars _channelOffers guard (LPEProcInst paramEqs)) varId _invariant = do
+    let v = paramEqs Map.! varId
+    varClone <- createFreshVarFromVar varId
+    let result = cstrAnd (Set.fromList ([guard, cstrEqual (cstrVar varClone) v]))
+    -- IOC.putMsgs [ EnvData.TXS_CORE_ANY ("destSatExpr for " ++ (Text.unpack (VarId.name varId)) ++ "/" ++ (Text.unpack (VarId.name varClone)) ++ " is " ++ (showValExpr result)) ]
+    return (varClone, result)
 -- constructDestSatExpr
 

@@ -38,7 +38,7 @@ cleanLPE (channels, initParamEqs, summands) _out invariant = do
   where
     addSummandIfUnique :: LPESummands -> LPESummand -> IOC.IOC LPESummands
     addSummandIfUnique soFar candidate = do
-        found <- containsSummand soFar candidate
+        found <- containsSummand soFar invariant candidate
         if found
         then do return soFar
         else do return (candidate:soFar)
@@ -46,9 +46,8 @@ cleanLPE (channels, initParamEqs, summands) _out invariant = do
     addSummandIfPredecessor :: LPESummands -> LPESummand -> IOC.IOC LPESummands
     addSummandIfPredecessor soFar candidate@(LPESummand _channelVars _channelOffers guard _paramEqs) = do
         -- Check if the summand can be reached via the initial state:
-        (tdefs, varSubst) <- createVarSubst initParamEqs
-        sat <- isSatisfiable (cstrAnd (Set.fromList [invariant, varSubst guard]))
-        restoreTdefs tdefs
+        guard' <- doBlindSubst initParamEqs guard
+        sat <- isSatisfiable guard' invariant
         if sat
         then do return (candidate:soFar)
         else do -- Check which summands could possible enable this summand:
@@ -60,43 +59,49 @@ cleanLPE (channels, initParamEqs, summands) _out invariant = do
                 else do return soFar
 -- cleanLPE
 
-containsSummand :: LPESummands -> LPESummand -> IOC.IOC Bool
-containsSummand [] _ = do return False
-containsSummand (x:xs) summand = do
-    equiv <- isEquivalentSummand x summand
+containsSummand :: LPESummands -> TxsDefs.VExpr -> LPESummand -> IOC.IOC Bool
+containsSummand [] _ _ = do return False
+containsSummand (x:xs) invariant summand = do
+    equiv <- isEquivalentSummand x summand invariant
     if equiv
     then do return True
     else containsSummand xs summand
 -- containsSummand
 
-isEquivalentSummand :: LPESummand -> LPESummand -> IOC.IOC Bool
-isEquivalentSummand (LPESummand _ _ _ LPEStop) (LPESummand _ _ _ (LPEProcInst _)) = do return False
-isEquivalentSummand (LPESummand _ _ _ (LPEProcInst _)) (LPESummand _ _ _ LPEStop) = do return False
-isEquivalentSummand (LPESummand _vars1 chans1 guard1 LPEStop) (LPESummand _vars2 chans2 guard2 LPEStop) = do
+isEquivalentSummand :: LPESummand -> LPESummand -> TxsDefs.VExpr -> IOC.IOC Bool
+isEquivalentSummand (LPESummand _ _ _ LPEStop) (LPESummand _ _ _ (LPEProcInst _)) _ = do return False
+isEquivalentSummand (LPESummand _ _ _ (LPEProcInst _)) (LPESummand _ _ _ LPEStop) _ = do return False
+isEquivalentSummand (LPESummand _vars1 chans1 guard1 LPEStop) (LPESummand _vars2 chans2 guard2 LPEStop) invariant = do
     let sortedChans1 = List.sortOn (ChanId.unid . fst) chans1
     let sortedChans2 = List.sortOn (ChanId.unid . fst) chans2
     if (map fst sortedChans1) /= (map fst sortedChans2)
     then do return False
     else do let chanVars1 = concat (map snd sortedChans1)
             let chanVars2 = concat (map snd sortedChans2)
-            (tdefs, chanVarSubst) <- createVarSubst (zipWith (\cv1 cv2 -> (cv2, cstrVar cv1)) chanVars1 chanVars2)
-            let guardEq = cstrEqual guard1 (chanVarSubst guard2)
-            taut <- isTautology guardEq
-            restoreTdefs tdefs
+            let subst = Map.fromList (zipWith (\cv1 cv2 -> (cv2, cstrVar cv1)) chanVars1 chanVars2)
+            guard2' <- doBlindSubst subst guard2
+            let guardEq = cstrEqual guard1 guard2'
+            taut <- isTautology guardEq invariant
             return taut
-isEquivalentSummand (LPESummand _vars1 chans1 guard1 (LPEProcInst paramEqs1)) (LPESummand _vars2 chans2 guard2 (LPEProcInst paramEqs2)) = do
+isEquivalentSummand (LPESummand _vars1 chans1 guard1 (LPEProcInst paramEqs1)) (LPESummand _vars2 chans2 guard2 (LPEProcInst paramEqs2)) invariant = do
     let sortedChans1 = List.sortOn (ChanId.unid . fst) chans1
     let sortedChans2 = List.sortOn (ChanId.unid . fst) chans2
     if (map fst sortedChans1) /= (map fst sortedChans2)
     then do return False
     else do let chanVars1 = concat (map snd sortedChans1)
             let chanVars2 = concat (map snd sortedChans2)
-            (tdefs, chanVarSubst) <- createVarSubst (zipWith (\cv1 cv2 -> (cv2, cstrVar cv1)) chanVars1 chanVars2)
-            let guardEq = cstrEqual guard1 (chanVarSubst guard2)
-            let procInstEqs = zipWith (\(_, v1) (_, v2) -> cstrEqual v1 (chanVarSubst v2)) paramEqs1 paramEqs2
-            taut <- isTautology (cstrAnd (Set.fromList (guardEq:procInstEqs)))
-            restoreTdefs tdefs
+            let subst = Map.fromList (zipWith (\cv1 cv2 -> (cv2, cstrVar cv1)) chanVars1 chanVars2)
+            guard2' <- doBlindSubst subst guard2
+            let guardEq = cstrEqual guard1 guard2'
+            procInstEqs <- Monad.mapM (getProcInstEq subst) (Map.toList paramEqs1)
+            taut <- isTautology (cstrAnd (Set.fromList (guardEq:procInstEqs))) invariant
             return taut
+  where
+    getProcInstEq :: Map.Map VarId TxsDefs.VExpr -> (VarId, TxsDefs.VExpr) -> IOC.IOC TxsDefs.VExpr
+    getProcInstEq subst (p1, v1) = do
+        let v2 = paramEqs2 Map.! p1
+        v2' <- doBlindSubstr subst v2
+        return (cstrEqual v1 (chanVarSubst v2))
 -- isEquivalentSummand
 
 
