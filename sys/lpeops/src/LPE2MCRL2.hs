@@ -57,6 +57,7 @@ lpe2mcrl2 lpeInstance out invariant = do
 lpe2mcrl2' :: LPEInstance -> String -> TxsDefs.VExpr -> T2MMonad (Either [String] LPEInstance)
 lpe2mcrl2' (channels, paramEqs, summands) out _invariant = do
     tdefs <- gets txsdefs
+    let orderedParams = Map.keys paramEqs
     -- Translate sorts.
     -- (These are just identifiers; they are defined further via constructors.)
     sorts <- Monad.mapM sortDef2sortDef (Map.toList (TxsDefs.sortDefs tdefs))
@@ -73,14 +74,14 @@ lpe2mcrl2' (channels, paramEqs, summands) out _invariant = do
     actions <- Monad.mapM createFreshAction channels
     modifySpec $ (\spec -> spec { MCRL2Defs.actions = Map.fromList actions })
     -- Translate LPE header:
-    (lpeProcName, lpeProc) <- createLPEProcess (map fst paramEqs)
+    (lpeProcName, lpeProc) <- createLPEProcess orderedParams
     modifySpec $ (\spec -> spec { MCRL2Defs.processes = Map.fromList [(lpeProcName, lpeProc)] })
     -- Translate LPE body:
-    newSummands <- Monad.mapM (summand2summand (lpeProcName, lpeProc)) summands
+    newSummands <- Monad.mapM (summand2summand (lpeProcName, lpeProc) orderedParams) summands
     let newProcess = lpeProc { MCRL2Defs.expr = MCRL2Defs.PChoice newSummands }
     modifySpec $ (\spec -> spec { MCRL2Defs.processes = Map.insert lpeProcName newProcess (MCRL2Defs.processes spec) })
     -- Translate LPE initialization:
-    lpeInit <- procInst2procInst (lpeProcName, lpeProc) (LPEProcInst paramEqs)
+    lpeInit <- procInst2procInst (lpeProcName, lpeProc) orderedParams (LPEProcInst paramEqs)
     modifySpec $ (\spec -> spec { MCRL2Defs.init = lpeInit })
     spec <- gets specification
     let filename = out ++ ".mcrl2"
@@ -177,8 +178,8 @@ createLPEProcess paramIds = do
     return $ (procName, MCRL2Defs.Process { MCRL2Defs.processParams = procParams, MCRL2Defs.expr = MCRL2Defs.PDeadlock })
 -- createLPEProcess
 
-summand2summand :: (MCRL2Defs.ObjectId, MCRL2Defs.Process) -> LPESummand -> T2MMonad MCRL2Defs.PExpr
-summand2summand (lpeProcName, lpeProc) (LPESummand chanVars chanOffers guard procInst) = do
+summand2summand :: (MCRL2Defs.ObjectId, MCRL2Defs.Process) -> [VarId.VarId] -> LPESummand -> T2MMonad MCRL2Defs.PExpr
+summand2summand (lpeProcName, lpeProc) orderedParams (LPESummand chanVars chanOffers guard procInst) = do
     -- Create the channel variables (both explicit and hidden) first, so that they can be referenced:
     actionVars <- Monad.mapM createFreshVar chanVars
     -- Create actions (with their arguments):
@@ -187,15 +188,15 @@ summand2summand (lpeProcName, lpeProc) (LPESummand chanVars chanOffers guard pro
     let newActionExpr = MCRL2Defs.PAction (MCRL2Defs.AExpr actions)
     -- Translate guard and recursive instantiation:
     newGuardExpr <- valExpr2dataExpr guard
-    newProcInst <- procInst2procInst (lpeProcName, lpeProc) procInst
+    newProcInst <- procInst2procInst (lpeProcName, lpeProc) orderedParams procInst
     -- Combine the different parts:
     return (MCRL2Defs.PSum actionVars (MCRL2Defs.PGuard newGuardExpr (MCRL2Defs.PSeq [newActionExpr, newProcInst]) MCRL2Defs.PDeadlock))
 -- summand2summand
 
-procInst2procInst :: (MCRL2Defs.ObjectId, MCRL2Defs.Process) -> LPEProcInst -> T2MMonad MCRL2Defs.PExpr
-procInst2procInst _ LPEStop = do return MCRL2Defs.PDeadlock
-procInst2procInst (lpeProcName, lpeProc) (LPEProcInst paramEqs) = do
-    paramValues <- Monad.mapM valExpr2dataExpr (map snd paramEqs)
+procInst2procInst :: (MCRL2Defs.ObjectId, MCRL2Defs.Process) -> [VarId.VarId] -> LPEProcInst -> T2MMonad MCRL2Defs.PExpr
+procInst2procInst _ _ LPEStop = do return MCRL2Defs.PDeadlock
+procInst2procInst (lpeProcName, lpeProc) orderedParams (LPEProcInst paramEqs) = do
+    paramValues <- Monad.mapM valExpr2dataExpr (paramEqsLookup orderedParams paramEqs)
     return (MCRL2Defs.PInst lpeProcName (zip (MCRL2Defs.processParams lpeProc) paramValues))
 -- paramEqs2procInst
 
