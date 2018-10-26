@@ -15,6 +15,7 @@ See LICENSE at root directory of this repository.
 -----------------------------------------------------------------------------
 
 module ValFactory (
+sort2defaultConst,
 sort2defaultValue
 ) where
 
@@ -28,26 +29,28 @@ import qualified SortId
 import qualified Constant
 import qualified CstrId
 
-sort2defaultValue :: TxsDefs.TxsDefs -> SortId.SortId -> TxsDefs.VExpr
-sort2defaultValue tdefs sortId
+sort2defaultConst :: TxsDefs.TxsDefs -> SortId.SortId -> Constant.Constant
+sort2defaultConst tdefs sortId
     | sortId == SortId.sortIdBool =
-        (ValExpr.cstrConst (Constant.Cbool False))
+        Constant.Cbool False
     | sortId == SortId.sortIdInt =
-        (ValExpr.cstrConst (Constant.Cint 0))
+        Constant.Cint 0
     | sortId == SortId.sortIdString =
-        (ValExpr.cstrConst (Constant.Cstring (Text.pack "")))
+        Constant.Cstring (Text.pack "")
     | sortId == SortId.sortIdRegex =
-        (ValExpr.cstrConst (Constant.Cstring (Text.pack "")))
+        Constant.Cstring (Text.pack "")
     | otherwise =
         -- Use any non-recursive constructor of this sort to express a value of this sort:
         case [ cstrId | cstrId <- Map.keys (TxsDefs.cstrDefs tdefs), CstrId.cstrsort cstrId == sortId, not(isRecursiveCstr tdefs cstrId) ] of
-          (cstrId:_) -> ValExpr.cstrCstr cstrId (map (sort2defaultValue tdefs) (CstrId.cstrargs cstrId))
+          (cstrId:_) -> Constant.Ccstr cstrId (map (sort2defaultConst tdefs) (CstrId.cstrargs cstrId))
           [] -> error ("Failed to generate a default value for " ++ show sortId ++ " (available={" ++ (List.intercalate ", " (map show (Map.keys (TxsDefs.cstrDefs tdefs)))) ++ "})!")
--- sort2defaultValue
+-- sort2defaultConst
+
+sort2defaultValue :: TxsDefs.TxsDefs -> SortId.SortId -> TxsDefs.VExpr
+sort2defaultValue tdefs sortId = ValExpr.cstrConst (sort2defaultConst tdefs sortId)
 
 isRecursiveCstr :: TxsDefs.TxsDefs -> CstrId.CstrId -> Bool
 isRecursiveCstr tdefs cstrId = List.or (map (isRecursiveSort tdefs Set.empty) (CstrId.cstrargs cstrId))
--- isRecursiveCstr
 
 isRecursiveSort :: TxsDefs.TxsDefs -> Set.Set SortId.SortId -> SortId.SortId -> Bool
 isRecursiveSort tdefs beenHere sortId

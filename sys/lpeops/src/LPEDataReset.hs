@@ -23,6 +23,8 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified FreeVar
 import qualified TxsDefs
+-- import qualified EnvCore as IOC
+-- import qualified EnvData
 import LPEOps
 import LPEParUsage
 import VarId
@@ -60,12 +62,12 @@ resetParamsInSummand initParamEqs paramUsagePerSummand belongsToRelation relevan
     resetParam paramUsage (p, v) =
         let requiredElements = Set.fromList (
                                  concat [
-                                   [ (dk, dj, (paramDestinations paramUsage) Map.! dj) | dj <- djs, dj `elem` (rulingParams paramUsage) ]
+                                   [ (dk, dj, mapGet (paramDestinations paramUsage) dj) | dj <- djs, dj `elem` (rulingParams paramUsage) ]
                                  | (dk, djs) <- Map.toList belongsToRelation, dk == p ]
                                ) in
           if (Set.intersection relevanceRelation requiredElements) == requiredElements
           then (p, v)
-          else (p, initParamEqs Map.! p)
+          else (p, mapGet initParamEqs p)
 -- resetParamsInSummand
 
 repeatUntilFixpoint :: Eq t => (t -> t) -> t -> t
@@ -88,7 +90,7 @@ updateRelevanceRelation paramUsagePerSummand controlFlowGraphs belongsToRelation
                     concat [
                       concat [
                         concat [
-                          [ (dk, dj, s) | (dj', s) <- Map.toList (paramSources (paramUsagePerSummand Map.! i )), dj' == dj ]
+                          [ (dk, dj, s) | (dj', s) <- Map.toList (paramSources (mapGet paramUsagePerSummand i)), dj' == dj ]
                         | (_r, i, t') <- Map.findWithDefault [] dp controlFlowGraphs, t' == t, dk `elem` (extractParamEqVars i dl) ]
                       | (dl', dp, t) <- update1, dl' == dl ]
                     | dj <- dkjs, not (dj `elem` dljs) ]
@@ -99,7 +101,7 @@ updateRelevanceRelation paramUsagePerSummand controlFlowGraphs belongsToRelation
 extractParamEqVars :: LPESummand -> VarId -> [VarId]
 extractParamEqVars (LPESummand _ _ _ LPEStop) _varId = []
 extractParamEqVars (LPESummand _ _ _ (LPEProcInst paramEqs)) varId =
-    let assignmentVars = Set.fromList (FreeVar.freeVars (paramEqs Map.! varId)) in
+    let assignmentVars = Set.fromList (FreeVar.freeVars (mapGet paramEqs varId)) in
       Set.toList (Set.intersection (Map.keysSet paramEqs) assignmentVars)
 -- extractParamEqVars
 
@@ -126,8 +128,8 @@ getControlFlowGraphs (x:xs) paramUsagePerSummand =
     
     constructEdgeFromRulingPar :: VarId -> (VarId, [(TxsDefs.VExpr, LPESummand, TxsDefs.VExpr)])
     constructEdgeFromRulingPar rulingPar =
-        let paramSource = (paramSources paramUsage) Map.! rulingPar in
-        let paramDestination = (paramDestinations paramUsage) Map.! rulingPar in
+        let paramSource = mapGet (paramSources paramUsage) rulingPar in
+        let paramDestination = mapGet (paramDestinations paramUsage) rulingPar in
           (rulingPar, [(paramSource, x, paramDestination)])
 -- getControlFlowGraphs
 

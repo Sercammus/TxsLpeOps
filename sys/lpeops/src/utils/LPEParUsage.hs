@@ -23,7 +23,8 @@ getParamSourcesPerSummand,
 getParamDestinationsPerSummand,
 getUsedParamsPerSummand,
 getChangedParamsPerSummand,
-getDirectlyUsedParamsPerSummand
+getDirectlyUsedParamsPerSummand,
+mapGet
 ) where
 
 -- import qualified Control.Monad       as Monad
@@ -42,6 +43,17 @@ import           VarId
 import           ValExpr
 import           VarFactory
 import Constant hiding (sort)
+
+-- import Debug.Trace
+
+mapGet :: (Show a, Ord a) => Map.Map a b -> a -> b
+mapGet m k =
+    --trace ("mapGet(" ++ (show k) ++ ")") (
+      if Map.member k m
+      then m Map.! k
+      else error ("Could not find " ++ (show k) ++ " in map!")
+    --)
+-- mapGet
 
 data LPEParamUsage = LPEParamUsage { directlyUsedParams :: [VarId]
                                    , changedParams :: [VarId]
@@ -107,7 +119,7 @@ getParamSourcesPerSummand (x:xs) params invariant = do
         ps' <- getParamSources summand ps
         srcSolution <- getUniqueSolution guard invariant [] [p]
         case srcSolution of
-          SolveDefs.Solved srcSolMap -> do return (Map.insert p (cstrConst (srcSolMap Map.! p)) ps')
+          SolveDefs.Solved srcSolMap -> do return (Map.insert p (cstrConst (mapGet srcSolMap p)) ps')
           _ -> do return ps'
 -- getParamSourcesPerSummand
 
@@ -125,7 +137,7 @@ getParamDestinationsPerSummand (x:xs) params invariant = do
         (destVar, destSatExpr) <- constructDestSatExpr summand p invariant
         destSolution <- getUniqueSolution destSatExpr invariant [] [destVar]
         case destSolution of
-          SolveDefs.Solved destSolMap -> do return (Map.insert p (cstrConst (destSolMap Map.! destVar)) ps')
+          SolveDefs.Solved destSolMap -> do return (Map.insert p (cstrConst (Map.findWithDefault (error "sdhfl") destVar destSolMap)) ps')
           _ -> do return ps'
 -- getParamDestinationsPerSummand
 
@@ -145,7 +157,7 @@ getUsedParamsPerSummand (x:xs) directlyUsedParamsPerSummand changedParamsPerSumm
         Map.findWithDefault [] summand directlyUsedParamsPerSummand
     getUsedParams summand@(LPESummand _channelVars _channelOffers _guard (LPEProcInst paramEqs)) =
         let changedPars = Map.findWithDefault [] summand changedParamsPerSummand in
-        let assignments = map (paramEqs Map.!) changedPars in
+        let assignments = map (mapGet paramEqs) changedPars in
         let indirectlyUsedPars = Set.unions (map (Set.fromList . FreeVar.freeVars) assignments) in
         let directlyUsedPars = Set.fromList (Map.findWithDefault [] summand directlyUsedParamsPerSummand) in
           Set.toList (Set.intersection (Map.keysSet paramEqs) (Set.union indirectlyUsedPars directlyUsedPars))
@@ -194,7 +206,7 @@ getDirectlyUsedParamsPerSummand (x@(LPESummand _channelVars _channelOffers guard
 constructDestSatExpr :: LPESummand -> VarId -> TxsDefs.VExpr -> IOC.IOC (VarId, TxsDefs.VExpr)
 constructDestSatExpr (LPESummand _ _ _ LPEStop) varId _invariant = do return (varId, cstrConst (Cbool False))
 constructDestSatExpr (LPESummand _channelVars _channelOffers guard (LPEProcInst paramEqs)) varId _invariant = do
-    let v = paramEqs Map.! varId
+    let v = mapGet paramEqs varId
     varClone <- createFreshVarFromVar varId
     let result = cstrAnd (Set.fromList ([guard, cstrEqual (cstrVar varClone) v]))
     -- IOC.putMsgs [ EnvData.TXS_CORE_ANY ("destSatExpr for " ++ (Text.unpack (VarId.name varId)) ++ "/" ++ (Text.unpack (VarId.name varClone)) ++ " is " ++ (showValExpr result)) ]

@@ -24,22 +24,18 @@ import qualified Control.Monad       as Monad
 import qualified Data.Set            as Set
 import qualified EnvCore             as IOC
 import qualified ChanId
-import qualified EnvData
 import qualified TxsDefs
 import qualified VarId
 import qualified ValExpr
 import LPEOps
-import Satisfiability
 import LPESuccessors
-import LPEPrettyPrint
+import Satisfiability
 
 -- Removes duplicate summands and summands that are unreachable by all other (!) summands
 -- (so basically we do a partial, symbolic reachability analysis).
 cleanLPE :: LPEOperation
 cleanLPE (channels, initParamEqs, summands) _out invariant = do
-    IOC.putMsgs [ EnvData.TXS_CORE_ANY ("NEW INPUT (" ++ (show (length summands)) ++ " summands)") ]
     uniqueSummands <- Monad.foldM addSummandIfUnique [] summands
-    IOC.putMsgs [ EnvData.TXS_CORE_ANY ("REACHABILITY (" ++ (show (length uniqueSummands)) ++ " summands)") ]
     predecessorSummands <- Monad.foldM addSummandIfPredecessor [] uniqueSummands
     return (Right (channels, initParamEqs, predecessorSummands))
   where
@@ -53,16 +49,12 @@ cleanLPE (channels, initParamEqs, summands) _out invariant = do
     addSummandIfPredecessor :: LPESummands -> LPESummand -> IOC.IOC LPESummands
     addSummandIfPredecessor soFar candidate@(LPESummand _channelVars _channelOffers guard _paramEqs) = do
         -- Check if the summand can be reached via the initial state:
-        IOC.putMsgs [ EnvData.TXS_CORE_ANY ("summand = " ++ (showLPESummand candidate)) ]
-        IOC.putMsgs [ EnvData.TXS_CORE_ANY ("init. subst. = " ++ (showSubst initParamEqs)) ]
         guard' <- doBlindSubst initParamEqs guard
         sat <- isSatisfiable guard' invariant
-        IOC.putMsgs [ EnvData.TXS_CORE_ANY ("sat1 = " ++ (show sat)) ]
         if sat
         then do return (candidate:soFar)
         else do -- Check which summands could possible enable this summand:
                 predecessors <- getPossiblePredecessors summands invariant candidate
-                Monad.mapM_ (\predSmd -> IOC.putMsgs [ EnvData.TXS_CORE_ANY ("pred = " ++ (show predSmd)) ]) predecessors
                 -- If the summand is only enabled by itself, it can still be safely deleted:
                 let predecessorsSet = Set.delete candidate (Set.fromList predecessors)
                 if predecessorsSet /= Set.empty

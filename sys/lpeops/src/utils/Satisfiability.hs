@@ -47,6 +47,7 @@ import VarId
 import ValExpr
 import BlindSubst
 import LPEPrettyPrint
+import ValFactory
 
 -- Frequently used method; code is modified code from TxsCore (with several safety checks removed!!).
 -- Attempts to find a solution for the given expression.
@@ -58,27 +59,21 @@ getSomeSolution expr _invariant variables =
             return SolveDefs.UnableToSolve
     else do smtEnv <- IOC.getSMT "current"
             (tdefs, expr1, undefs) <- eliminateAny expr
-            IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("Without ANY *: " ++ (showValExpr expr1)) ]
-            IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("Undefined variables: " ++ (show undefs)) ]
             let freeVars1 = Set.union (Set.fromList ((FreeVar.freeVars expr1) ++ variables)) undefs
-            IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("Free variables: " ++ (show freeVars1)) ]
             let assertions1 = Solve.add expr1 Solve.empty
             (sol1, _) <- MonadState.lift $ MonadState.runStateT (Solve.solve (Set.toList freeVars1) assertions1) smtEnv
-            IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("Solution 1: " ++ (showSolution sol1)) ]
             case sol1 of
               SolveDefs.Solved solMap ->
                 do let freeVars2 = undefs
                    let blindSubstVars = Set.toList (freeVars1 Set.\\ freeVars2)
                    let blindSubst = Map.fromList (map (\v -> (v, cstrConst (solMap Map.! v))) blindSubstVars)
-                   IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("Blind substitution: " ++ (showSubst blindSubst)) ]
                    expr2 <- doBlindSubst blindSubst expr1
-                   IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("Expression 2: " ++ (showValExpr expr2)) ]
                    let assertions2 = Solve.add (cstrNot expr2) Solve.empty
                    (sol2, _) <- MonadState.lift $ MonadState.runStateT (Solve.solve (Set.toList freeVars2) assertions2) smtEnv
-                   IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("Solution 2: " ++ (showSolution sol2)) ]
                    case sol2 of
                      SolveDefs.Unsolvable -> do restoreTdefs tdefs
-                                                return (SolveDefs.Solved (Map.fromList (map (\v -> (v, solMap Map.! v)) variables)))
+                                                let newSolMap = Map.fromList (map (\v -> (v, Map.findWithDefault (sort2defaultConst tdefs (SortOf.sortOf v)) v solMap)) variables)
+                                                return (SolveDefs.Solved newSolMap)
                      _ -> do restoreTdefs tdefs
                              return SolveDefs.UnableToSolve
               otherResult -> do restoreTdefs tdefs
@@ -90,8 +85,7 @@ defaultInvariant = cstrConst (Constant.Cbool True)
 
 -- Checks if the specified expression cannot be false.
 isTautology :: TxsDefs.VExpr -> TxsDefs.VExpr -> IOC.IOC Bool
-isTautology expr invariant = do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("Tautology? -> " ++ (showValExpr expr)) ]
-                                isNotSatisfiable (cstrNot expr) invariant
+isTautology expr invariant = isNotSatisfiable (cstrNot expr) invariant
 
 -- Checks if the specified expression can be true.
 isSatisfiable :: TxsDefs.VExpr -> TxsDefs.VExpr -> IOC.IOC Bool
@@ -127,7 +121,7 @@ areNotSatisfiable expressions invariant = do sat <- Monad.mapM (\e -> isNotSatis
 -- The solution only has to be unique with regard to the variables listed by the third parameter:
 getUniqueSolution :: TxsDefs.VExpr -> TxsDefs.VExpr -> [VarId] -> [VarId] -> IOC.IOC (SolveDefs.SolveProblem VarId)
 getUniqueSolution expr invariant variables uniqueSolVars = do
-    sol <- getSomeSolution expr invariant variables
+    sol <- getSomeSolution expr invariant (variables ++ uniqueSolVars)
     case sol of
       SolveDefs.Solved solMap ->
         do -- Then check if there is NO solution where (one of) the specified variables have different values:
