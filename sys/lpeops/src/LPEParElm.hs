@@ -35,8 +35,8 @@ parElm lpeInstance@((_channels, paramEqs, summands)) _out _invariant = do
     -- This initial set of inert parameters is reduced until a fixpoint is reached:
     let inertParams = getInertParams lpeInstance (allParams Set.\\ guardParams)
     -- The remaining inert parameters are removed from the LPE:
-    newLPEInstance <- removeParsFromLPE inertParams lpeInstance
-    return (Right newLPEInstance)
+    newLPE <- removeParsFromLPE inertParams lpeInstance
+    return (Right newLPE)
   where
     getGuard :: LPESummand -> TxsDefs.VExpr
     getGuard (LPESummand _ _ guard _) = guard

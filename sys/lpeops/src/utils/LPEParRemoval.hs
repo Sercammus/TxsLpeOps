@@ -39,10 +39,9 @@ removeParsFromLPE targetParams lpeInstance@(channels, paramEqs, summands)
     | otherwise = do
         IOC.putMsgs [ EnvData.TXS_CORE_ANY "Removing the following LPE parameters:" ]
         Monad.mapM_ (\p -> IOC.putMsgs [ EnvData.TXS_CORE_ANY ("\t" ++ (Text.unpack (VarId.name p))) ]) (Set.toList targetParams)
-        let newParamEqs = Map.restrictKeys paramEqs targetParams
-        let rho = \e -> Subst.subst newParamEqs Map.empty (e :: TxsDefs.VExpr)
+        let rho = \e -> Subst.subst (Map.restrictKeys paramEqs targetParams) Map.empty (e :: TxsDefs.VExpr)
         newSummands <- Monad.mapM (removeParsFromSummand rho) summands
-        return (channels, newParamEqs, newSummands)
+        return (channels, Map.withoutKeys paramEqs targetParams, newSummands)
   where
     -- Eliminates parameters from a summand.
     -- Note that channel variables are always fresh, and therefore do not have to be substituted:
@@ -52,7 +51,7 @@ removeParsFromLPE targetParams lpeInstance@(channels, paramEqs, summands)
     
     -- Eliminates parameters from a process instantiation:
     removeParsFromProcInst :: LPEProcInst -> LPEProcInst
-    removeParsFromProcInst (LPEProcInst eqs) = LPEProcInst (Map.restrictKeys eqs targetParams)
+    removeParsFromProcInst (LPEProcInst eqs) = LPEProcInst (Map.withoutKeys eqs targetParams)
     removeParsFromProcInst LPEStop = LPEStop
 -- removeParsFromLPE
 

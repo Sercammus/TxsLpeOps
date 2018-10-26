@@ -80,7 +80,7 @@ checkConfluenceCondition (summand1@(LPESummand _channelVars1 _channelOffers1 gua
     if summand1 == summand2
     then do return True
     else do -- a1 == a1[g1] && ... && an == an[g1]
-            channelArgEqs <- Monad.mapM getChannelArgEq (Map.keys paramEqs2)
+            channelArgEqs <- Monad.mapM getChannelArgEq channelVars2
             
             -- x1[g1][g2] == x1[g2][g1] && ... && xn[g1][g2] == xn[g2][g1]
             instantiationEqs <- Monad.mapM getInstantiationEq (Map.keys paramEqs2)

@@ -57,9 +57,9 @@ visitValExprM f expr = do
     let visitValExprM1 = visitValExprMK f 1
     case expr of
       (view -> Vconst _) ->
-          f [] expr
+          do f [] expr
       (view -> Vvar _) ->
-          f [] expr
+          do f [] expr
       (view -> Vfunc _fid vexps) ->
           do newVExps <- Monad.mapM visitValExprM1 vexps
              f newVExps expr
@@ -161,7 +161,7 @@ defaultValExprVisitorM defaultDat subExps expr = do
                   _                          -> error ("DefaultValExprVisitorM not defined for " ++ (show expr) ++ "!")
     return (ValExprVisitorOutput expr' 1 defaultDat)
   where
-      emptyFis :: Map.Map FuncId (FuncDef VarId)
-      emptyFis = Map.empty :: Map.Map FuncId (FuncDef VarId)
+    emptyFis :: Map.Map FuncId (FuncDef VarId)
+    emptyFis = Map.empty :: Map.Map FuncId (FuncDef VarId)
 -- defaultValExprVisitorM
 

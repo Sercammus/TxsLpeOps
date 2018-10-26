@@ -35,17 +35,17 @@ import           Constant
 -- Eliminates parameters that always have the same value from an LPE.
 -- State spaces before and after are isomorph.
 constElm :: LPEOperation
-constElm lpeInstance@((_channels, initParamEqs, _summands)) _out invariant = do
-    constParams <- getConstParams lpeInstance invariant (Map.keysSet initParamEqs)
-    newLPEInstance <- removeParsFromLPE constParams lpeInstance
-    return (Right newLPEInstance)
+constElm lpe@((_channels, initParamEqs, _summands)) _out invariant = do
+    constParams <- getConstParams lpe invariant (Map.keysSet initParamEqs)
+    newLPE <- removeParsFromLPE constParams lpe
+    return (Right newLPE)
 -- constElm
 
 getConstParams :: LPEInstance -> TxsDefs.VExpr -> Set.Set VarId -> IOC.IOC (Set.Set VarId)
-getConstParams lpeInstance invariant constParams = do
-    newConstParams <- getConstParamsForAllSummands lpeInstance invariant constParams
+getConstParams lpe invariant constParams = do
+    newConstParams <- getConstParamsForAllSummands lpe invariant constParams
     if newConstParams /= constParams
-    then getConstParams lpeInstance invariant newConstParams
+    then getConstParams lpe invariant newConstParams
     else return newConstParams
 -- getConstParams
 
@@ -53,7 +53,7 @@ getConstParamsForAllSummands :: LPEInstance -> TxsDefs.VExpr -> Set.Set VarId ->
 getConstParamsForAllSummands (_channels, initParamEqs, summands) invariant constParams = do
     let subst = Map.restrictKeys initParamEqs constParams
     constParamsPerSummand <- Monad.mapM (getConstParamsForSummand subst invariant constParams) summands
-    return (foldl Set.intersection Set.empty constParamsPerSummand)
+    return (foldl Set.intersection constParams constParamsPerSummand)
 -- getConstParamsForAllSummands
 
 getConstParamsForSummand :: Map.Map VarId TxsDefs.VExpr -> TxsDefs.VExpr -> Set.Set VarId -> LPESummand -> IOC.IOC (Set.Set VarId)
@@ -64,8 +64,8 @@ getConstParamsForSummand subst invariant constParams summand = do
 
 isConstParamForSummand :: Map.Map VarId TxsDefs.VExpr -> TxsDefs.VExpr -> LPESummand -> VarId -> IOC.IOC (Set.Set VarId)
 isConstParamForSummand _ _ (LPESummand _ _ _ LPEStop) _ = do return Set.empty
-isConstParamForSummand subst invariant (LPESummand _ _ guard (LPEProcInst _)) testParam = do
-    let expr = cstrITE guard (cstrEqual expr (cstrVar testParam)) (cstrConst (Cbool True))
+isConstParamForSummand subst invariant (LPESummand _ _ guard (LPEProcInst paramEqs)) testParam = do
+    let expr = cstrITE guard (cstrEqual (paramEqs Map.! testParam) (cstrVar testParam)) (cstrConst (Cbool True))
     expr' <- doBlindSubst subst expr
     taut <- isTautology expr' invariant
     if taut

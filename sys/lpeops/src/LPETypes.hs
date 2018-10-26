@@ -23,12 +23,14 @@ LPEProcInst(..),
 LPEChannelOffer,
 LPEChannelOffers,
 LPEParamEqs,
+newLPESummand,
+newLPEInstance,
 paramEqsLookup,
 toLPEInstance,
 fromLPEInstance
 ) where
 
-import           Control.Monad.State
+import qualified Control.Monad.State as MonadState
 import qualified Data.List as List
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -76,12 +78,21 @@ type LPEParamEqs = Map.Map VarId TxsDefs.VExpr
 paramEqsLookup :: [VarId] -> LPEParamEqs -> [TxsDefs.VExpr]
 paramEqsLookup orderedParams paramEqs = map (\p -> paramEqs Map.! p) orderedParams
 
+toLPEParamEqs :: [(VarId, TxsDefs.VExpr)] -> LPEParamEqs
+toLPEParamEqs list = Map.fromList list
+
+newLPESummand :: [VarId] -> LPEChannelOffers -> TxsDefs.VExpr -> [(VarId, TxsDefs.VExpr)] -> LPESummand
+newLPESummand chanVarIds chanOffers guard procInstParamEqs = LPESummand chanVarIds chanOffers guard (LPEProcInst (toLPEParamEqs procInstParamEqs))
+
+newLPEInstance :: ([TxsDefs.ChanId], [(VarId, TxsDefs.VExpr)], LPESummands) -> LPEInstance
+newLPEInstance (chanIds, initParamEqs, summands) = (chanIds, toLPEParamEqs initParamEqs, summands)
+
 -- Constructs an LPEInstance from a process expression (unless there is a problem).
 -- The process expression should be the instantiation of a process that is already linear.
 toLPEInstance :: TxsDefs.BExpr                          -- Process instantiation.
               -> IOC.IOC (Either [String] LPEInstance)  -- Instance (unless there are problems).
 toLPEInstance procInst = do
-    envc <- get
+    envc <- MonadState.get
     case IOC.state envc of
       IOC.Initing { IOC.tdefs = tdefs } -> let procDefs = TxsDefs.procDefs tdefs in
         case TxsDefs.view procInst of

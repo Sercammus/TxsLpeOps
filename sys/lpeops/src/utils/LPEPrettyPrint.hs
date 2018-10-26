@@ -21,7 +21,8 @@ showValExpr,
 showLPEChannelOffer,
 showLPEParamEq,
 showLPESummand,
-showLPEInstance
+showLPEInstance,
+showSubst
 ) where
 
 import qualified Data.List as List
@@ -128,5 +129,6 @@ showLPEInstance (chanIds, initParamEqs, summands) =
     (List.intercalate "\n     ## " (map showLPESummand summands)) ++ "\n;"
 -- showLPEInstance
 
-
+showSubst :: Map.Map VarId TxsDefs.VExpr -> String
+showSubst substMap = "Subst [" ++ (showLPEParamEqs substMap) ++ "]"
 

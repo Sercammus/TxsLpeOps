@@ -43,8 +43,8 @@ parReset lpeInstance@((_channels, paramEqs, summands)) _out invariant = do
     possibleSuccessors <- Monad.mapM (getPossibleSuccessors summands invariant) summands
     let successorsPerSummand = zipWith (\s i -> (s, i, Map.keys paramEqs)) summands possibleSuccessors
     IOC.putMsgs [ EnvData.TXS_CORE_ANY "Analyzing control flow..." ]
-    newLPEInstance <- parResetLoop lpeInstance invariant successorsPerSummand
-    return (Right newLPEInstance)
+    newLPE <- parResetLoop lpeInstance invariant successorsPerSummand
+    return (Right newLPE)
 -- parReset
 
 -- Updates the information collected about summands, in particular their lists of used variables,

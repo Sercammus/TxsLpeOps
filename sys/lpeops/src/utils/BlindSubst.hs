@@ -71,7 +71,7 @@ doBlindSubst subst expr = do
   where
     substVisitor :: [ValExprVisitorOutput ()] -> TxsDefs.VExpr -> IOC.IOC (ValExprVisitorOutput ())
     -- If we find a variable, substitute it (only if it is present in substEqs, of course):
-    substVisitor _ (view -> Vvar varId) =
+    substVisitor _ (view -> Vvar varId) = do
         case Map.lookup varId subst of
           Just v -> do return (ValExprVisitorOutput v 1 ())
           Nothing -> do return (ValExprVisitorOutput (cstrVar varId) 1 ())
@@ -98,7 +98,5 @@ doBlindParamEqsSubst subst target = do
     paramEqs <- Monad.mapM (doBlindParamEqSubst subst) (Map.toList target)
     return (Map.fromList paramEqs)
 -- doBlindParamEqsSubst
-
-
 
 
