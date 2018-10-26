@@ -4,6 +4,7 @@ Copyright (c) 2015-2017 TNO and Radboud University
 See LICENSE at root directory of this repository.
 -}
 
+{-# OPTIONS_GHC -Wno-unused-imports #-}
 module Main where
 
 import System.Exit
@@ -19,18 +20,18 @@ import TestConfCheck
 testList :: Test
 testList = TestList
     [
-      TestLabel "cleanBasic"               testCleanBasic
-    , TestLabel "cleanUnreachable"         testCleanUnreachable
-    , TestLabel "constElmBasic"            testConstElmBasic
-    , TestLabel "constElmXYX"              testConstElmXYX
-    , TestLabel "parElmBasic"              testParElmBasic
-    , TestLabel "parElmXUpperBound"        testParElmXUpperBound
-    , TestLabel "parDataReset"             testDataResetBasic
-    , TestLabel "parResetBasic"            testParResetBasic
-    , TestLabel "confCheckBasic"           testConfCheckBasic
-    , TestLabel "confElmNoChange"          testConfElmNoChange
-    , TestLabel "confElmBasic"             testConfElmBasic
-    , TestLabel "confElmModulo"            testConfElmModulo
+    --  TestLabel "cleanBasic"               testCleanBasic
+    --, TestLabel "cleanUnreachable"         testCleanUnreachable
+    --, TestLabel "constElmBasic"            testConstElmBasic
+    --, TestLabel "constElmXYX"              testConstElmXYX
+    --, TestLabel "parElmBasic"              testParElmBasic
+    --, TestLabel "parElmXUpperBound"        testParElmXUpperBound
+     TestLabel "parDataReset"             testDataResetBasic
+    --, TestLabel "parResetBasic"            testParResetBasic
+    --, TestLabel "confCheckBasic"           testConfCheckBasic
+    --, TestLabel "confElmNoChange"          testConfElmNoChange
+    --, TestLabel "confElmBasic"             testConfElmBasic
+    --, TestLabel "confElmModulo"            testConfElmModulo
     ]
 
 main :: IO ()

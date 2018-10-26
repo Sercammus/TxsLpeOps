@@ -38,34 +38,34 @@ testParElmBasic = TestCase $ do
     tryLPEOperation parElm lpeInstance1 lpeInstance2
   where
     summand1_1 :: LPESummand
-    summand1_1 = LPESummand -- A ? y >-> P(x)
+    summand1_1 = newLPESummand -- A ? y >-> P(x)
         [varIdY]
         [(chanIdA, [varIdY])]
         (vexprTrue)
-        (LPEProcInst [(varIdX, vexprX)])
+        [(varIdX, vexprX)]
     summand1_2 :: LPESummand
-    summand1_2 = LPESummand -- A ? z >-> P(x+1)
+    summand1_2 = newLPESummand -- A ? z >-> P(x+1)
         [varIdZ]
         [(chanIdA, [varIdZ])]
         (vexprTrue)
-        (LPEProcInst [(varIdX, vexprSum vexprX vexpr1)])
+        [(varIdX, vexprSum vexprX vexpr1)]
     lpeInstance1 :: LPEInstance
-    lpeInstance1 = ([chanIdA], [(varIdX, vexpr0)], [summand1_1, summand1_2])
+    lpeInstance1 = newLPEInstance ([chanIdA], [(varIdX, vexpr0)], [summand1_1, summand1_2])
     
     summand2_1 :: LPESummand
-    summand2_1 = LPESummand -- A ? y >-> P()
+    summand2_1 = newLPESummand -- A ? y >-> P()
         [varIdY]
         [(chanIdA, [varIdY])]
         (vexprTrue)
-        (LPEProcInst [])
+        []
     summand2_2 :: LPESummand
-    summand2_2 = LPESummand -- A ? z >-> P()
+    summand2_2 = newLPESummand -- A ? z >-> P()
         [varIdZ]
         [(chanIdA, [varIdZ])]
         (vexprTrue)
-        (LPEProcInst [])
+        []
     lpeInstance2 :: LPEInstance
-    lpeInstance2 = ([chanIdA], [], [summand2_1, summand2_2])
+    lpeInstance2 = newLPEInstance ([chanIdA], [], [summand2_1, summand2_2])
 -- testParElmBasic
 
 testParElmXUpperBound :: Test
@@ -73,34 +73,34 @@ testParElmXUpperBound = TestCase $ do
     tryLPEOperation parElm lpeInstance1 lpeInstance2
   where
     summand1_1 :: LPESummand
-    summand1_1 = LPESummand -- A ? y [x == 2] >-> P(x)
+    summand1_1 = newLPESummand -- A ? y [x == 2] >-> P(x)
         [varIdY]
         [(chanIdA, [varIdY])]
         (cstrEqual vexprX vexpr2)
-        (LPEProcInst [(varIdX, vexprX)])
+        [(varIdX, vexprX)]
     summand1_2 :: LPESummand
-    summand1_2 = LPESummand -- A ? z [x != 2] >-> P(x+1)
+    summand1_2 = newLPESummand -- A ? z [x != 2] >-> P(x+1)
         [varIdZ]
         [(chanIdA, [varIdZ])]
         (cstrNot (cstrEqual vexprX vexpr2))
-        (LPEProcInst [(varIdX, vexprSum vexprX vexpr1)])
+        [(varIdX, vexprSum vexprX vexpr1)]
     lpeInstance1 :: LPEInstance
-    lpeInstance1 = ([chanIdA], [(varIdX, vexpr0)], [summand1_1, summand1_2])
+    lpeInstance1 = newLPEInstance ([chanIdA], [(varIdX, vexpr0)], [summand1_1, summand1_2])
     
     summand2_1 :: LPESummand
-    summand2_1 = LPESummand -- A ? y [x == 2] >-> P(x)
+    summand2_1 = newLPESummand -- A ? y [x == 2] >-> P(x)
         [varIdY]
         [(chanIdA, [varIdY])]
         (cstrEqual vexprX vexpr2)
-        (LPEProcInst [(varIdX, vexprX)])
+        [(varIdX, vexprX)]
     summand2_2 :: LPESummand
-    summand2_2 = LPESummand -- A ? z [x != 2] >-> P(x+1)
+    summand2_2 = newLPESummand -- A ? z [x != 2] >-> P(x+1)
         [varIdZ]
         [(chanIdA, [varIdZ])]
         (cstrNot (cstrEqual vexprX vexpr2))
-        (LPEProcInst [(varIdX, vexprSum vexprX vexpr1)])
+        [(varIdX, vexprSum vexprX vexpr1)]
     lpeInstance2 :: LPEInstance
-    lpeInstance2 = ([chanIdA], [(varIdX, vexpr0)], [summand2_1, summand2_2])
+    lpeInstance2 = newLPEInstance ([chanIdA], [(varIdX, vexpr0)], [summand2_1, summand2_2])
 -- testParElmXUpperBound
 
 ---------------------------------------------------------------------------

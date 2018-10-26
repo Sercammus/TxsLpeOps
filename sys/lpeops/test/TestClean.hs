@@ -38,52 +38,52 @@ testCleanBasic = TestCase $ do
     tryLPEOperation cleanLPE lpeInstance1 lpeInstance2
   where
     summand1_1 :: LPESummand
-    summand1_1 = LPESummand -- A ? z [x==0] >-> P(1)
+    summand1_1 = newLPESummand -- A ? z [x==0] >-> P(1)
         [varIdZ]
         [(chanIdA, [varIdZ])]
         (cstrEqual vexprX vexpr0)
-        (LPEProcInst [(varIdX, vexpr1)])
+        [(varIdX, vexpr1)]
     summand1_2 :: LPESummand
-    summand1_2 = LPESummand -- A ? y [x==1] >-> P(2)
+    summand1_2 = newLPESummand -- A ? y [x==1] >-> P(2)
         [varIdY]
         [(chanIdA, [varIdY])]
         (cstrAnd (Set.fromList [cstrEqual vexprX vexpr1]))
-        (LPEProcInst [(varIdX, vexpr2)])
+        [(varIdX, vexpr2)]
     summand1_3 :: LPESummand
-    summand1_3 = LPESummand -- A ? z [x==1] >-> P(2)
+    summand1_3 = newLPESummand -- A ? z [x==1] >-> P(2)
         [varIdZ]
         [(chanIdA, [varIdZ])]
         (cstrEqual vexprX vexpr1)
-        (LPEProcInst [(varIdX, vexpr2)])
+        [(varIdX, vexpr2)]
     summand1_4 :: LPESummand
-    summand1_4 = LPESummand -- A ? z [x==2] >-> P(0)
+    summand1_4 = newLPESummand -- A ? z [x==2] >-> P(0)
         [varIdZ]
         [(chanIdA, [varIdZ])]
         (cstrEqual vexprX vexpr2)
-        (LPEProcInst [(varIdX, vexpr0)])
+        [(varIdX, vexpr0)]
     lpeInstance1 :: LPEInstance
-    lpeInstance1 = ([chanIdA], [(varIdX, vexpr0)], [summand1_1, summand1_2, summand1_3, summand1_4])
+    lpeInstance1 = newLPEInstance ([chanIdA], [(varIdX, vexpr0)], [summand1_1, summand1_2, summand1_3, summand1_4])
     
     summand2_1 :: LPESummand
-    summand2_1 = LPESummand -- A ? z [x==0] >-> P(1)
+    summand2_1 = newLPESummand -- A ? z [x==0] >-> P(1)
         [varIdZ]
         [(chanIdA, [varIdZ])]
         (cstrEqual vexprX vexpr0)
-        (LPEProcInst [(varIdX, vexpr1)])
+        [(varIdX, vexpr1)]
     summand2_2 :: LPESummand
-    summand2_2 = LPESummand -- A ? y [x==1] >-> P(2)
+    summand2_2 = newLPESummand -- A ? y [x==1] >-> P(2)
         [varIdY]
         [(chanIdA, [varIdY])]
         (cstrAnd (Set.fromList [cstrEqual vexprX vexpr1]))
-        (LPEProcInst [(varIdX, vexpr2)])
+        [(varIdX, vexpr2)]
     summand2_4 :: LPESummand
-    summand2_4 = LPESummand -- A ? z [x==2] >-> P(0)
+    summand2_4 = newLPESummand -- A ? z [x==2] >-> P(0)
         [varIdZ]
         [(chanIdA, [varIdZ])]
         (cstrEqual vexprX vexpr2)
-        (LPEProcInst [(varIdX, vexpr0)])
+        [(varIdX, vexpr0)]
     lpeInstance2 :: LPEInstance
-    lpeInstance2 = ([chanIdA], [(varIdX, vexpr0)], [summand2_1, summand2_2, summand2_4])
+    lpeInstance2 = newLPEInstance ([chanIdA], [(varIdX, vexpr0)], [summand2_1, summand2_2, summand2_4])
 -- testCleanBasic
 
 testCleanUnreachable :: Test
@@ -91,46 +91,46 @@ testCleanUnreachable = TestCase $ do
     tryLPEOperation cleanLPE lpeInstance1 lpeInstance2
   where
     summand1_1 :: LPESummand
-    summand1_1 = LPESummand -- A ? z [x==0] >-> P(1)
+    summand1_1 = newLPESummand -- A ? z [x==0] >-> P(1)
         [varIdZ]
         [(chanIdA, [varIdZ])]
         (cstrEqual vexprX vexpr0)
-        (LPEProcInst [(varIdX, vexpr1)])
+        [(varIdX, vexpr1)]
     summand1_2 :: LPESummand
-    summand1_2 = LPESummand -- A ? y [x==1] >-> P(0)
+    summand1_2 = newLPESummand -- A ? y [x==1] >-> P(0)
         [varIdY]
         [(chanIdA, [varIdY])]
         (cstrAnd (Set.fromList [cstrEqual vexprX vexpr1]))
-        (LPEProcInst [(varIdX, vexpr0)])
+        [(varIdX, vexpr0)]
     summand1_3 :: LPESummand
-    summand1_3 = LPESummand -- A ? z [x==1] >-> P(0)
+    summand1_3 = newLPESummand -- A ? z [x==1] >-> P(0)
         [varIdZ]
         [(chanIdA, [varIdZ])]
         (cstrEqual vexprX vexpr1)
-        (LPEProcInst [(varIdX, vexpr0)])
+        [(varIdX, vexpr0)]
     summand1_4 :: LPESummand
-    summand1_4 = LPESummand -- A ? z [x==2] >-> P(0)
+    summand1_4 = newLPESummand -- A ? z [x==2] >-> P(0)
         [varIdZ]
         [(chanIdA, [varIdZ])]
         (cstrEqual vexprX vexpr2)
-        (LPEProcInst [(varIdX, vexpr0)])
+        [(varIdX, vexpr0)]
     lpeInstance1 :: LPEInstance
-    lpeInstance1 = ([chanIdA], [(varIdX, vexpr0)], [summand1_1, summand1_2, summand1_3, summand1_4])
+    lpeInstance1 = newLPEInstance ([chanIdA], [(varIdX, vexpr0)], [summand1_1, summand1_2, summand1_3, summand1_4])
     
     summand2_1 :: LPESummand
-    summand2_1 = LPESummand -- A ? z [x==0] >-> P(1)
+    summand2_1 = newLPESummand -- A ? z [x==0] >-> P(1)
         [varIdZ]
         [(chanIdA, [varIdZ])]
         (cstrEqual vexprX vexpr0)
-        (LPEProcInst [(varIdX, vexpr1)])
+        [(varIdX, vexpr1)]
     summand2_2 :: LPESummand
-    summand2_2 = LPESummand -- A ? y [x==1] >-> P(0)
+    summand2_2 = newLPESummand -- A ? y [x==1] >-> P(0)
         [varIdY]
         [(chanIdA, [varIdY])]
         (cstrAnd (Set.fromList [cstrEqual vexprX vexpr1]))
-        (LPEProcInst [(varIdX, vexpr0)])
+        [(varIdX, vexpr0)]
     lpeInstance2 :: LPEInstance
-    lpeInstance2 = ([chanIdA], [(varIdX, vexpr0)], [summand2_1, summand2_2])
+    lpeInstance2 = newLPEInstance ([chanIdA], [(varIdX, vexpr0)], [summand2_1, summand2_2])
 -- testCleanUnreachable
 
 ---------------------------------------------------------------------------

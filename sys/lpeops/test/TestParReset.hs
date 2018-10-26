@@ -37,58 +37,58 @@ testParResetBasic = TestCase $ do
     tryLPEOperation parReset lpeInstance1 lpeInstance2
   where
     summand1_1 :: LPESummand
-    summand1_1 = LPESummand -- A ? z [x==0] >-> P(1, z)
+    summand1_1 = newLPESummand -- A ? z [x==0] >-> P(1, z)
         [varIdZ]
         [(chanIdA, [varIdZ])]
         (cstrEqual vexprX vexpr0)
-        (LPEProcInst [(varIdX, vexpr1), (varIdY, vexprZ)])
+        [(varIdX, vexpr1), (varIdY, vexprZ)]
     summand1_2 :: LPESummand
-    summand1_2 = LPESummand -- A ? z [x==1 && z==y] >-> P(2, y)
+    summand1_2 = newLPESummand -- A ? z [x==1 && z==y] >-> P(2, y)
         [varIdZ]
         [(chanIdA, [varIdZ])]
         (cstrAnd (Set.fromList [cstrEqual vexprX vexpr1, cstrEqual vexprZ vexprY]))
-        (LPEProcInst [(varIdX, vexpr2), (varIdY, vexprY)])
+        [(varIdX, vexpr2), (varIdY, vexprY)]
     summand1_3 :: LPESummand
-    summand1_3 = LPESummand -- A ? z [x==2] >-> P(3, y)
+    summand1_3 = newLPESummand -- A ? z [x==2] >-> P(3, y)
         []
         []
         (cstrEqual vexprX vexpr2)
-        (LPEProcInst [(varIdX, vexpr3), (varIdY, vexprY)])
+        [(varIdX, vexpr3), (varIdY, vexprY)]
     summand1_4 :: LPESummand
-    summand1_4 = LPESummand -- A ? z [x==3] >-> P(0, y)
+    summand1_4 = newLPESummand -- A ? z [x==3] >-> P(0, y)
         []
         []
         (cstrEqual vexprX vexpr3)
-        (LPEProcInst [(varIdX, vexpr0), (varIdY, vexprY)])
+        [(varIdX, vexpr0), (varIdY, vexprY)]
     lpeInstance1 :: LPEInstance
-    lpeInstance1 = ([chanIdA], [(varIdX, vexpr0), (varIdY, anyInt)], [summand1_1, summand1_2, summand1_3, summand1_4])
+    lpeInstance1 = newLPEInstance ([chanIdA], [(varIdX, vexpr0), (varIdY, anyInt)], [summand1_1, summand1_2, summand1_3, summand1_4])
     
     summand2_1 :: LPESummand
-    summand2_1 = LPESummand -- A ? z [x==0] >-> P(1, z)
+    summand2_1 = newLPESummand -- A ? z [x==0] >-> P(1, z)
         [varIdZ]
         [(chanIdA, [varIdZ])]
         (cstrEqual vexprX vexpr0)
-        (LPEProcInst [(varIdX, vexpr1), (varIdY, vexprZ)])
+        [(varIdX, vexpr1), (varIdY, vexprZ)]
     summand2_2 :: LPESummand
-    summand2_2 = LPESummand -- A ? z [x==1 && z==y] >-> P(2, ANY int)
+    summand2_2 = newLPESummand -- A ? z [x==1 && z==y] >-> P(2, ANY int)
         [varIdZ]
         [(chanIdA, [varIdZ])]
         (cstrAnd (Set.fromList [cstrEqual vexprX vexpr1, cstrEqual vexprZ vexprY]))
-        (LPEProcInst [(varIdX, vexpr2), (varIdY, anyInt)])
+        [(varIdX, vexpr2), (varIdY, anyInt)]
     summand2_3 :: LPESummand
-    summand2_3 = LPESummand -- A ? z [x==2] >-> P(3, ANY int)
+    summand2_3 = newLPESummand -- A ? z [x==2] >-> P(3, ANY int)
         []
         []
         (cstrEqual vexprX vexpr2)
-        (LPEProcInst [(varIdX, vexpr3), (varIdY, anyInt)])
+        [(varIdX, vexpr3), (varIdY, anyInt)]
     summand2_4 :: LPESummand
-    summand2_4 = LPESummand -- A ? z [x==3] >-> P(0, ANY int)
+    summand2_4 = newLPESummand -- A ? z [x==3] >-> P(0, ANY int)
         []
         []
         (cstrEqual vexprX vexpr3)
-        (LPEProcInst [(varIdX, vexpr0), (varIdY, anyInt)])
+        [(varIdX, vexpr0), (varIdY, anyInt)]
     lpeInstance2 :: LPEInstance
-    lpeInstance2 = ([chanIdA], [(varIdX, vexpr0), (varIdY, anyInt)], [summand2_1, summand2_2, summand2_3, summand2_4])
+    lpeInstance2 = newLPEInstance ([chanIdA], [(varIdX, vexpr0), (varIdY, anyInt)], [summand2_1, summand2_2, summand2_3, summand2_4])
 -- testParResetBasic
 
 ---------------------------------------------------------------------------
