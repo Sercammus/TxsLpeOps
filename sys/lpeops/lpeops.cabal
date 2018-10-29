@@ -50,6 +50,7 @@ library
                       , behave
                       , behaveenv
                       , coreenv
+                      , deepseq
                       , solve
                       , defs
                       , bexpr
@@ -106,6 +107,7 @@ test-suite lpeops-test
                      , MissingH
                      , behave
                      , coreenv
+                     , deepseq
                      , solve
                      , defs
                      , bexpr

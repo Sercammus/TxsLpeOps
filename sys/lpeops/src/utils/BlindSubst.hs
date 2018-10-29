@@ -25,8 +25,8 @@ doBlindParamEqsSubst
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.State as MonadState
-import qualified Control.Exception as Exception
 import qualified EnvCore as IOC
+import qualified EnvData
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified TxsDefs
@@ -59,7 +59,13 @@ eliminateAny expr = do
     eliminateAnyVisitorM _ (view -> Vconst (Cany sort)) = do
         do varId <- createFreshVar sort
            return (ValExprVisitorOutput (cstrVar varId) 1 (Set.singleton varId))
-    eliminateAnyVisitorM xs x = defaultValExprVisitorM (Set.unions (map customData xs)) xs x
+    eliminateAnyVisitorM xs x = do
+        vo <- MonadState.liftIO $ tryDefaultValExprVisitor (Set.unions (map customData xs)) xs x
+        case vo of
+          Left _ -> do IOC.putMsgs [ EnvData.TXS_CORE_ANY "Error found and caught (eliminateAny)!" ]
+                       varId <- createFreshVar (SortOf.sortOf x)
+                       return (ValExprVisitorOutput (cstrVar varId) 1 (Set.singleton varId))
+          Right r -> return r
 -- eliminateAny
 
 -- Applies a substitution to the given expression, introducing 'undefined variables' (as defined above) where necessary.
@@ -79,11 +85,14 @@ doBlindSubst subst expr = do
     -- However, reconstruction of the parent expression might fail (because something was substituted incorrectly),
     -- in which case we return 'ANY <sort>' instead:
     substVisitor subExps parentExpr = do
-        vo <- MonadState.lift $ Exception.catch (defaultValExprVisitorM () subExps parentExpr) handler
-        return (ValExprVisitorOutput (expression vo) 1 ())
-      where
-        handler :: Exception.SomeException -> IO (ValExprVisitorOutput ())
-        handler _ = do return (ValExprVisitorOutput (cstrConst (Cany (SortOf.sortOf parentExpr))) 1 ())
+        vo <- MonadState.liftIO $ tryDefaultValExprVisitor () subExps parentExpr
+        case vo of
+          Left _ -> do IOC.putMsgs [ EnvData.TXS_CORE_ANY "Error found and caught (doBlindSubst)!" ]
+                       return (ValExprVisitorOutput (cstrConst (Cany (SortOf.sortOf parentExpr))) 1 ())
+          Right r -> return r
+      -- where
+        -- handler :: Exception.SomeException -> IO (ValExprVisitorOutput ())
+        -- handler _ = do return (ValExprVisitorOutput (cstrConst (Cany (SortOf.sortOf parentExpr))) 1 ())
 -- doBlindSubst
 
 -- Convenience method:
