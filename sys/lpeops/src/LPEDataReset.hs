@@ -23,14 +23,15 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified FreeVar
 import qualified TxsDefs
--- import qualified EnvCore as IOC
--- import qualified EnvData
+import qualified EnvCore as IOC
+import qualified EnvData
 import LPEOps
 import LPEParUsage
 import VarId
 
 dataReset :: LPEOperation
 dataReset (channels, initParamEqs, summands) _out invariant = do
+    IOC.putMsgs [ EnvData.TXS_CORE_ANY "<<dataReset>>" ]
     let params = Map.keys initParamEqs
     paramUsagePerSummand <- getParamUsagePerSummand summands params invariant
     let controlFlowParams = getControlFlowParams summands paramUsagePerSummand params

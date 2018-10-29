@@ -23,6 +23,7 @@ import qualified Control.Monad       as Monad
 import qualified Data.Map            as Map
 import qualified Data.Set            as Set
 import qualified EnvCore             as IOC
+import qualified EnvData
 import qualified TxsDefs
 import           LPEOps
 import           LPEParRemoval
@@ -36,6 +37,7 @@ import           Constant
 -- State spaces before and after are isomorph.
 constElm :: LPEOperation
 constElm lpe@((_channels, initParamEqs, _summands)) _out invariant = do
+    IOC.putMsgs [ EnvData.TXS_CORE_ANY "<<constElm>>" ]
     constParams <- getConstParams lpe invariant (Map.keysSet initParamEqs)
     newLPE <- removeParsFromLPE constParams lpe
     return (Right newLPE)

@@ -49,6 +49,7 @@ getConfluentTauSummands summands invariant = do
 -- Flags confluent ISTEPs by renaming them to CISTEPs.
 confCheck :: LPEOperation
 confCheck (channels, paramEqs, summands) _out invariant = do
+    IOC.putMsgs [ EnvData.TXS_CORE_ANY "<<confCheck>>" ]
     confluentTauSummands <- getConfluentTauSummands summands invariant
     let noConfluentTauSummands = (Set.fromList summands) Set.\\ (Set.fromList confluentTauSummands)
     let newSummands = Set.union noConfluentTauSummands (Set.fromList (map flagTauSummand confluentTauSummands))
@@ -122,6 +123,7 @@ checkConfluenceCondition (summand1@(LPESummand _channelVars1 _channelOffers1 gua
 -- Appends confluent ISTEPs to predecessor summands.
 confElm :: LPEOperation
 confElm (channels, paramEqs, summands) _out invariant = do
+    IOC.putMsgs [ EnvData.TXS_CORE_ANY "<<confElm>>" ]
     confluentTauSummands <- getConfluentTauSummands summands invariant
     if confluentTauSummands == []
     then do return $ Right (channels, paramEqs, summands)

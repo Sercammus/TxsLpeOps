@@ -21,6 +21,8 @@ parElm
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified TxsDefs
+import qualified EnvCore as IOC
+import qualified EnvData
 import qualified FreeVar
 import qualified VarId
 import LPEOps
@@ -29,6 +31,7 @@ import LPEParRemoval
 -- Eliminates inert parameters (=parameters that do not contribute to the behavior of a process) from an LPE:
 parElm :: LPEOperation
 parElm lpeInstance@((_channels, paramEqs, summands)) _out _invariant = do
+    IOC.putMsgs [ EnvData.TXS_CORE_ANY "<<parElm>>" ]
     let allParams = Set.fromList (Map.keys paramEqs)
     let guardParams = Set.unions (map (Set.fromList . FreeVar.freeVars . getGuard) summands)
     -- All parameters are initially assumed to be inert, except those used in a guard.

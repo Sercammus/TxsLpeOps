@@ -23,6 +23,7 @@ import qualified Data.Map            as Map
 import qualified Control.Monad       as Monad
 import qualified Data.Set            as Set
 import qualified EnvCore             as IOC
+import qualified EnvData
 import qualified ChanId
 import qualified TxsDefs
 import qualified VarId
@@ -35,6 +36,7 @@ import Satisfiability
 -- (so basically we do a partial, symbolic reachability analysis).
 cleanLPE :: LPEOperation
 cleanLPE (channels, initParamEqs, summands) _out invariant = do
+    IOC.putMsgs [ EnvData.TXS_CORE_ANY "<<clean>>" ]
     uniqueSummands <- Monad.foldM addSummandIfUnique [] summands
     predecessorSummands <- Monad.foldM addSummandIfPredecessor [] uniqueSummands
     return (Right (channels, initParamEqs, predecessorSummands))
