@@ -37,7 +37,7 @@ getPossiblePredecessors allSummands invariant (LPESummand _channelVars _channelO
     addSummandIfPossiblePredecessor soFar (LPESummand _ _ _ LPEStop) = do return soFar
     addSummandIfPossiblePredecessor soFar summand@(LPESummand _ _ g (LPEProcInst paramEqs)) = do
       guard' <- doBlindSubst paramEqs guard
-      sat <- isSatisfiable (cstrAnd (Set.fromList [g, guard'])) invariant
+      sat <- couldBeSatisfiable (cstrAnd (Set.fromList [g, guard'])) invariant
       return $ if sat then soFar ++ [summand] else soFar
 -- getPossibleSuccessors
 
@@ -54,7 +54,7 @@ getPossibleSuccessors allSummands invariant (LPESummand _channelVars _channelOff
     addSummandIfPossibleSuccessor :: [LPESummand] -> LPESummand -> IOC.IOC [LPESummand]
     addSummandIfPossibleSuccessor soFar summand@(LPESummand _ _ g _) = do
       g' <- doBlindSubst paramEqs g
-      sat <- isSatisfiable (cstrAnd (Set.fromList [guard, g'])) invariant
+      sat <- couldBeSatisfiable (cstrAnd (Set.fromList [guard, g'])) invariant
       return $ if sat then soFar ++ [summand] else soFar
 -- getPossibleSuccessors
 

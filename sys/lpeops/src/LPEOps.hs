@@ -31,7 +31,7 @@ import           LPETypes
 import           LPEPrettyPrint
 
 lpeOpsVersion :: String
-lpeOpsVersion = "0.5.0"
+lpeOpsVersion = "0.6.5"
 
 data LPEOp = LPEOpLoop | LPEOp LPEOperation
 
@@ -71,12 +71,12 @@ lpeOperation _ops [] lpeInstances _out _invariant = do return (Right lpeInstance
 lpeOperation ops (LPEOpLoop:xs) (lpeInstance:ys) out invariant =
     if lpeInstance `elem` ys
     then do lpeOperation ops xs (lpeInstance:ys) out invariant
-    else do lpeOperation ops ops (lpeInstance:ys) out invariant
+    else do lpeOperation ops ops (lpeInstance:lpeInstance:ys) out invariant
 lpeOperation ops ((LPEOp op):xs) (lpeInstance:ys) out invariant = do
     eitherNewLPEInstance <- op lpeInstance out invariant
     case eitherNewLPEInstance of
       Left msgs -> do return (Left msgs)
-      Right newLPE -> do lpeOperation ops xs (newLPE:lpeInstance:ys) out invariant
+      Right newLPE -> do lpeOperation ops xs (newLPE:ys) out invariant
 -- lpeOperation
 
 discardLPE :: LPEOperation

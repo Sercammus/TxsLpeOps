@@ -34,7 +34,6 @@ import           Constant
 
 -- LPE rewrite method.
 -- Eliminates parameters that always have the same value from an LPE.
--- State spaces before and after are isomorph.
 constElm :: LPEOperation
 constElm lpe@((_channels, initParamEqs, _summands)) _out invariant = do
     IOC.putMsgs [ EnvData.TXS_CORE_ANY "<<constElm>>" ]

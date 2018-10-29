@@ -34,24 +34,24 @@ import           VarId
 import           ValExpr
 import           LPESuccessors
 
-import Debug.Trace
+--import Debug.Trace
 
 mapGet :: (Show a, Ord a) => Map.Map a b -> a -> b
 mapGet m k =
-    trace ("mapGet(" ++ (show k) ++ ")") (
+    --trace ("mapGet(" ++ (show k) ++ ")") (
       if Map.member k m
       then m Map.! k
       else error ("Could not find " ++ (show k) ++ " in map!")
-    )
+    --)
 -- mapGet
 
 mapGetS :: (Show a, Ord a) => LPESummand -> Map.Map a b -> a -> b
 mapGetS s m k =
-    trace ("mapGetS(" ++ (show k) ++ ")") (
+    --trace ("mapGetS(" ++ (show k) ++ ")") (
       if Map.member k m
       then m Map.! k
       else error ("Could not find " ++ (show k) ++ " in map!\nSummand: " ++ (showLPESummand s))
-    )
+    --)
 -- mapGetS
 
 -- LPE rewrite method.
@@ -73,10 +73,9 @@ parReset lpeInstance@((_channels, paramEqs, summands)) _out invariant = do
 -- With the final information, assign ANY values to variables that are unused:
 parResetLoop :: LPEInstance -> TxsDefs.VExpr -> [(LPESummand, [LPESummand], [VarId])] -> IOC.IOC LPEInstance
 parResetLoop lpeInstance@(channels, initParamEqs, summands) invariant successorsPerSummand = do
-    let newSuccessorsPerSummand = parResetUpdate lpeInstance successorsPerSummand
+    let newSuccessorsPerSummand = parResetUpdate successorsPerSummand
     if newSuccessorsPerSummand == successorsPerSummand
-    then do IOC.putMsgs [ EnvData.TXS_CORE_ANY "Resetting the following parameters:" ]
-            newSummands <- Monad.mapM (resetParamsInSummand lpeInstance invariant successorsPerSummand) summands
+    then do newSummands <- Monad.mapM (resetParamsInSummand lpeInstance invariant successorsPerSummand) summands
             return (channels, initParamEqs, newSummands)
     else parResetLoop lpeInstance invariant newSuccessorsPerSummand
 -- parResetLoop
@@ -101,7 +100,7 @@ resetParamsInSummand (_, initParamEqs, summands) invariant successorsPerSummand 
     printNewParamEqs newParamEqs = do
         let changedParamEqs = Map.filterWithKey (\p v -> v /= (mapGet paramEqs p)) newParamEqs
         let Just summandNumber = (List.elemIndex summand summands)
-        Monad.mapM_ (\((p, v)) -> IOC.putMsgs [ EnvData.TXS_CORE_ANY ("\t" ++ (Text.unpack (VarId.name p)) ++ " := " ++ (showValExpr v) ++ " instead of " ++ (showValExpr (mapGet paramEqs p)) ++ " in " ++ (numberToString (summandNumber + 1)) ++ " summand") ]) (Map.toList changedParamEqs)
+        Monad.mapM_ (\((p, v)) -> IOC.putMsgs [ EnvData.TXS_CORE_ANY ("Setting " ++ (Text.unpack (VarId.name p)) ++ " to " ++ (showValExpr v) ++ " instead of " ++ (showValExpr (mapGet paramEqs p)) ++ " in " ++ (numberToString (summandNumber + 1)) ++ " summand") ]) (Map.toList changedParamEqs)
     -- printNewParamEqs
     
     summandToConstraint :: LPEParamEqs -> LPESummand -> IOC.IOC TxsDefs.VExpr
@@ -121,12 +120,9 @@ resetParamsInSummand (_, initParamEqs, summands) invariant successorsPerSummand 
     -- numberToString
 -- resetParamsInSummand
 
-showSuccessorsPerSummand :: (LPESummand, [LPESummand], [VarId]) -> String
-showSuccessorsPerSummand (s, _, uvars) = (showLPESummand s ) ++ " -----> { " ++ (List.intercalate ", " (map (\p -> Text.unpack (VarId.name p)) uvars)) ++ " }"
-
 -- Updates the information collected about summands, in particular their lists of used variables:
-parResetUpdate :: LPEInstance -> [(LPESummand, [LPESummand], [VarId])] -> [(LPESummand, [LPESummand], [VarId])]
-parResetUpdate i successorsPerSummand = map updateSummand successorsPerSummand
+parResetUpdate :: [(LPESummand, [LPESummand], [VarId])] -> [(LPESummand, [LPESummand], [VarId])]
+parResetUpdate successorsPerSummand = map updateSummand successorsPerSummand
   where
     -- Initially, all variables are added to the list of used variables of a summand.
     -- They are removed only if:
@@ -141,25 +137,18 @@ parResetUpdate i successorsPerSummand = map updateSummand successorsPerSummand
     getRelevantToSuccessorVars successor@(LPESummand _channelVars channelOffers guard procInst) =
         let usedVars = concat [uvars | (s, _g, uvars) <- successorsPerSummand, s == successor] in
         
-        let offensiveVars = (case procInst of
-                              LPEProcInst paramEqs -> [u | u <- usedVars, Map.notMember u paramEqs]
-                              _ -> []) in
+        -- Parameters in the guard are relevant to the successor, because they enable/disable the channel+instantiation:
+        let guardVars = Set.fromList (FreeVar.freeVars guard) in
         
-        if offensiveVars /= []
-        then error ("offensiveVars = " ++ (show offensiveVars) ++ "\n" ++ (showLPEInstance i) ++ "\n" ++ (List.intercalate "\n" (map showSuccessorsPerSummand successorsPerSummand)))
-        else 
-          -- Parameters in the guard are relevant to the successor, because they enable/disable the channel+instantiation:
-          let guardVars = Set.fromList (FreeVar.freeVars guard) in
-          
-          -- Parameters used in assignments to used variables are relevant (because the variables are used):
-          let assignmentVars = (case procInst of
-                                  LPEProcInst paramEqs -> Set.fromList (concat [FreeVar.freeVars (mapGetS successor paramEqs u) | u <- usedVars])
-                                  _ -> Set.empty) in
-          
-          -- The successor communicates via these variables, so their values are NOT relevant to the successor:
-          let channelOfferVars = Set.fromList (concat (map snd channelOffers)) in
-          
-          -- Combine them all:
-            (Set.union guardVars assignmentVars) Set.\\ channelOfferVars
+        -- Parameters used in assignments to used variables are relevant (because the variables are used):
+        let assignmentVars = (case procInst of
+                                LPEProcInst paramEqs -> Set.fromList (concat [FreeVar.freeVars (mapGetS successor paramEqs u) | u <- usedVars])
+                                _ -> Set.empty) in
+        
+        -- The successor communicates via these variables, so their values are NOT relevant to the successor:
+        let channelOfferVars = Set.fromList (concat (map snd channelOffers)) in
+        
+        -- Combine them all:
+          (Set.union guardVars assignmentVars) Set.\\ channelOfferVars
 -- parResetUpdate
 

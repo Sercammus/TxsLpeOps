@@ -19,6 +19,7 @@ module Satisfiability (
 getSomeSolution,
 isTautology,
 isSatisfiable,
+couldBeSatisfiable,
 isNotSatisfiable,
 areSatisfiable,
 areNotSatisfiable,
@@ -86,6 +87,15 @@ defaultInvariant = cstrConst (Constant.Cbool True)
 -- Checks if the specified expression cannot be false.
 isTautology :: TxsDefs.VExpr -> TxsDefs.VExpr -> IOC.IOC Bool
 isTautology expr invariant = isNotSatisfiable (cstrNot expr) invariant
+
+-- Checks if the specified expression can be true.
+couldBeSatisfiable :: TxsDefs.VExpr -> TxsDefs.VExpr -> IOC.IOC Bool
+couldBeSatisfiable expr invariant = do
+    sol <- getSomeSolution expr invariant []
+    case sol of
+      SolveDefs.Unsolvable -> do return False
+      _ -> do return True
+-- couldBeSatisfiable
 
 -- Checks if the specified expression can be true.
 isSatisfiable :: TxsDefs.VExpr -> TxsDefs.VExpr -> IOC.IOC Bool

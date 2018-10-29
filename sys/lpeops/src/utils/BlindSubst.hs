@@ -26,7 +26,7 @@ doBlindParamEqsSubst
 import qualified Control.Monad as Monad
 import qualified Control.Monad.State as MonadState
 import qualified EnvCore as IOC
-import qualified EnvData
+-- import qualified EnvData
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified TxsDefs
@@ -62,7 +62,7 @@ eliminateAny expr = do
     eliminateAnyVisitorM xs x = do
         vo <- MonadState.liftIO $ tryDefaultValExprVisitor (Set.unions (map customData xs)) xs x
         case vo of
-          Left _ -> do IOC.putMsgs [ EnvData.TXS_CORE_ANY "Error found and caught (eliminateAny)!" ]
+          Left _ -> do -- IOC.putMsgs [ EnvData.TXS_CORE_ANY "Error found and caught (eliminateAny)!" ]
                        varId <- createFreshVar (SortOf.sortOf x)
                        return (ValExprVisitorOutput (cstrVar varId) 1 (Set.singleton varId))
           Right r -> return r
@@ -87,7 +87,7 @@ doBlindSubst subst expr = do
     substVisitor subExps parentExpr = do
         vo <- MonadState.liftIO $ tryDefaultValExprVisitor () subExps parentExpr
         case vo of
-          Left _ -> do IOC.putMsgs [ EnvData.TXS_CORE_ANY "Error found and caught (doBlindSubst)!" ]
+          Left _ -> do -- IOC.putMsgs [ EnvData.TXS_CORE_ANY "Error found and caught (doBlindSubst)!" ]
                        return (ValExprVisitorOutput (cstrConst (Cany (SortOf.sortOf parentExpr))) 1 ())
           Right r -> return r
       -- where

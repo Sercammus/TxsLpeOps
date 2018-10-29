@@ -52,7 +52,7 @@ cleanLPE (channels, initParamEqs, summands) _out invariant = do
     addSummandIfPredecessor soFar candidate@(LPESummand _channelVars _channelOffers guard _paramEqs) = do
         -- Check if the summand can be reached via the initial state:
         guard' <- doBlindSubst initParamEqs guard
-        sat <- isSatisfiable guard' invariant
+        sat <- couldBeSatisfiable guard' invariant
         if sat
         then do return (candidate:soFar)
         else do -- Check which summands could possible enable this summand:
