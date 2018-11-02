@@ -45,12 +45,12 @@ mapGet m k =
     --)
 -- mapGet
 
-mapGetS :: (Show a, Ord a) => LPESummand -> Map.Map a b -> a -> b
-mapGetS s m k =
+mapGetS :: (Show a, Ord a) => LPEInstance -> LPESummand -> Map.Map a b -> a -> b
+mapGetS i s m k =
     --trace ("mapGetS(" ++ (show k) ++ ")") (
       if Map.member k m
       then m Map.! k
-      else error ("Could not find " ++ (show k) ++ " in map!\nSummand: " ++ (showLPESummand s))
+      else error ("Could not find " ++ (show k) ++ " in map!\nSummand: " ++ (showLPESummand s) ++ "\nLPE: " ++ (showLPEInstance i))
     --)
 -- mapGetS
 
@@ -73,7 +73,7 @@ parReset lpeInstance@((_channels, paramEqs, summands)) _out invariant = do
 -- With the final information, assign ANY values to variables that are unused:
 parResetLoop :: LPEInstance -> TxsDefs.VExpr -> [(LPESummand, [LPESummand], [VarId])] -> IOC.IOC LPEInstance
 parResetLoop lpeInstance@(channels, initParamEqs, summands) invariant successorsPerSummand = do
-    let newSuccessorsPerSummand = parResetUpdate successorsPerSummand
+    let newSuccessorsPerSummand = parResetUpdate lpeInstance successorsPerSummand
     if newSuccessorsPerSummand == successorsPerSummand
     then do newSummands <- Monad.mapM (resetParamsInSummand lpeInstance invariant successorsPerSummand) summands
             return (channels, initParamEqs, newSummands)
@@ -121,8 +121,8 @@ resetParamsInSummand (_, initParamEqs, summands) invariant successorsPerSummand 
 -- resetParamsInSummand
 
 -- Updates the information collected about summands, in particular their lists of used variables:
-parResetUpdate :: [(LPESummand, [LPESummand], [VarId])] -> [(LPESummand, [LPESummand], [VarId])]
-parResetUpdate successorsPerSummand = map updateSummand successorsPerSummand
+parResetUpdate :: LPEInstance -> [(LPESummand, [LPESummand], [VarId])] -> [(LPESummand, [LPESummand], [VarId])]
+parResetUpdate i successorsPerSummand = map updateSummand successorsPerSummand
   where
     -- Initially, all variables are added to the list of used variables of a summand.
     -- They are removed only if:
@@ -134,7 +134,7 @@ parResetUpdate successorsPerSummand = map updateSummand successorsPerSummand
           (summand, successors, Set.toList relevantToSuccessorVars)
     
     getRelevantToSuccessorVars :: LPESummand -> Set.Set VarId
-    getRelevantToSuccessorVars successor@(LPESummand _channelVars channelOffers guard procInst) =
+    getRelevantToSuccessorVars successor@(LPESummand channelVars _channelOffers guard procInst) =
         let usedVars = concat [uvars | (s, _g, uvars) <- successorsPerSummand, s == successor] in
         
         -- Parameters in the guard are relevant to the successor, because they enable/disable the channel+instantiation:
@@ -142,13 +142,10 @@ parResetUpdate successorsPerSummand = map updateSummand successorsPerSummand
         
         -- Parameters used in assignments to used variables are relevant (because the variables are used):
         let assignmentVars = (case procInst of
-                                LPEProcInst paramEqs -> Set.fromList (concat [FreeVar.freeVars (mapGetS successor paramEqs u) | u <- usedVars])
+                                LPEProcInst paramEqs -> Set.fromList (concat [FreeVar.freeVars (mapGetS i successor paramEqs u) | u <- usedVars])
                                 _ -> Set.empty) in
         
-        -- The successor communicates via these variables, so their values are NOT relevant to the successor:
-        let channelOfferVars = Set.fromList (concat (map snd channelOffers)) in
-        
         -- Combine them all:
-          (Set.union guardVars assignmentVars) Set.\\ channelOfferVars
+          (Set.union guardVars assignmentVars) Set.\\ (Set.fromList channelVars)
 -- parResetUpdate
 
