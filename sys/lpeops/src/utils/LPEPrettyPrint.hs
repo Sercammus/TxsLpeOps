@@ -18,6 +18,7 @@ See LICENSE at root directory of this repository.
 {-# LANGUAGE FlexibleContexts    #-}
 module LPEPrettyPrint (
 showValExpr,
+showContextFreeValExpr,
 showLPEChannelOffer,
 showLPEParamEq,
 showLPESummand,
@@ -38,55 +39,68 @@ import qualified FuncId
 import qualified CstrId
 import qualified SortId
 import qualified ChanId
+import qualified FreeVar
 import LPETypes
 
+showCFValExpr :: Map.Map VarId String -> TxsDefs.VExpr -> String
+showCFValExpr _ (view -> Vconst (Cbool val))      = show val
+showCFValExpr _ (view -> Vconst (Cint val))       = show val
+showCFValExpr _ (view -> Vconst (Cstring val))    = show val
+showCFValExpr _ (view -> Vconst (Cregex val))     = show val
+showCFValExpr f (view -> Vconst (Ccstr cid pars)) = let newPars = map (showCFValExpr f . cstrConst) pars in
+                                                      (Text.unpack (CstrId.name cid)) ++ "(" ++ (separatedList newPars ", ") ++ ")"
+showCFValExpr _ (view -> Vconst (Cany sort))      = "ANY " ++ (Text.unpack (SortId.name sort))
+showCFValExpr f (view -> Vvar vid)                = f Map.! vid
+showCFValExpr f (view -> Vfunc fid vexps)         = let newVExps = map (showCFValExpr f) vexps in
+                                                      (Text.unpack (FuncId.name fid)) ++ "(" ++ (separatedList newVExps ", ") ++ ")"
+showCFValExpr f (view -> Vcstr cid vexps)         = let newVExps = map (showCFValExpr f) vexps in
+                                                      (Text.unpack (CstrId.name cid)) ++ "(" ++ (separatedList newVExps ", ") ++ ")"
+showCFValExpr f (view -> Viscstr cid vexp)        = let newVExp = showCFValExpr f vexp in
+                                                      "(" ++ newVExp ++ " is " ++ (Text.unpack (CstrId.name cid)) ++ ")"
+showCFValExpr f (view -> Vaccess cid p vexp)      = let newVExp = showCFValExpr f vexp in
+                                                      (Text.unpack (CstrId.name cid)) ++ "(" ++ newVExp ++ ")[" ++ (show p) ++ "]"
+showCFValExpr f (view -> Vite cond vexp1 vexp2)   = "if " ++ (showCFValExpr f cond) ++ " then " ++ (showCFValExpr f vexp1) ++ " else " ++ (showCFValExpr f vexp2) ++ " end"
+showCFValExpr f (view -> Vdivide t n)             = "(" ++ (showCFValExpr f t) ++ "/" ++ (showCFValExpr f n) ++ ")"
+showCFValExpr f (view -> Vmodulo t n)             = "(" ++ (showCFValExpr f t) ++ "%" ++ (showCFValExpr f n) ++ ")"
+showCFValExpr f (view -> Vgez v)                  = (showCFValExpr f v) ++ ">=0"
+showCFValExpr f (view -> Vsum s)                  = let newVExps = map (visitcOccur f) (FMX.toDistinctAscOccurListT s) in
+                                                      "(" ++ (separatedList newVExps "+") ++ ")"
+showCFValExpr f (view -> Vproduct p)              = let newVExps = map (visitcOccur f) (FMX.toDistinctAscOccurListT p) in
+                                                      "(" ++ (separatedList newVExps "*") ++ ")"
+showCFValExpr f (view -> Vequal vexp1 vexp2)      = "(" ++ (showCFValExpr f vexp1) ++ "==" ++ (showCFValExpr f vexp2) ++ ")"
+showCFValExpr f (view -> Vand vexps)              = let newVExps = map (showCFValExpr f) (Set.toList vexps) in
+                                                      "(" ++ (separatedList newVExps " && ") ++ ")"
+showCFValExpr f (view -> Vnot vexp)               = "not(" ++ (showCFValExpr f vexp) ++ ")"
+showCFValExpr f (view -> Vlength vexp)            = "length(" ++ (showCFValExpr f vexp) ++ ")"
+showCFValExpr f (view -> Vat s p)                 = (showCFValExpr f s) ++ "[" ++ (showCFValExpr f p) ++ "]"
+showCFValExpr f (view -> Vconcat vexps)           = let newVExps = map (showCFValExpr f) vexps in
+                                                      (separatedList newVExps ":")
+showCFValExpr f (view -> Vstrinre s r)            = "regex(" ++ (showCFValExpr f s) ++ ", " ++ (showCFValExpr f r) ++ ")"
+showCFValExpr f (view -> Vpredef kd fid vexps)    = let newVExps = map (showCFValExpr f) vexps in
+                                                      (Text.unpack (FuncId.name fid)) ++ "[" ++ (show kd) ++ "](" ++ (separatedList newVExps ", ") ++ ")"
+showCFValExpr _ expr                              = error ("LPEPrettyPrint.showCFValExpr not defined for " ++ (show expr))
+-- showCFValExpr
+
+visitcOccur :: Map.Map VarId String -> (TxsDefs.VExpr, Integer) -> String
+visitcOccur f (v, 1) = showCFValExpr f v
+visitcOccur f (v, n) = (showCFValExpr f v) ++ " times " ++ (show n)
+
 showValExpr :: TxsDefs.VExpr -> String
-showValExpr      (view -> Vconst (Cbool val))      = show val
-showValExpr      (view -> Vconst (Cint val))       = show val
-showValExpr      (view -> Vconst (Cstring val))    = show val
-showValExpr      (view -> Vconst (Cregex val))     = show val
-showValExpr      (view -> Vconst (Ccstr cid pars)) = let newPars = map (showValExpr . cstrConst) pars in
-                                                       (Text.unpack (CstrId.name cid)) ++ "(" ++ (separatedList newPars ", ") ++ ")"
-showValExpr      (view -> Vconst (Cany sort))      = "ANY " ++ (Text.unpack (SortId.name sort))
-showValExpr      (view -> Vvar vid)                = Text.unpack (VarId.name vid)
-showValExpr      (view -> Vfunc fid vexps)         = let newVExps = map showValExpr vexps in
-                                                       (Text.unpack (FuncId.name fid)) ++ "(" ++ (separatedList newVExps ", ") ++ ")"
-showValExpr      (view -> Vcstr cid vexps)         = let newVExps = map showValExpr vexps in
-                                                       (Text.unpack (CstrId.name cid)) ++ "(" ++ (separatedList newVExps ", ") ++ ")"
-showValExpr      (view -> Viscstr cid vexp)        = let newVExp = showValExpr vexp in
-                                                       "(" ++ newVExp ++ " is " ++ (Text.unpack (CstrId.name cid)) ++ ")"
-showValExpr      (view -> Vaccess cid p vexp)      = let newVExp = showValExpr vexp in
-                                                        (Text.unpack (CstrId.name cid)) ++ "(" ++ newVExp ++ ")[" ++ (show p) ++ "]"
-showValExpr      (view -> Vite cond vexp1 vexp2)   = "if " ++ (showValExpr cond) ++ " then " ++ (showValExpr vexp1) ++ " else " ++ (showValExpr vexp2) ++ " end"
-showValExpr      (view -> Vdivide t n)             = "(" ++ (showValExpr t) ++ "/" ++ (showValExpr n) ++ ")"
-showValExpr      (view -> Vmodulo t n)             = "(" ++ (showValExpr t) ++ "%" ++ (showValExpr n) ++ ")"
-showValExpr      (view -> Vgez v)                  = (showValExpr v) ++ ">=0"
-showValExpr      (view -> Vsum s)                  = let newVExps = map visitcOccur (FMX.toDistinctAscOccurListT s) in
-                                                       "(" ++ (separatedList newVExps "+") ++ ")"
-showValExpr      (view -> Vproduct p)              = let newVExps = map visitcOccur (FMX.toDistinctAscOccurListT p) in
-                                                       "(" ++ (separatedList newVExps "*") ++ ")"
-showValExpr      (view -> Vequal vexp1 vexp2)      = "(" ++ (showValExpr vexp1) ++ "==" ++ (showValExpr vexp2) ++ ")"
-showValExpr      (view -> Vand vexps)              = let newVExps = map showValExpr (Set.toList vexps) in
-                                                       "(" ++ (separatedList newVExps " && ") ++ ")"
-showValExpr      (view -> Vnot vexp)               = "!" ++ (showValExpr vexp)
-showValExpr      (view -> Vlength vexp)            = "length(" ++ (showValExpr vexp) ++ ")"
-showValExpr      (view -> Vat s p)                 = (showValExpr s) ++ "[" ++ (showValExpr p) ++ "]"
-showValExpr      (view -> Vconcat vexps)           = let newVExps = map showValExpr vexps in
-                                                       (separatedList newVExps ":")
-showValExpr      (view -> Vstrinre s r)            = "regex(" ++ (showValExpr s) ++ ", " ++ (showValExpr r) ++ ")"
-showValExpr      (view -> Vpredef kd fid vexps)    = let newVExps = map showValExpr vexps in
-                                                       (Text.unpack (FuncId.name fid)) ++ "[" ++ (show kd) ++ "](" ++ (separatedList newVExps ", ") ++ ")"
-showValExpr expr                                   = error ("LPEPrettyPrint.showValExpr not defined for " ++ (show expr))
+showValExpr expr =
+    let f = Map.fromList (map (\v -> (v, Text.unpack (VarId.name v))) (FreeVar.freeVars expr)) in
+      showCFValExpr f expr
 -- showValExpr
+
+showContextFreeValExpr :: TxsDefs.VExpr -> String
+showContextFreeValExpr expr =
+    let f = Map.fromList (map (\(v, n) -> (v, "var" ++ (show (n::Integer)))) (zip (FreeVar.freeVars expr) [1..])) in
+      showCFValExpr f expr
+-- showContextFreeValExpr
 
 separatedList :: [String] -> String -> String
 separatedList [] _ = ""
 separatedList [x] _ = x
 separatedList (x1:x2:xs) separator = x1 ++ separator ++ (separatedList (x2:xs) separator)
-
-visitcOccur :: (TxsDefs.VExpr, Integer) -> String
-visitcOccur (v, 1) = showValExpr v
-visitcOccur (v, n) = (showValExpr v) ++ " times " ++ (show n)
 
 showLPEChannelOffer :: LPEChannelOffer -> String
 showLPEChannelOffer (chanId, vars) = (Text.unpack (ChanId.name chanId)) ++ (concat (map (\v -> " ? " ++ (Text.unpack (VarId.name v))) vars))
@@ -103,7 +117,7 @@ showLPEParamEq :: (VarId, TxsDefs.VExpr) -> String
 showLPEParamEq (varId, expr) = (Text.unpack (VarId.name varId)) ++ " = " ++ (showValExpr expr)
 
 showLPEParamEqs :: LPEParamEqs -> String
-showLPEParamEqs paramEqs = List.intercalate ", " (map showLPEParamEq (Map.toList paramEqs))
+showLPEParamEqs paramEqs = List.intercalate "\n            , " (map showLPEParamEq (Map.toList paramEqs))
 
 showProcInst :: LPEProcInst -> String
 showProcInst LPEStop = "STOP"
@@ -126,7 +140,7 @@ showLPEInstance :: LPEInstance -> String
 showLPEInstance (chanIds, initParamEqs, summands) =
     "LPE[" ++ (List.intercalate "; " (map showChanDecl chanIds)) ++ "] (" ++
     (showLPEParamEqs initParamEqs) ++ ") ::=\n        " ++
-    (List.intercalate "\n     ## " (map showLPESummand summands)) ++ "\n;"
+    (List.intercalate "\n     ## " (map showLPESummand (Set.toList summands))) ++ "\n;"
 -- showLPEInstance
 
 showSubst :: Map.Map VarId TxsDefs.VExpr -> String
