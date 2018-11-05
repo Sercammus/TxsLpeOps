@@ -20,7 +20,8 @@ restoreTdefs,
 eliminateAny,
 doBlindSubst,
 doBlindParamEqSubst,
-doBlindParamEqsSubst
+doBlindParamEqsSubst,
+doConfidentSubst
 ) where
 
 import qualified Control.Monad as Monad
@@ -36,6 +37,7 @@ import VarId
 import ValExpr hiding (subst)
 import ValExprVisitor
 import VarFactory
+import ValFactory
 
 -- Manipulating expressions (e.g. blind substitutions before SAT-solving) may require helper variables.
 -- These variables are added to the TorXakis definitions in the environment of the monad.
@@ -69,7 +71,6 @@ eliminateAny expr = do
 -- eliminateAny
 
 -- Applies a substitution to the given expression, introducing 'undefined variables' (as defined above) where necessary.
--- Also returns the previous TorXakis definitions (so that they can be restored afterwards):
 doBlindSubst :: Map.Map VarId TxsDefs.VExpr -> TxsDefs.VExpr -> IOC.IOC TxsDefs.VExpr
 doBlindSubst subst expr = do
     visitorOutput <- visitValExprM substVisitor expr
@@ -87,12 +88,8 @@ doBlindSubst subst expr = do
     substVisitor subExps parentExpr = do
         vo <- MonadState.liftIO $ tryDefaultValExprVisitor () subExps parentExpr
         case vo of
-          Left _ -> do -- IOC.putMsgs [ EnvData.TXS_CORE_ANY "Error found and caught (doBlindSubst)!" ]
-                       return (ValExprVisitorOutput (cstrConst (Cany (SortOf.sortOf parentExpr))) 1 ())
+          Left _ -> do return (ValExprVisitorOutput (cstrConst (Cany (SortOf.sortOf parentExpr))) 1 ())
           Right r -> return r
-      -- where
-        -- handler :: Exception.SomeException -> IO (ValExprVisitorOutput ())
-        -- handler _ = do return (ValExprVisitorOutput (cstrConst (Cany (SortOf.sortOf parentExpr))) 1 ())
 -- doBlindSubst
 
 -- Convenience method:
@@ -107,5 +104,28 @@ doBlindParamEqsSubst subst target = do
     paramEqs <- Monad.mapM (doBlindParamEqSubst subst) (Map.toList target)
     return (Map.fromList paramEqs)
 -- doBlindParamEqsSubst
+
+-- Applies a substitution to the given expression, using default data expressions when encountering an undefined expressions.
+doConfidentSubst :: Map.Map VarId TxsDefs.VExpr -> TxsDefs.VExpr -> IOC.IOC TxsDefs.VExpr
+doConfidentSubst subst expr = do
+    txsdefs <- MonadState.gets (IOC.tdefs . IOC.state)
+    visitorOutput <- visitValExprM (substVisitor txsdefs) expr
+    return (expression visitorOutput)
+  where
+    substVisitor :: TxsDefs.TxsDefs -> [ValExprVisitorOutput ()] -> TxsDefs.VExpr -> IOC.IOC (ValExprVisitorOutput ())
+    -- If we find a variable, substitute it (only if it is present in substEqs, of course):
+    substVisitor _ _ (view -> Vvar varId) = do
+        case Map.lookup varId subst of
+          Just v -> do return (ValExprVisitorOutput v 1 ())
+          Nothing -> do return (ValExprVisitorOutput (cstrVar varId) 1 ())
+    -- In other cases, the parent expression inherits undefined variables from its sub-expressions.
+    -- However, reconstruction of the parent expression might fail (because something was substituted incorrectly),
+    -- in which case we return 'ANY <sort>' instead:
+    substVisitor tdefs subExps parentExpr = do
+        vo <- MonadState.liftIO $ tryDefaultValExprVisitor () subExps parentExpr
+        case vo of
+          Left _ -> do return (ValExprVisitorOutput (sort2defaultValue tdefs (SortOf.sortOf parentExpr)) 1 ())
+          Right r -> return r
+-- doConfidentSubst
 
 
