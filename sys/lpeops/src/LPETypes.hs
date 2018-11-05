@@ -27,7 +27,8 @@ newLPESummand,
 newLPEInstance,
 paramEqsLookup,
 toLPEInstance,
-fromLPEInstance
+fromLPEInstance,
+getScopeProblems
 ) where
 
 import qualified Control.Monad.State as MonadState
@@ -39,6 +40,7 @@ import qualified EnvCore as IOC
 import qualified SortOf
 import qualified TxsDefs
 import qualified TxsShow
+import qualified FreeVar
 import qualified ProcId
 import           VarId
 import           ChanId
@@ -60,7 +62,7 @@ type LPEInstance = ([TxsDefs.ChanId], LPEParamEqs, LPESummands)
 --  - Guard (restriction on when the summand can be 'applied').
 --  - STOP, or a number of parameter equations to be used for the recursive instantiation.
 data LPESummand = LPESummand [VarId] LPEChannelOffers TxsDefs.VExpr LPEProcInst deriving (Eq, Ord, Show)
-type LPESummands = [LPESummand]
+type LPESummands = Set.Set LPESummand
 
 -- Summands can end with a recursive instantiation of the LPE or with a STOP:
 data LPEProcInst = LPEStop | LPEProcInst LPEParamEqs deriving (Eq, Ord, Show)
@@ -84,8 +86,8 @@ toLPEParamEqs list = Map.fromList list
 newLPESummand :: [VarId] -> LPEChannelOffers -> TxsDefs.VExpr -> [(VarId, TxsDefs.VExpr)] -> LPESummand
 newLPESummand chanVarIds chanOffers guard procInstParamEqs = LPESummand chanVarIds chanOffers guard (LPEProcInst (toLPEParamEqs procInstParamEqs))
 
-newLPEInstance :: ([TxsDefs.ChanId], [(VarId, TxsDefs.VExpr)], LPESummands) -> LPEInstance
-newLPEInstance (chanIds, initParamEqs, summands) = (chanIds, toLPEParamEqs initParamEqs, summands)
+newLPEInstance :: ([TxsDefs.ChanId], [(VarId, TxsDefs.VExpr)], [LPESummand]) -> LPEInstance
+newLPEInstance (chanIds, initParamEqs, summands) = (chanIds, toLPEParamEqs initParamEqs, Set.fromList summands)
 
 -- Constructs an LPEInstance from a process expression (unless there is a problem).
 -- The process expression should be the instantiation of a process that is already linear.
@@ -102,7 +104,11 @@ toLPEInstance procInst = do
                 Left msgs -> do return (Left msgs)
                 Right eqs -> case getLPESummands procId procDef body of
                                Left msgs -> do return (Left msgs)
-                               Right summands -> do return (Right (chans, eqs, summands))
+                               Right summands -> let result = (chans, eqs, Set.fromList summands) in
+                                                 let scopeProblems = getScopeProblems result in
+                                                   if scopeProblems == []
+                                                   then do return (Right result)
+                                                   else do return (Left scopeProblems)
             Nothing -> do let definedProcessNames = List.intercalate " or " (map (Text.unpack . ProcId.name) (Map.keys procDefs))
                           return (Left ["Expected " ++ definedProcessNames ++ ", found " ++ (show (Text.unpack (ProcId.name procId))) ++ "!"])
           _ -> do return (Left ["Expression must be process instantiation, found " ++ (TxsShow.fshow (TxsDefs.view procInst)) ++ "!"])
@@ -129,7 +135,11 @@ getLPESummands expectedProcId expectedProcDef@(TxsDefs.ProcDef defChanIds params
                         Right eqs -> case concatEither (map (getChannelOffer params) (Set.toList offers)) of
                                        Left msgs -> Left msgs
                                        Right channelOffers -> let channelVars = (concat (map snd channelOffers)) ++ (Set.toList hiddenvars) in
-                                                                Right [LPESummand channelVars channelOffers constraint (LPEProcInst eqs)]
+                                                              let constructedSummand = LPESummand channelVars channelOffers constraint (LPEProcInst eqs) in
+                                                              let scopeProblems = getSummandScopeProblems (Set.fromList params) constructedSummand in
+                                                                if scopeProblems == []
+                                                                then Right [constructedSummand]
+                                                                else Left (("Invalid summand: " ++ (TxsShow.fshow expr)):scopeProblems)
           _ -> Left ["Expected process instantiation, but found " ++ (TxsShow.fshow (TxsDefs.view procInst)) ++ "!"]
       _ -> Left ["Expected choice or channel, but found " ++ (TxsShow.fshow (TxsDefs.view expr)) ++ "!"]
 -- getLPESummands
@@ -178,7 +188,7 @@ fromLPEInstance (chans, paramEqs, summands) procName = do
                                    , ProcId.procvars = map (VarId.varsort) orderedParams
                                    , ProcId.procexit = ProcId.NoExit }
     let newProcInit = TxsDefs.procInst newProcId chans (paramEqsLookup orderedParams paramEqs)
-    let newProcBody = TxsDefs.choice (Set.fromList (map (summandToBExpr newProcId orderedParams) summands))
+    let newProcBody = TxsDefs.choice (Set.fromList (map (summandToBExpr newProcId orderedParams) (Set.toList summands)))
     let newProcDef = TxsDefs.ProcDef chans orderedParams newProcBody
     return (newProcInit, newProcId, newProcDef)
   where
@@ -198,5 +208,31 @@ fromLPEInstance (chans, paramEqs, summands) procName = do
       offerToOffer :: LPEChannelOffer -> TxsDefs.Offer
       offerToOffer (chanId, chanVars) = TxsDefs.Offer { TxsDefs.chanid = chanId, TxsDefs.chanoffers = [TxsDefs.Quest var | var <- chanVars] }
 -- fromLPEInstance
+
+-- This method can detect certain problems with an LPE, making finding bugs in LPE operations easier:
+getScopeProblems :: LPEInstance -> [String]
+getScopeProblems (_chanIds, initParamEqs, summands) = concat (map (getSummandScopeProblems (Map.keysSet initParamEqs)) (Set.toList summands))
+
+getSummandScopeProblems :: Set.Set VarId -> LPESummand -> [String]
+getSummandScopeProblems scope (LPESummand channelVars _channelOffers guard procInst) =
+    let newScope = Set.union scope (Set.fromList channelVars) in
+      (checkExpr "Guard" newScope guard) ++ (checkProcInst newScope procInst)
+    -- checkSummand
+  where
+    checkProcInst :: Set.Set VarId -> LPEProcInst -> [String]
+    checkProcInst _ LPEStop = []
+    checkProcInst scp (LPEProcInst eqs) =
+        let nonExistentParameters = (Map.keysSet eqs) Set.\\ scope in
+          (map (\p -> "Process instantiation initializes non-existent parameter: " ++ (Text.unpack (VarId.name p)) ++ "!") (Set.toList nonExistentParameters))
+          ++
+          (concat (map ((checkExpr "Process instantiation" scp) . snd) (Map.toList eqs)))
+    -- checkProcInst
+    
+    checkExpr :: String -> Set.Set VarId -> TxsDefs.VExpr -> [String]
+    checkExpr description scp expr =
+        let outOfScope = (Set.fromList (FreeVar.freeVars expr)) Set.\\ scp in
+          (map (\v -> description ++ " uses out-of-scope variable: " ++ (Text.unpack (VarId.name v)) ++ "!") (Set.toList outOfScope))
+    -- checkExpr
+-- getSummandScopeProblems
 
 

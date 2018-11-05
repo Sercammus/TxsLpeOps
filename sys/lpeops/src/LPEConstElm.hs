@@ -53,7 +53,7 @@ getConstParams lpe invariant constParams = do
 getConstParamsForAllSummands :: LPEInstance -> TxsDefs.VExpr -> Set.Set VarId -> IOC.IOC (Set.Set VarId)
 getConstParamsForAllSummands (_channels, initParamEqs, summands) invariant constParams = do
     let subst = Map.restrictKeys initParamEqs constParams
-    constParamsPerSummand <- Monad.mapM (getConstParamsForSummand subst invariant constParams) summands
+    constParamsPerSummand <- Monad.mapM (getConstParamsForSummand subst invariant constParams) (Set.toList summands)
     return (foldl Set.intersection constParams constParamsPerSummand)
 -- getConstParamsForAllSummands
 

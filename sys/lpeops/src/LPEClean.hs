@@ -37,34 +37,53 @@ import Satisfiability
 cleanLPE :: LPEOperation
 cleanLPE (channels, initParamEqs, summands) _out invariant = do
     IOC.putMsgs [ EnvData.TXS_CORE_ANY "<<clean>>" ]
-    uniqueSummands <- Monad.foldM addSummandIfUnique [] summands
-    predecessorSummands <- Monad.foldM addSummandIfPredecessor [] uniqueSummands
-    return (Right (channels, initParamEqs, predecessorSummands))
+    uniqueSummands <- Monad.foldM addSummandIfUnique Set.empty (Set.toList summands)
+    Monad.when ((length uniqueSummands) < (Set.size summands)) (IOC.putMsgs [ EnvData.TXS_CORE_ANY ("Removed " ++ (show ((Set.size summands) - (length uniqueSummands))) ++ " duplicate summands") ])
+    initReachableSummands <- Monad.foldM addSummandIfReachableFromInit Set.empty uniqueSummands
+    reachableSummands <- reachableSummandsLoop initReachableSummands invariant (uniqueSummands Set.\\ initReachableSummands)
+    Monad.when ((length reachableSummands) < (length uniqueSummands)) (IOC.putMsgs [ EnvData.TXS_CORE_ANY ("Removed " ++ (show ((length uniqueSummands) - (length reachableSummands))) ++ " unreachable summands") ])
+    return (Right (channels, initParamEqs, reachableSummands))
   where
-    addSummandIfUnique :: LPESummands -> LPESummand -> IOC.IOC LPESummands
+    addSummandIfUnique :: Set.Set LPESummand -> LPESummand -> IOC.IOC (Set.Set LPESummand)
     addSummandIfUnique soFar candidate = do
-        found <- containsSummand soFar invariant candidate
+        found <- containsSummand (Set.toList soFar) invariant candidate
         if found
         then do return soFar
-        else do return (candidate:soFar)
+        else do return (Set.insert candidate soFar)
+    -- addSummandIfUnique
     
-    addSummandIfPredecessor :: LPESummands -> LPESummand -> IOC.IOC LPESummands
-    addSummandIfPredecessor soFar candidate@(LPESummand _channelVars _channelOffers guard _paramEqs) = do
+    addSummandIfReachableFromInit :: Set.Set LPESummand -> LPESummand -> IOC.IOC (Set.Set LPESummand)
+    addSummandIfReachableFromInit soFar candidate@(LPESummand _channelVars _channelOffers guard _paramEqs) = do
         -- Check if the summand can be reached via the initial state:
         guard' <- doBlindSubst initParamEqs guard
         sat <- couldBeSatisfiable guard' invariant
         if sat
-        then do return (candidate:soFar)
-        else do -- Check which summands could possible enable this summand:
-                predecessors <- getPossiblePredecessors summands invariant candidate
-                -- If the summand is only enabled by itself, it can still be safely deleted:
-                let predecessorsSet = Set.delete candidate (Set.fromList predecessors)
-                if predecessorsSet /= Set.empty
-                then do return (candidate:soFar)
-                else do return soFar
+        then do return (Set.insert candidate soFar)
+        else do return soFar
+    -- addSummandIfReachableFromInit
 -- cleanLPE
 
-containsSummand :: LPESummands -> TxsDefs.VExpr -> LPESummand -> IOC.IOC Bool
+reachableSummandsLoop :: Set.Set LPESummand -> TxsDefs.VExpr -> Set.Set LPESummand -> IOC.IOC (Set.Set LPESummand)
+reachableSummandsLoop reachableSummands invariant summands = do
+    IOC.putMsgs [ EnvData.TXS_CORE_ANY ("Reached " ++ (show (Set.size reachableSummands)) ++ " of " ++ (show ((Set.size reachableSummands) + (Set.size summands))) ++ " summands") ]
+    newReachableSummands <- Monad.foldM (updateReachableSummands reachableSummands invariant) reachableSummands summands
+    if newReachableSummands /= reachableSummands
+    then reachableSummandsLoop newReachableSummands invariant (summands Set.\\ newReachableSummands)
+    else do return newReachableSummands
+-- reachableSummandsLoop
+
+updateReachableSummands :: Set.Set LPESummand -> TxsDefs.VExpr -> Set.Set LPESummand -> LPESummand -> IOC.IOC (Set.Set LPESummand)
+updateReachableSummands reachableSummands invariant soFar summand = do
+    -- Check which summands could possible enable this summand:
+    predecessors <- getPossiblePredecessors reachableSummands invariant summand
+    -- If the summand is enabled by other summands than itself, it must be reachable:
+    let predecessorsSet = Set.delete summand (Set.fromList predecessors)
+    if predecessorsSet /= Set.empty
+    then do return (Set.insert summand soFar)
+    else do return soFar
+-- updateReachableSummands
+
+containsSummand :: [LPESummand] -> TxsDefs.VExpr -> LPESummand -> IOC.IOC Bool
 containsSummand [] _ _ = do return False
 containsSummand (x:xs) invariant summand = do
     equiv <- isEquivalentSummand x summand invariant

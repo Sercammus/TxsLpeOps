@@ -77,7 +77,7 @@ lpe2mcrl2' (channels, paramEqs, summands) out _invariant = do
     (lpeProcName, lpeProc) <- createLPEProcess orderedParams
     modifySpec $ (\spec -> spec { MCRL2Defs.processes = Map.fromList [(lpeProcName, lpeProc)] })
     -- Translate LPE body:
-    newSummands <- Monad.mapM (summand2summand (lpeProcName, lpeProc) orderedParams) summands
+    newSummands <- Monad.mapM (summand2summand (lpeProcName, lpeProc) orderedParams) (Set.toList summands)
     let newProcess = lpeProc { MCRL2Defs.expr = MCRL2Defs.PChoice newSummands }
     modifySpec $ (\spec -> spec { MCRL2Defs.processes = Map.insert lpeProcName newProcess (MCRL2Defs.processes spec) })
     -- Translate LPE initialization:

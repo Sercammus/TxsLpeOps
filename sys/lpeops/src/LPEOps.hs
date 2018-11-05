@@ -54,7 +54,7 @@ lpeOperations operations procInst out invariant = do
     eitherLPEInstance <- toLPEInstance procInst
     case eitherLPEInstance of
       Left msgs -> do return (Left msgs)
-      Right lpeInstance -> do eitherNewLPEInstances <- lpeOperation operations operations [lpeInstance] out invariant
+      Right lpeInstance -> do eitherNewLPEInstances <- lpeOperation operations operations [lpeInstance, lpeInstance] out invariant
                               case eitherNewLPEInstances of
                                 Left msgs -> do return (Left msgs)
                                 Right [] -> do return (Left ["No output LPE found!"])
@@ -76,7 +76,10 @@ lpeOperation ops ((LPEOp op):xs) (lpeInstance:ys) out invariant = do
     eitherNewLPEInstance <- op lpeInstance out invariant
     case eitherNewLPEInstance of
       Left msgs -> do return (Left msgs)
-      Right newLPE -> do lpeOperation ops xs (newLPE:ys) out invariant
+      Right newLPE -> let scopeProblems = getScopeProblems newLPE in
+                        if scopeProblems == []
+                        then do lpeOperation ops xs (newLPE:ys) out invariant
+                        else do return (Left scopeProblems)
 -- lpeOperation
 
 discardLPE :: LPEOperation

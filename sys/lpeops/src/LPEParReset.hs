@@ -61,8 +61,8 @@ parReset :: LPEOperation
 parReset lpeInstance@((_channels, paramEqs, summands)) _out invariant = do
     IOC.putMsgs [ EnvData.TXS_CORE_ANY "<<parReset>>" ]
     IOC.putMsgs [ EnvData.TXS_CORE_ANY "Identifying successors..." ]
-    possibleSuccessors <- Monad.mapM (getPossibleSuccessors summands invariant) summands
-    let successorsPerSummand = zipWith (\s i -> (s, i, Map.keys paramEqs)) summands possibleSuccessors
+    possibleSuccessors <- Monad.mapM (getPossibleSuccessors summands invariant) (Set.toList summands)
+    let successorsPerSummand = zipWith (\s i -> (s, i, Map.keys paramEqs)) (Set.toList summands) possibleSuccessors
     IOC.putMsgs [ EnvData.TXS_CORE_ANY "Analyzing control flow..." ]
     newLPE <- parResetLoop lpeInstance invariant successorsPerSummand
     return (Right newLPE)
@@ -75,8 +75,8 @@ parResetLoop :: LPEInstance -> TxsDefs.VExpr -> [(LPESummand, [LPESummand], [Var
 parResetLoop lpeInstance@(channels, initParamEqs, summands) invariant successorsPerSummand = do
     let newSuccessorsPerSummand = parResetUpdate lpeInstance successorsPerSummand
     if newSuccessorsPerSummand == successorsPerSummand
-    then do newSummands <- Monad.mapM (resetParamsInSummand lpeInstance invariant successorsPerSummand) summands
-            return (channels, initParamEqs, newSummands)
+    then do newSummands <- Monad.mapM (resetParamsInSummand lpeInstance invariant successorsPerSummand) (Set.toList summands)
+            return (channels, initParamEqs, Set.fromList newSummands)
     else parResetLoop lpeInstance invariant newSuccessorsPerSummand
 -- parResetLoop
 
@@ -86,7 +86,7 @@ resetParamsInSummand (_, initParamEqs, summands) invariant successorsPerSummand 
     case [ (sucs, uvars) | (smd, sucs, uvars) <- successorsPerSummand, smd == summand ] of
       [(sucs, uvars)] -> if (length uvars) == (length initParamEqs)
                          then do return summand -- (All variables are used, apparently, so do not touch the summand.)
-                         else do let nonSuccessors = Set.toList ((Set.fromList summands) Set.\\ (Set.fromList sucs))
+                         else do let nonSuccessors = Set.toList (summands Set.\\ (Set.fromList sucs))
                                  let newParamEqs = Map.union (Map.filterWithKey (\p _ -> p `elem` uvars) paramEqs) (Map.filterWithKey (\p _ -> not (p `elem` uvars)) initParamEqs)
                                  constraints <- Monad.mapM (summandToConstraint newParamEqs) nonSuccessors
                                  notSat <- areNotSatisfiable constraints invariant
@@ -99,7 +99,7 @@ resetParamsInSummand (_, initParamEqs, summands) invariant successorsPerSummand 
     printNewParamEqs :: LPEParamEqs -> IOC.IOC ()
     printNewParamEqs newParamEqs = do
         let changedParamEqs = Map.filterWithKey (\p v -> v /= (mapGet paramEqs p)) newParamEqs
-        let Just summandNumber = (List.elemIndex summand summands)
+        let Just summandNumber = (List.elemIndex summand (Set.toList summands))
         Monad.mapM_ (\((p, v)) -> IOC.putMsgs [ EnvData.TXS_CORE_ANY ("Setting " ++ (Text.unpack (VarId.name p)) ++ " to " ++ (showValExpr v) ++ " instead of " ++ (showValExpr (mapGet paramEqs p)) ++ " in " ++ (numberToString (summandNumber + 1)) ++ " summand") ]) (Map.toList changedParamEqs)
     -- printNewParamEqs
     
@@ -147,5 +147,6 @@ parResetUpdate i successorsPerSummand = map updateSummand successorsPerSummand
         
         -- Combine them all:
           (Set.union guardVars assignmentVars) Set.\\ (Set.fromList channelVars)
+          --Set.intersection (Set.union guardVars assignmentVars) (Map.keysSet )
 -- parResetUpdate
 

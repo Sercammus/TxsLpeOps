@@ -20,7 +20,6 @@ confCheck,
 confElm
 ) where
 
-import qualified Data.List           as List
 import qualified Data.Map            as Map
 import qualified Control.Monad       as Monad
 import qualified Data.Set            as Set
@@ -40,9 +39,9 @@ chanIdConfluentIstep = ChanId (Text.pack "CISTEP") 969 []
 
 getConfluentTauSummands :: LPESummands -> TxsDefs.VExpr -> IOC.IOC LPESummands
 getConfluentTauSummands summands invariant = do
-    confluentTauSummands <- Monad.filterM (isConfluentTauSummand summands invariant) (filter isTauSummand summands)
+    confluentTauSummands <- Monad.filterM (isConfluentTauSummand (Set.toList summands) invariant) (filter isTauSummand (Set.toList summands))
     IOC.putMsgs [ EnvData.TXS_CORE_ANY ("Detected " ++ (show (length confluentTauSummands)) ++ " confluent ISTEP summand(s)!") ]
-    return confluentTauSummands
+    return (Set.fromList confluentTauSummands)
 -- getConfluentTauSummands
 
 -- LPE rewrite method.
@@ -51,9 +50,9 @@ confCheck :: LPEOperation
 confCheck (channels, paramEqs, summands) _out invariant = do
     IOC.putMsgs [ EnvData.TXS_CORE_ANY "<<confCheck>>" ]
     confluentTauSummands <- getConfluentTauSummands summands invariant
-    let noConfluentTauSummands = (Set.fromList summands) Set.\\ (Set.fromList confluentTauSummands)
-    let newSummands = Set.union noConfluentTauSummands (Set.fromList (map flagTauSummand confluentTauSummands))
-    do return (Right (channels, paramEqs, Set.toList newSummands))
+    let noConfluentTauSummands = summands Set.\\ confluentTauSummands
+    let newSummands = Set.union noConfluentTauSummands (Set.map flagTauSummand confluentTauSummands)
+    do return (Right (channels, paramEqs, newSummands))
 -- confCheck
 
 isTauSummand :: LPESummand -> Bool
@@ -125,12 +124,13 @@ confElm :: LPEOperation
 confElm (channels, paramEqs, summands) _out invariant = do
     IOC.putMsgs [ EnvData.TXS_CORE_ANY "<<confElm>>" ]
     confluentTauSummands <- getConfluentTauSummands summands invariant
-    if confluentTauSummands == []
+    if confluentTauSummands == Set.empty
     then do return $ Right (channels, paramEqs, summands)
-    else do definiteSuccessors <- Monad.mapM (getDefiniteSuccessors summands invariant) summands
-            let confluentTauSuccessors = map (List.intersect confluentTauSummands) definiteSuccessors
-            mergedSummands <- Monad.mapM mergeZippedSummands (zip summands confluentTauSuccessors)
-            return $ Right (channels, paramEqs, mergedSummands)
+    else do let orderedSummands = Set.toList summands
+            definiteSuccessors <- Monad.mapM (getDefiniteSuccessors summands invariant) orderedSummands
+            let confluentTauSuccessors = map (Set.toList . (Set.intersection confluentTauSummands) . Set.fromList) definiteSuccessors
+            mergedSummands <- Monad.mapM mergeZippedSummands (zip orderedSummands confluentTauSuccessors)
+            return $ Right (channels, paramEqs, Set.fromList mergedSummands)
   where
     mergeZippedSummands :: (LPESummand, [LPESummand]) -> IOC.IOC LPESummand
     mergeZippedSummands (summand, []) = do return summand

@@ -60,23 +60,29 @@ getSomeSolution expr _invariant variables =
             return SolveDefs.UnableToSolve
     else do smtEnv <- IOC.getSMT "current"
             (tdefs, expr1, undefs) <- eliminateAny expr
+            --IOC.putMsgs [ EnvData.TXS_CORE_ANY ("expr1 = " ++ (showContextFreeValExpr expr1)) ]
             let freeVars1 = Set.union (Set.fromList ((FreeVar.freeVars expr1) ++ variables)) undefs
             let assertions1 = Solve.add expr1 Solve.empty
             (sol1, _) <- MonadState.lift $ MonadState.runStateT (Solve.solve (Set.toList freeVars1) assertions1) smtEnv
             case sol1 of
               SolveDefs.Solved solMap ->
-                do let freeVars2 = undefs
-                   let blindSubstVars = Set.toList (freeVars1 Set.\\ freeVars2)
-                   let blindSubst = Map.fromList (map (\v -> (v, cstrConst (solMap Map.! v))) blindSubstVars)
-                   expr2 <- doBlindSubst blindSubst expr1
-                   let assertions2 = Solve.add (cstrNot expr2) Solve.empty
-                   (sol2, _) <- MonadState.lift $ MonadState.runStateT (Solve.solve (Set.toList freeVars2) assertions2) smtEnv
-                   case sol2 of
-                     SolveDefs.Unsolvable -> do restoreTdefs tdefs
-                                                let newSolMap = Map.fromList (map (\v -> (v, Map.findWithDefault (sort2defaultConst tdefs (SortOf.sortOf v)) v solMap)) variables)
-                                                return (SolveDefs.Solved newSolMap)
-                     _ -> do restoreTdefs tdefs
-                             return SolveDefs.UnableToSolve
+                do if undefs == Set.empty
+                   then do restoreTdefs tdefs
+                           let newSolMap = Map.fromList (map (\v -> (v, Map.findWithDefault (sort2defaultConst tdefs (SortOf.sortOf v)) v solMap)) variables)
+                           return (SolveDefs.Solved newSolMap)
+                   else do let freeVars2 = undefs
+                           let blindSubstVars = Set.toList (freeVars1 Set.\\ freeVars2)
+                           let blindSubst = Map.fromList (map (\v -> (v, cstrConst (solMap Map.! v))) blindSubstVars)
+                           expr2 <- doBlindSubst blindSubst expr1
+                           --IOC.putMsgs [ EnvData.TXS_CORE_ANY ("expr2 = " ++ (showContextFreeValExpr expr2)) ]
+                           let assertions2 = Solve.add (cstrNot expr2) Solve.empty
+                           (sol2, _) <- MonadState.lift $ MonadState.runStateT (Solve.solve (Set.toList freeVars2) assertions2) smtEnv
+                           case sol2 of
+                             SolveDefs.Unsolvable -> do restoreTdefs tdefs
+                                                        let newSolMap = Map.fromList (map (\v -> (v, Map.findWithDefault (sort2defaultConst tdefs (SortOf.sortOf v)) v solMap)) variables)
+                                                        return (SolveDefs.Solved newSolMap)
+                             _ -> do restoreTdefs tdefs
+                                     return SolveDefs.UnableToSolve
               otherResult -> do restoreTdefs tdefs
                                 return otherResult
 -- getSomeSolution
