@@ -58,6 +58,8 @@ import Relabel (relabel)
 import Subst
 import SortOf
 
+import TxsShow
+
 -- ----------------------------------------------------------------------------------------- --
 -- Types :
 -- ----------------------------------------------------------------------------------------- --
@@ -608,12 +610,12 @@ lpePar (TxsDefs.view -> ProcInst procIdInst chansInst _paramsInst) translatedPro
           updateProcInstL :: [VarId] -> ProcId -> [ChanId] -> BExpr -> BExpr
           updateProcInstL opParamsR' procIdPAR' chansDefPar (TxsDefs.view -> ActionPref actOfferL (TxsDefs.view -> ProcInst _procIdInstL _chansInstL paramsInstL)) =
               actionPref actOfferL (procInst procIdPAR' chansDefPar (paramsInstL ++ map cstrVar opParamsR'))
-          updateProcInstL _ _ _ _ = error "only allowed with ActionPref >-> ProcInst"
+          updateProcInstL _ _ _ v = error ("ActionPref >-> ProcInst expected on lhs of ||, found " ++ (fshow v) ++ "!")
           
           updateProcInstR :: [VarId] -> ProcId -> [ChanId] -> BExpr -> BExpr
           updateProcInstR opParamsL' procIdPAR' chansDefPar (TxsDefs.view -> ActionPref actOfferR (TxsDefs.view -> ProcInst _procIdInstR _chansInstR paramsInstR)) =
               actionPref actOfferR (procInst procIdPAR' chansDefPar (map cstrVar opParamsL' ++ paramsInstR))
-          updateProcInstR _ _ _ _ = error "only allowed with ActionPref >-> ProcInst"
+          updateProcInstR _ _ _ v = error ("ActionPref >-> ProcInst expected on rhs of ||, found " ++ (fshow v) ++ "!")
           
       -- accu = (opNr, steps, params, procDefs)
       -- foldl : (a -> b -> a) -> a -> [b] -> a

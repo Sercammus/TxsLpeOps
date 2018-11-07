@@ -135,7 +135,4 @@ MODELDEF Model ::=
 
     BEHAVIOUR
         model [In_Material, Correction, ProduceReport, Material, MeasureReport, Out_Material]()
-        -- correct [ ProduceReport, MeasureReport, Correction ] ( ) -- WORKS
-        -- measure [ Material, MeasureReport, Out_Material ] ( ) -- WORKS
-        -- produce [ In_Material, Correction, Material, ProduceReport ] ( ) -- WORKS
 ENDDEF
