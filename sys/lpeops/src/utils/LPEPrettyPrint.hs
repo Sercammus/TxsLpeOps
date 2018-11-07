@@ -33,7 +33,7 @@ import qualified Data.Text as Text
 import qualified FreeMonoidX as FMX
 import Constant hiding (sort)
 import VarId
-import ValExpr
+import ValExpr hiding (subst)
 import qualified TxsDefs
 import qualified FuncId
 import qualified CstrId
@@ -144,5 +144,5 @@ showLPEInstance (chanIds, initParamEqs, summands) =
 -- showLPEInstance
 
 showSubst :: Map.Map VarId TxsDefs.VExpr -> String
-showSubst substMap = "Subst [" ++ (showLPEParamEqs substMap) ++ "]"
+showSubst subst = "[" ++ (List.intercalate ", " (map (\(p, v) -> (Text.unpack (VarId.name p)) ++ " := " ++ (showValExpr v)) (Map.toList subst))) ++ "]"
 

@@ -27,7 +27,7 @@ doConfidentSubst
 import qualified Control.Monad as Monad
 import qualified Control.Monad.State as MonadState
 import qualified EnvCore as IOC
--- import qualified EnvData
+import qualified EnvData
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified TxsDefs
@@ -38,6 +38,8 @@ import ValExpr hiding (subst)
 import ValExprVisitor
 import VarFactory
 import ValFactory
+import LPETypes
+import LPEPrettyPrint
 
 -- Manipulating expressions (e.g. blind substitutions before SAT-solving) may require helper variables.
 -- These variables are added to the TorXakis definitions in the environment of the monad.
@@ -64,8 +66,7 @@ eliminateAny expr = do
     eliminateAnyVisitorM xs x = do
         vo <- MonadState.liftIO $ tryDefaultValExprVisitor (Set.unions (map customData xs)) xs x
         case vo of
-          Left _ -> do -- IOC.putMsgs [ EnvData.TXS_CORE_ANY "Error found and caught (eliminateAny)!" ]
-                       varId <- createFreshVar (SortOf.sortOf x)
+          Left _ -> do varId <- createFreshVar (SortOf.sortOf x)
                        return (ValExprVisitorOutput (cstrVar varId) 1 (Set.singleton varId))
           Right r -> return r
 -- eliminateAny
@@ -106,8 +107,8 @@ doBlindParamEqsSubst subst target = do
 -- doBlindParamEqsSubst
 
 -- Applies a substitution to the given expression, using default data expressions when encountering an undefined expressions.
-doConfidentSubst :: Map.Map VarId TxsDefs.VExpr -> TxsDefs.VExpr -> IOC.IOC TxsDefs.VExpr
-doConfidentSubst subst expr = do
+doConfidentSubst :: LPESummand -> Map.Map VarId TxsDefs.VExpr -> TxsDefs.VExpr -> IOC.IOC TxsDefs.VExpr
+doConfidentSubst contextSummand subst expr = do
     txsdefs <- MonadState.gets (IOC.tdefs . IOC.state)
     visitorOutput <- visitValExprM (substVisitor txsdefs) expr
     return (expression visitorOutput)
@@ -124,8 +125,15 @@ doConfidentSubst subst expr = do
     substVisitor tdefs subExps parentExpr = do
         vo <- MonadState.liftIO $ tryDefaultValExprVisitor () subExps parentExpr
         case vo of
-          Left _ -> do return (ValExprVisitorOutput (sort2defaultValue tdefs (SortOf.sortOf parentExpr)) 1 ())
+          Left _ -> do let defaultValue = sort2defaultValue tdefs (SortOf.sortOf parentExpr)
+                       IOC.putMsgs [ EnvData.TXS_CORE_RUNTIME_WARNING ("WARNING: Confidently substituted " ++ (showValExpr defaultValue) ++ " for " ++ (showValExpr parentExpr) ++ (showSubst subst)
+                                       ++ "\nExpression: " ++ (showValExpr expr)
+                                       ++ "\nSummand: " ++ (showLPESummand contextSummand)) ]
+                       return (ValExprVisitorOutput defaultValue 1 ())
           Right r -> return r
 -- doConfidentSubst
+
+
+
 
 

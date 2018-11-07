@@ -44,19 +44,19 @@ removeParsFromLPE targetParams lpeInstance@(channels, paramEqs, summands)
     -- Eliminates parameters from a summand.
     -- Note that channel variables are always fresh, and therefore do not have to be substituted:
     removeParsFromSummand :: Map.Map VarId TxsDefs.VExpr -> LPESummand -> IOC.IOC LPESummand
-    removeParsFromSummand rho (LPESummand channelVars channelOffers guard procInst) = do
-        guard' <- doConfidentSubst rho guard
-        procInst' <- removeParsFromProcInst rho procInst
+    removeParsFromSummand rho contextSummand@(LPESummand channelVars channelOffers guard procInst) = do
+        guard' <- doConfidentSubst contextSummand rho guard
+        procInst' <- removeParsFromProcInst contextSummand rho procInst
         return (LPESummand channelVars channelOffers guard' procInst')
     
     -- Eliminates parameters from a process instantiation:
-    removeParsFromProcInst :: Map.Map VarId TxsDefs.VExpr -> LPEProcInst -> IOC.IOC LPEProcInst
-    removeParsFromProcInst rho (LPEProcInst eqs) = do
+    removeParsFromProcInst :: LPESummand -> Map.Map VarId TxsDefs.VExpr -> LPEProcInst -> IOC.IOC LPEProcInst
+    removeParsFromProcInst contextSummand rho (LPEProcInst eqs) = do
         let withoutTargetParams = Map.toList (Map.withoutKeys eqs targetParams)
-        newAssignments <- Monad.mapM (doConfidentSubst rho) (map snd withoutTargetParams)
+        newAssignments <- Monad.mapM (doConfidentSubst contextSummand rho) (map snd withoutTargetParams)
         let newEqs = Map.fromList (zip (map fst withoutTargetParams) newAssignments)
         return (LPEProcInst newEqs)
-    removeParsFromProcInst _ LPEStop = do return LPEStop
+    removeParsFromProcInst _ _ LPEStop = do return LPEStop
 -- removeParsFromLPE
 
 
