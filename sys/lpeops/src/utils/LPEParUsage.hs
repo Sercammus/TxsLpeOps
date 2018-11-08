@@ -17,22 +17,21 @@ See LICENSE at root directory of this repository.
 module LPEParUsage (
 LPEParamUsage(..),
 showLPEParamUsage,
-extractParamUsage,
+showLPEParamUsagePerSummand,
 getParamUsagePerSummand,
 getParamSourcesPerSummand,
 getParamDestinationsPerSummand,
 getUsedParamsPerSummand,
 getChangedParamsPerSummand,
-getDirectlyUsedParamsPerSummand,
-mapGet
+getDirectlyUsedParamsPerSummand
 ) where
 
--- import qualified Control.Monad       as Monad
+import qualified Control.Monad       as Monad
+import qualified Data.List           as List
 import qualified Data.Map            as Map
 import qualified Data.Set            as Set
 import qualified Data.Text           as Text
 import qualified EnvCore             as IOC
--- import qualified EnvData
 import qualified FreeVar
 import qualified SolveDefs
 import qualified TxsDefs
@@ -44,153 +43,141 @@ import           ValExpr
 import           VarFactory
 import Constant hiding (sort)
 
--- import Debug.Trace
+-- Just for convenience, not used anywhere else:
+type ParamsPerSummand = Map.Map LPESummand (Set.Set VarId)
 
-mapGet :: (Show a, Ord a) => Map.Map a b -> a -> b
-mapGet m k =
-    --trace ("mapGet(" ++ (show k) ++ ")") (
-      if Map.member k m
-      then m Map.! k
-      else error ("Could not find " ++ (show k) ++ " in map!")
-    --)
--- mapGet
-
-data LPEParamUsage = LPEParamUsage { directlyUsedParams :: [VarId]
-                                   , changedParams :: [VarId]
-                                   , usedParams :: [VarId]
-                                   , rulingParams :: [VarId]
-                                   , paramSources :: Map.Map VarId TxsDefs.VExpr
-                                   , paramDestinations :: Map.Map VarId TxsDefs.VExpr
-                                   }
+data LPEParamUsage = LPEParamUsage { directlyUsedParams :: Set.Set VarId
+                                   , changedParams :: Set.Set VarId
+                                   , usedParams :: Set.Set VarId
+                                   , rulingParams :: Set.Set VarId
+                                   , paramSources :: LPEParamEqs
+                                   , paramDestinations :: LPEParamEqs
+                                   } deriving (Eq)
 -- LPEParamUsage
 
 showLPEParamUsage :: LPEParamUsage -> String
 showLPEParamUsage paramUsage =
-    "directly used params = {" ++ (showVarIds (directlyUsedParams paramUsage)) ++ "}\n" ++
-    "changed params = {" ++ (showVarIds (changedParams paramUsage)) ++ "}\n" ++
-    "used params = {" ++ (showVarIds (usedParams paramUsage)) ++ "}\n" ++
-    "param sources = {" ++ (showMap (Map.toList (paramSources paramUsage))) ++ "}\n" ++
-    "param destinations = {" ++ (showMap (Map.toList (paramDestinations paramUsage))) ++ "}\n"
+    "|-> Directly used = {" ++ (showVarIds (directlyUsedParams paramUsage)) ++ "}\n" ++
+    "|-> Changed = {" ++ (showVarIds (changedParams paramUsage)) ++ "}\n" ++
+    "|-> Used = {" ++ (showVarIds (usedParams paramUsage)) ++ "}\n" ++
+    "|-> Ruling = {" ++ (showVarIds (rulingParams paramUsage)) ++ "}\n" ++
+    "|-> Sources = " ++ (showSubst (paramSources paramUsage)) ++ "\n" ++
+    "\\-> Destinations = " ++ (showSubst (paramDestinations paramUsage)) ++ "\n"
   where
-    showVarIds :: [VarId] -> String
-    showVarIds [] = ""
-    showVarIds [v] = Text.unpack (VarId.name v)
-    showVarIds (v1:v2:vs) = (showVarIds [v1]) ++ ", " ++ (showVarIds (v2:vs))
-    
-    showMap :: [(VarId, TxsDefs.VExpr)] -> String
-    showMap [] = ""
-    showMap [(v, e)] = (Text.unpack (VarId.name v)) ++ " := " ++ (showValExpr e)
-    showMap (v1:v2:vs) = (showMap [v1]) ++ ", " ++ (showMap (v2:vs))
+    showVarIds :: Set.Set VarId -> String
+    showVarIds vs = List.intercalate ", " (map (Text.unpack . VarId.name) (Set.toList vs))
 -- showLPEParamUsage
 
-extractParamUsage :: LPESummand -> Map.Map LPESummand LPEParamUsage -> LPEParamUsage
-extractParamUsage summand paramUsagePerSummand = Map.findWithDefault (LPEParamUsage [] [] [] [] Map.empty Map.empty) summand paramUsagePerSummand
+showLPEParamUsagePerSummand :: Map.Map LPESummand LPEParamUsage -> String
+showLPEParamUsagePerSummand paramUsages = concat (map (\(s, m) -> "\nSummand:\n\\-> " ++ (showLPESummand s) ++ "\nParameter usage:\n" ++ m) (Map.toList (Map.map showLPEParamUsage paramUsages)))
 
-getParamUsagePerSummand :: [LPESummand] -> [VarId] -> TxsDefs.VExpr -> IOC.IOC (Map.Map LPESummand LPEParamUsage)
+getParamUsagePerSummand :: LPESummands -> Set.Set VarId -> TxsDefs.VExpr -> IOC.IOC (Map.Map LPESummand LPEParamUsage)
 getParamUsagePerSummand summands params invariant = do
     let directlyUsedParamsPerSummand = getDirectlyUsedParamsPerSummand summands params
     changedParamsPerSummand <- getChangedParamsPerSummand summands params invariant
     let usedParamsPerSummand = getUsedParamsPerSummand summands directlyUsedParamsPerSummand changedParamsPerSummand
     paramSourcesPerSummand <- getParamSourcesPerSummand summands params invariant
     paramDestinationsPerSummand <- getParamDestinationsPerSummand summands params invariant
-    let result = map (\summand -> let summandParamSources = Map.findWithDefault Map.empty summand paramSourcesPerSummand in
-                                  let summandParamDestinations = Map.findWithDefault Map.empty summand paramDestinationsPerSummand in
-                                    (summand, LPEParamUsage { directlyUsedParams = Map.findWithDefault [] summand directlyUsedParamsPerSummand
-                                                            , changedParams      = Map.findWithDefault [] summand changedParamsPerSummand
-                                                            , usedParams         = Map.findWithDefault [] summand usedParamsPerSummand
-                                                            , rulingParams       = Map.keys (Map.intersection summandParamSources summandParamDestinations)
-                                                            , paramSources       = summandParamSources
-                                                            , paramDestinations  = summandParamDestinations
-                                                            })) summands
-    -- Monad.mapM_ (\(s, u) -> IOC.putMsgs [ EnvData.TXS_CORE_ANY ("summand: " ++ (showLPESummand s) ++ "\n" ++ (showLPEParamUsage u)) ]) result
-    return (Map.fromList result)
+    return (Map.fromSet (\summand -> let summandParamSources = paramSourcesPerSummand Map.! summand in
+                                     let summandParamDestinations = paramDestinationsPerSummand Map.! summand in
+                                       LPEParamUsage { directlyUsedParams = directlyUsedParamsPerSummand Map.! summand 
+                                                     , changedParams      = changedParamsPerSummand Map.! summand
+                                                     , usedParams         = usedParamsPerSummand Map.! summand
+                                                     , rulingParams       = Map.keysSet (Map.intersection summandParamSources summandParamDestinations)
+                                                     , paramSources       = paramSourcesPerSummand Map.! summand
+                                                     , paramDestinations  = paramDestinationsPerSummand Map.! summand
+                                                     }) summands)
 -- getParamUsagePerSummand
 
-getParamSourcesPerSummand :: [LPESummand] -> [VarId] -> TxsDefs.VExpr -> IOC.IOC (Map.Map LPESummand (Map.Map VarId TxsDefs.VExpr))
-getParamSourcesPerSummand [] _ _invariant = do return Map.empty
-getParamSourcesPerSummand (x:xs) params invariant = do
-    parSources <- getParamSources x params
-    xs' <- getParamSourcesPerSummand xs params invariant
-    return (Map.insert x parSources xs')
+getParamSourcesPerSummand :: LPESummands -> Set.Set VarId -> TxsDefs.VExpr -> IOC.IOC (Map.Map LPESummand LPEParamEqs)
+getParamSourcesPerSummand summands params invariant = do
+    let orderedSummands = Set.toList summands
+    dests <- Monad.mapM getParamSources orderedSummands
+    return (Map.fromList (zip orderedSummands dests))
   where
-    getParamSources :: LPESummand -> [VarId] -> IOC.IOC (Map.Map VarId TxsDefs.VExpr)
-    getParamSources _ [] = do return Map.empty
-    getParamSources summand@(LPESummand _channelVars _channelOffers guard _) (p:ps) = do
-        ps' <- getParamSources summand ps
-        srcSolution <- getUniqueSolution guard invariant [] [p]
-        case srcSolution of
-          SolveDefs.Solved srcSolMap -> do return (Map.insert p (cstrConst (mapGet srcSolMap p)) ps')
-          _ -> do return ps'
+    getParamSources :: LPESummand -> IOC.IOC LPEParamEqs
+    getParamSources summand = do
+        dests <- Monad.mapM (getParamSource summand) (Set.toList params)
+        do return (Map.unions dests)
+    -- getParamSources
+    
+    getParamSource :: LPESummand -> VarId -> IOC.IOC LPEParamEqs
+    getParamSource (LPESummand _ _ guard _) param = do
+        guardSolution <- getUniqueSolution guard invariant [] [param]
+        case guardSolution of
+          SolveDefs.Solved gdSolMap -> do return (Map.singleton param (cstrConst (gdSolMap Map.! param)))
+          _ -> do return Map.empty
+    -- getParamSource
 -- getParamSourcesPerSummand
 
-getParamDestinationsPerSummand :: [LPESummand] -> [VarId] -> TxsDefs.VExpr -> IOC.IOC (Map.Map LPESummand (Map.Map VarId TxsDefs.VExpr))
-getParamDestinationsPerSummand [] _ _invariant = do return Map.empty
-getParamDestinationsPerSummand (x:xs) params invariant = do
-    parDestinations <- getParamDestinations x params
-    xs' <- getParamDestinationsPerSummand xs params invariant
-    return (Map.insert x parDestinations xs')
+getParamDestinationsPerSummand :: LPESummands -> Set.Set VarId -> TxsDefs.VExpr -> IOC.IOC (Map.Map LPESummand LPEParamEqs)
+getParamDestinationsPerSummand summands params invariant = do
+    let orderedSummands = Set.toList summands
+    dests <- Monad.mapM getParamDestinations orderedSummands
+    return (Map.fromList (zip orderedSummands dests))
   where
-    getParamDestinations :: LPESummand -> [VarId] -> IOC.IOC (Map.Map VarId TxsDefs.VExpr)
-    getParamDestinations _ [] = do return Map.empty
-    getParamDestinations summand (p:ps) = do
-        ps' <- getParamDestinations summand ps
-        (destVar, destSatExpr) <- constructDestSatExpr summand p invariant
+    getParamDestinations :: LPESummand -> IOC.IOC LPEParamEqs
+    getParamDestinations summand = do
+        dests <- Monad.mapM (getParamDestination summand) (Set.toList params)
+        do return (Map.unions dests)
+    -- getParamDestinations
+    
+    getParamDestination :: LPESummand -> VarId -> IOC.IOC LPEParamEqs
+    getParamDestination summand param = do
+        (destVar, destSatExpr) <- constructDestSatExpr summand param
         destSolution <- getUniqueSolution destSatExpr invariant [] [destVar]
         case destSolution of
-          SolveDefs.Solved destSolMap -> do return (Map.insert p (cstrConst (Map.findWithDefault (error "sdhfl") destVar destSolMap)) ps')
-          _ -> do return ps'
+          SolveDefs.Solved destSolMap -> do return (Map.singleton param (cstrConst (destSolMap Map.! destVar)))
+          _ -> do return Map.empty
+    -- getParamDestination
 -- getParamDestinationsPerSummand
 
 -- Finds the parameters that are 'used' by the specified summands.
 -- A parameter that is 'used' by a summand is one that:
---    + Occurs in the guard, or
---    + Occurs in the assignment to a variable (in the process instantiation).
-getUsedParamsPerSummand :: [LPESummand] -> Map.Map LPESummand [VarId] -> Map.Map LPESummand [VarId] -> Map.Map LPESummand [VarId]
-getUsedParamsPerSummand [] _directlyUsedParamsPerSummand _changedParamsPerSummand = Map.empty
-getUsedParamsPerSummand (x:xs) directlyUsedParamsPerSummand changedParamsPerSummand =
-    let usedPars = getUsedParams x in
-    let xs' = getUsedParamsPerSummand xs directlyUsedParamsPerSummand changedParamsPerSummand in
-      Map.insert x usedPars xs'
+--  + Occurs in the guard (which means that it is marked as 'directly used'), or
+--  + Occurs in the assignment to a variable (in the process instantiation) that is marked as 'changed'.
+getUsedParamsPerSummand :: LPESummands -> ParamsPerSummand -> ParamsPerSummand -> ParamsPerSummand
+getUsedParamsPerSummand summands directlyUsedParamsPerSummand changedParamsPerSummand =
+    Map.fromSet getUsedParams summands
   where
-    getUsedParams :: LPESummand -> [VarId]
-    getUsedParams summand@(LPESummand _channelVars _channelOffers _guard LPEStop) =
-        Map.findWithDefault [] summand directlyUsedParamsPerSummand
-    getUsedParams summand@(LPESummand _channelVars _channelOffers _guard (LPEProcInst paramEqs)) =
-        let changedPars = Map.findWithDefault [] summand changedParamsPerSummand in
-        let assignments = map (mapGet paramEqs) changedPars in
-        let indirectlyUsedPars = Set.unions (map (Set.fromList . FreeVar.freeVars) assignments) in
-        let directlyUsedPars = Set.fromList (Map.findWithDefault [] summand directlyUsedParamsPerSummand) in
-          Set.toList (Set.intersection (Map.keysSet paramEqs) (Set.union indirectlyUsedPars directlyUsedPars))
+    getUsedParams :: LPESummand -> Set.Set VarId
+    getUsedParams summand@(LPESummand _ _ _ LPEStop) = directlyUsedParamsPerSummand Map.! summand
+    getUsedParams summand@(LPESummand _ _ _ (LPEProcInst paramEqs)) =
+        let changedPars = changedParamsPerSummand Map.! summand in
+        let changedParsAssignments = Map.restrictKeys paramEqs changedPars in
+        let directlyUsedPars = directlyUsedParamsPerSummand Map.! summand in
+        let indirectlyUsedPars = Set.unions (map (Set.fromList . FreeVar.freeVars) (Map.elems changedParsAssignments)) in
+          Set.intersection (Map.keysSet paramEqs) (Set.union indirectlyUsedPars directlyUsedPars)
 -- getUsedParamsPerSummand
 
--- Finds the parameters that are changed by a summand, for all specified summands.
-getChangedParamsPerSummand :: [LPESummand] -> [VarId] -> TxsDefs.VExpr -> IOC.IOC (Map.Map LPESummand [VarId])
-getChangedParamsPerSummand [] _ _ = do return Map.empty
-getChangedParamsPerSummand (x:xs) params invariant = do
-    changedPars <- getChangedParams x params
-    xs' <- getChangedParamsPerSummand xs params invariant
-    return (Map.insert x changedPars xs')
+-- Finds the parameters that are (possibly) changed by a summand, for all specified summands.
+getChangedParamsPerSummand :: LPESummands -> Set.Set VarId -> TxsDefs.VExpr -> IOC.IOC ParamsPerSummand
+getChangedParamsPerSummand summands params invariant = do
+    let orderedSummands = Set.toList summands
+    changed <- Monad.mapM getChangedParams orderedSummands
+    return (Map.fromList (zip orderedSummands changed))
   where
-    getChangedParams :: LPESummand -> [VarId] -> IOC.IOC [VarId]
-    getChangedParams _summand [] = do return []
-    getChangedParams summand (p:ps) = do
-        furtherChangedParams <- getChangedParams summand ps
-        (destVar, destSatExpr) <- constructDestSatExpr summand p invariant
-        taut <- isTautology (cstrITE destSatExpr (cstrEqual (cstrVar destVar) (cstrVar p)) (cstrConst (Cbool True))) invariant
-        if taut
-        then do return furtherChangedParams
-        else do return (p:furtherChangedParams)
+    getChangedParams :: LPESummand -> IOC.IOC (Set.Set VarId)
+    getChangedParams summand = do
+        unchangedParams <- Monad.filterM (isParamUnchanged summand) (Set.toList params)
+        return (params Set.\\ (Set.fromList unchangedParams))
+    -- getChangedParams
+    
+    isParamUnchanged :: LPESummand -> VarId -> IOC.IOC Bool
+    isParamUnchanged summand param = do
+        (destVar, destSatExpr) <- constructDestSatExpr summand param
+        isTautology (cstrITE destSatExpr (cstrEqual (cstrVar destVar) (cstrVar param)) (cstrConst (Cbool True))) invariant
 -- getChangedParamsPerSummand
 
 -- Finds the parameters that are 'directly used' by the specified summands.
 -- A parameter that is 'directly used' by a summand is one that occurs in the guard.
-getDirectlyUsedParamsPerSummand :: [LPESummand] -> [VarId] -> Map.Map LPESummand [VarId]
-getDirectlyUsedParamsPerSummand [] _ = Map.empty
-getDirectlyUsedParamsPerSummand (x@(LPESummand _channelVars _channelOffers guard _):xs) params =
-    let guardFreeVars = FreeVar.freeVars guard in
-    let directlyUsedPars = Set.intersection (Set.fromList guardFreeVars) (Set.fromList params) in
-    let xs' = getDirectlyUsedParamsPerSummand xs params in
-      Map.insert x (Set.toList directlyUsedPars) xs'
+-- (Normally, the parameters used in action arguments are also considered to be 'directly used', but
+-- in TorXakis all action arguments are of the form '? x').
+getDirectlyUsedParamsPerSummand :: LPESummands -> Set.Set VarId -> ParamsPerSummand
+getDirectlyUsedParamsPerSummand summands params = Map.fromSet getDirectlyUsedParams summands
+  where
+    getDirectlyUsedParams :: LPESummand -> Set.Set VarId
+    getDirectlyUsedParams (LPESummand _ _ guard _) = Set.intersection (Set.fromList (FreeVar.freeVars guard)) params
 -- getDirectlyUsedParamsPerSummand
 
 -- The function returns a pair:
@@ -200,16 +187,15 @@ getDirectlyUsedParamsPerSummand (x@(LPESummand _channelVars _channelOffers guard
 -- There are two use cases:
 --   1. Looking for the value of a parameter after a summand by solving the expression for the variable.
 --   2. Determining whether the value of a parameter is unaffected by a summand
---      by checking if 'expression && p2 == p' is a tautology. Here,
+--      by checking if 'expression && p2 == p1' is a tautology. Here,
 --      p2 is the first element in the pair returned by this function, and
 --      p1 is the variable provided as the second parameter to this function.
-constructDestSatExpr :: LPESummand -> VarId -> TxsDefs.VExpr -> IOC.IOC (VarId, TxsDefs.VExpr)
-constructDestSatExpr (LPESummand _ _ _ LPEStop) varId _invariant = do return (varId, cstrConst (Cbool False))
-constructDestSatExpr (LPESummand _channelVars _channelOffers guard (LPEProcInst paramEqs)) varId _invariant = do
-    let v = mapGet paramEqs varId
-    varClone <- createFreshVarFromVar varId
-    let result = cstrAnd (Set.fromList ([guard, cstrEqual (cstrVar varClone) v]))
-    -- IOC.putMsgs [ EnvData.TXS_CORE_ANY ("destSatExpr for " ++ (Text.unpack (VarId.name varId)) ++ "/" ++ (Text.unpack (VarId.name varClone)) ++ " is " ++ (showValExpr result)) ]
-    return (varClone, result)
+constructDestSatExpr :: LPESummand -> VarId -> IOC.IOC (VarId, TxsDefs.VExpr)
+constructDestSatExpr (LPESummand _ _ _ LPEStop) param = do return (param, cstrConst (Cbool False))
+constructDestSatExpr (LPESummand _channelVars _channelOffers guard (LPEProcInst paramEqs)) param = do
+    paramClone <- createFreshVarFromVar param
+    let eq = cstrAnd (Set.fromList ([guard, cstrEqual (cstrVar paramClone) (paramEqs Map.! param)]))
+    -- IOC.putMsgs [ EnvData.TXS_CORE_ANY ("destSatExpr for " ++ (Text.unpack (VarId.name param)) ++ "/" ++ (Text.unpack (VarId.name paramClone)) ++ " is " ++ (showValExpr eq)) ]
+    return (paramClone, eq)
 -- constructDestSatExpr
 

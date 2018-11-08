@@ -117,7 +117,7 @@ showLPEParamEq :: (VarId, TxsDefs.VExpr) -> String
 showLPEParamEq (varId, expr) = (Text.unpack (VarId.name varId)) ++ " = " ++ (showValExpr expr)
 
 showLPEParamEqs :: LPEParamEqs -> String
-showLPEParamEqs paramEqs = List.intercalate "\n            , " (map showLPEParamEq (Map.toList paramEqs))
+showLPEParamEqs paramEqs = List.intercalate ", " (map showLPEParamEq (Map.toList paramEqs))
 
 showProcInst :: LPEProcInst -> String
 showProcInst LPEStop = "STOP"
