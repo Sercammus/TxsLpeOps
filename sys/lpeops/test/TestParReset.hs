@@ -11,7 +11,7 @@ module TestParReset
 testParResetBasic
 )
 where
- 
+
 import Test.HUnit
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -32,9 +32,10 @@ import LPEOps
 import LPEParReset
 import TestUtils
 
+{-# ANN module "HLint: ignore Reduce duplication" #-}
+
 testParResetBasic :: Test
-testParResetBasic = TestCase $ do
-    tryLPEOperation parReset lpeInstance1 lpeInstance2
+testParResetBasic = TestCase $ tryLPEOperation parReset lpeInstance1 lpeInstance2
   where
     summand1_1 :: LPESummand
     summand1_1 = newLPESummand -- A ? z [x==0] >-> P(1, z)

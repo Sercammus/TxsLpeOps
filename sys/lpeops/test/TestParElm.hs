@@ -12,7 +12,7 @@ testParElmBasic,
 testParElmXUpperBound,
 )
 where
- 
+
 import Test.HUnit
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -33,21 +33,22 @@ import LPEOps
 import LPEParElm
 import TestUtils
 
+{-# ANN module "HLint: ignore Reduce duplication" #-}
+
 testParElmBasic :: Test
-testParElmBasic = TestCase $ do
-    tryLPEOperation parElm lpeInstance1 lpeInstance2
+testParElmBasic = TestCase $ tryLPEOperation parElm lpeInstance1 lpeInstance2
   where
     summand1_1 :: LPESummand
     summand1_1 = newLPESummand -- A ? y >-> P(x)
         [varIdY]
         [(chanIdA, [varIdY])]
-        (vexprTrue)
+        vexprTrue
         [(varIdX, vexprX)]
     summand1_2 :: LPESummand
     summand1_2 = newLPESummand -- A ? z >-> P(x+1)
         [varIdZ]
         [(chanIdA, [varIdZ])]
-        (vexprTrue)
+        vexprTrue
         [(varIdX, vexprSum vexprX vexpr1)]
     lpeInstance1 :: LPEInstance
     lpeInstance1 = newLPEInstance ([chanIdA], [(varIdX, vexpr0)], [summand1_1, summand1_2])
@@ -56,21 +57,20 @@ testParElmBasic = TestCase $ do
     summand2_1 = newLPESummand -- A ? y >-> P()
         [varIdY]
         [(chanIdA, [varIdY])]
-        (vexprTrue)
+        vexprTrue
         []
     summand2_2 :: LPESummand
     summand2_2 = newLPESummand -- A ? z >-> P()
         [varIdZ]
         [(chanIdA, [varIdZ])]
-        (vexprTrue)
+        vexprTrue
         []
     lpeInstance2 :: LPEInstance
     lpeInstance2 = newLPEInstance ([chanIdA], [], [summand2_1, summand2_2])
 -- testParElmBasic
 
 testParElmXUpperBound :: Test
-testParElmXUpperBound = TestCase $ do
-    tryLPEOperation parElm lpeInstance1 lpeInstance2
+testParElmXUpperBound = TestCase $ tryLPEOperation parElm lpeInstance1 lpeInstance2
   where
     summand1_1 :: LPESummand
     summand1_1 = newLPESummand -- A ? y [x == 2] >-> P(x)

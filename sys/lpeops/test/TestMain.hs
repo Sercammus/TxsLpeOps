@@ -5,6 +5,7 @@ See LICENSE at root directory of this repository.
 -}
 
 {-# OPTIONS_GHC -Wno-unused-imports #-}
+
 module Main where
 
 import System.Exit

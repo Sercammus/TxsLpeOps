@@ -3,7 +3,7 @@ TorXakis - Model Based Testing
 Copyright (c) 2015-2017 TNO and Radboud University
 See LICENSE at root directory of this repository.
 -}
-     
+
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
 module TestConstElm
@@ -12,7 +12,7 @@ testConstElmBasic,
 testConstElmXYX,
 )
 where
- 
+
 import Test.HUnit
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -32,9 +32,10 @@ import LPEOps
 import LPEConstElm
 import TestUtils
 
+{-# ANN module "HLint: ignore Reduce duplication" #-}
+
 testConstElmBasic :: Test
-testConstElmBasic = TestCase $ do
-    tryLPEOperation constElm lpeInstance1 lpeInstance2
+testConstElmBasic = TestCase $ tryLPEOperation constElm lpeInstance1 lpeInstance2
   where
     summand1_1 :: LPESummand
     summand1_1 = newLPESummand -- A ? z [z==0] >-> P(1, 0)
@@ -68,8 +69,7 @@ testConstElmBasic = TestCase $ do
 -- testConstElmBasic
 
 testConstElmXYX :: Test
-testConstElmXYX = TestCase $ do
-    tryLPEOperation constElm lpeInstance1 lpeInstance2
+testConstElmXYX = TestCase $ tryLPEOperation constElm lpeInstance1 lpeInstance2
   where
     summand1_1 :: LPESummand
     summand1_1 = newLPESummand -- A ? __FV1 [__FV1==z] >-> P(x, 1, z)

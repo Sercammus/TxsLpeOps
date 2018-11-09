@@ -3,7 +3,7 @@ TorXakis - Model Based Testing
 Copyright (c) 2015-2017 TNO and Radboud University
 See LICENSE at root directory of this repository.
 -}
-     
+
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
 module TestClean
@@ -12,7 +12,7 @@ testCleanBasic,
 testCleanUnreachable
 )
 where
- 
+
 import Test.HUnit
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -33,9 +33,10 @@ import LPEOps
 import LPEClean
 import TestUtils
 
+{-# ANN module "HLint: ignore Reduce duplication" #-}
+
 testCleanBasic :: Test
-testCleanBasic = TestCase $ do
-    tryLPEOperation cleanLPE lpeInstance1 lpeInstance2
+testCleanBasic = TestCase $ tryLPEOperation cleanLPE lpeInstance1 lpeInstance2
   where
     summand1_1 :: LPESummand
     summand1_1 = newLPESummand -- A ? z [x==0] >-> P(1)
@@ -87,8 +88,7 @@ testCleanBasic = TestCase $ do
 -- testCleanBasic
 
 testCleanUnreachable :: Test
-testCleanUnreachable = TestCase $ do
-    tryLPEOperation cleanLPE lpeInstance1 lpeInstance2
+testCleanUnreachable = TestCase $ tryLPEOperation cleanLPE lpeInstance1 lpeInstance2
   where
     summand1_1 :: LPESummand
     summand1_1 = newLPESummand -- A ? z [x==0] >-> P(1)

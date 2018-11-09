@@ -14,7 +14,7 @@ testConfElmBasic,
 testConfElmModulo
 )
 where
- 
+
 import Test.HUnit
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -35,9 +35,10 @@ import LPEOps
 import LPEConfCheck
 import TestUtils
 
+{-# ANN module "HLint: ignore Reduce duplication" #-}
+
 testConfCheckBasic :: Test
-testConfCheckBasic = TestCase $ do
-    tryLPEOperation confCheck lpeInstance1 lpeInstance2
+testConfCheckBasic = TestCase $ tryLPEOperation confCheck lpeInstance1 lpeInstance2
   where
     summand1_1 :: LPESummand
     summand1_1 = newLPESummand -- A ? [x!=2] >-> P(x+1, y)
@@ -71,8 +72,7 @@ testConfCheckBasic = TestCase $ do
 -- testConfCheckBasic
 
 testConfElmNoChange :: Test
-testConfElmNoChange = TestCase $ do
-    tryLPEOperation confElm lpeInstance1 lpeInstance2
+testConfElmNoChange = TestCase $ tryLPEOperation confElm lpeInstance1 lpeInstance2
   where
     summand1_1 :: LPESummand
     summand1_1 = newLPESummand -- A ? [x!=2] >-> P(x+1, y)
@@ -106,8 +106,7 @@ testConfElmNoChange = TestCase $ do
 -- testConfElmNoChange
 
 testConfElmBasic :: Test
-testConfElmBasic = TestCase $ do
-    tryLPEOperation confElm lpeInstance1 lpeInstance2
+testConfElmBasic = TestCase $ tryLPEOperation confElm lpeInstance1 lpeInstance2
   where
     summand1_1 :: LPESummand
     summand1_1 = newLPESummand -- A >-> P(x+1, y)
@@ -141,8 +140,7 @@ testConfElmBasic = TestCase $ do
 -- testConfElmBasic
 
 testConfElmModulo :: Test
-testConfElmModulo = TestCase $ do
-    tryLPEOperation confElm lpeInstance1 lpeInstance2
+testConfElmModulo = TestCase $ tryLPEOperation confElm lpeInstance1 lpeInstance2
   where
     summand1_1 :: LPESummand
     summand1_1 = newLPESummand -- A >-> P((x+1) % 3, y)
