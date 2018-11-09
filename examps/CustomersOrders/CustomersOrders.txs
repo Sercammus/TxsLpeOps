@@ -47,10 +47,16 @@ FUNCDEF  add ( x :: Report; l :: ReportList ) :: ReportList ::=
     FI
 ENDDEF
 
-PROCDEF bufferedOutput [ IReport, OReport :: Report ] (queue :: ReportList) ::=
+PROCDEF bufferedOutput_ORIGINAL [ IReport, OReport :: Report ] (queue :: ReportList) ::=
         IReport ? r >-> bufferedOutput [ IReport, OReport ] (add (r , queue))
     ##
         [[ isCstr_Report (queue) ]] =>> OReport ! head(queue) >-> bufferedOutput [ IReport, OReport ] (tail(queue))
+ENDDEF
+
+PROCDEF bufferedOutput [ IReport, OReport :: Report ] (queue :: ReportList) ::=
+        IReport ? r >-> bufferedOutput [ IReport, OReport ] (add (r , queue))
+    ##
+        OReport ? y [[IF isCstr_Report (queue) THEN y == head(queue) ELSE False FI]] >-> bufferedOutput [ IReport, OReport ] (tail(queue))
 ENDDEF
 
 PROCDEF handle [ Customer :: Customer; Order :: Order; Report :: Report ] (cs :: List_Customer; os :: List_Order; changed :: Bool) EXIT ::= 

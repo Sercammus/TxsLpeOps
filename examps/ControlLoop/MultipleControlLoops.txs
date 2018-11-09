@@ -269,12 +269,11 @@ PROCDEF measureProcess [ In_Cmd         :: Int # MeasureCmd
         In_Cmd ! id ? measureCmd | In_Material ! id ? batchInfo [[ isValid_BatchInfo(batchInfo)
                                                               /\ (batchId(measureCmd) == batchId(batchInfo)) ]]
     >-> (
-            (Out_Report ! id ! C_MeasureReport(batchInfo) >-> EXIT
+            Out_Report ! id ! C_MeasureReport(batchInfo)
         |||
-            Out_Material ! id ! batchInfo >-> EXIT ) >>>
-        (
+            Out_Material ! id ! batchInfo
+        |||
             measureProcess [ In_Cmd, In_Material, Out_Report, Out_Material ] ( id )
-        )
         )
 ENDDEF                       
 
@@ -421,7 +420,7 @@ PROCDEF correctProcess [ In_Cmd            :: Int # CorrectCmd
             ]]
     >-> (
             Out_Correction ! id ! batchId(correctCmd)
-        >->
+        |||
             correctProcess [ In_Cmd, In_ProduceReport, In_MeasureReport, Out_Correction ] ( id )
         )
 ENDDEF

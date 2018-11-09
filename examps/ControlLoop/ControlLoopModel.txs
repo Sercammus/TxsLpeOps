@@ -51,7 +51,7 @@ PROCDEF produceLoop [ In_Material           :: Int
     NI
 ENDDEF
 
-PROCDEF measure_ORIGINAL [ In_Material   :: Int
+PROCDEF measure [ In_Material   :: Int
                 ; Out_Report    :: MeasureReport
                 ; Out_Material  :: Int
                 ]( ) ::=
@@ -66,7 +66,7 @@ PROCDEF measure_ORIGINAL [ In_Material   :: Int
         )
 ENDDEF
 
-PROCDEF measure [ In_Material   :: Int
+PROCDEF measure_ORIGINAL [ In_Material   :: Int
                 ; Out_Report    :: MeasureReport
                 ; Out_Material  :: Int
                 ]( ) ::=
