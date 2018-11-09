@@ -14,7 +14,6 @@ See LICENSE at root directory of this repository.
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE ViewPatterns        #-}
 module Satisfiability (
 getSomeSolution,
 isTautology,
@@ -56,35 +55,36 @@ import ValFactory
 getSomeSolution :: TxsDefs.VExpr -> TxsDefs.VExpr -> [VarId] -> IOC.IOC (SolveDefs.SolveProblem VarId)
 getSomeSolution expr _invariant variables =
     if SortOf.sortOf expr /= SortId.sortIdBool
-    then do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("Value expression must be of sort Bool (" ++ (show expr) ++ ")!") ]
+    then do IOC.putMsgs [ EnvData.TXS_CORE_USER_ERROR ("Value expression must be of sort Bool (" ++ show expr ++ ")!") ]
             return SolveDefs.UnableToSolve
     else do smtEnv <- IOC.getSMT "current"
             (tdefs, expr1, undefs) <- eliminateAny expr
-            --IOC.putMsgs [ EnvData.TXS_CORE_ANY ("expr1 = " ++ (showContextFreeValExpr expr1)) ]
-            let freeVars1 = Set.union (Set.fromList ((FreeVar.freeVars expr1) ++ variables)) undefs
+            --IOC.putMsgs [ EnvData.TXS_CORE_ANY ("expr1 = " ++ showContextFreeValExpr expr1) ]
+            let freeVars1 = Set.union (Set.fromList (FreeVar.freeVars expr1 ++ variables)) undefs
             let assertions1 = Solve.add expr1 Solve.empty
             (sol1, _) <- MonadState.lift $ MonadState.runStateT (Solve.solve (Set.toList freeVars1) assertions1) smtEnv
             case sol1 of
               SolveDefs.Solved solMap ->
-                do if undefs == Set.empty
-                   then do restoreTdefs tdefs
-                           let newSolMap = Map.fromList (map (\v -> (v, Map.findWithDefault (sort2defaultConst tdefs (SortOf.sortOf v)) v solMap)) variables)
-                           return (SolveDefs.Solved newSolMap)
-                   else do let freeVars2 = undefs
-                           let blindSubstVars = Set.toList (freeVars1 Set.\\ freeVars2)
-                           let blindSubst = Map.fromList (map (\v -> (v, cstrConst (solMap Map.! v))) blindSubstVars)
-                           expr2 <- doBlindSubst blindSubst expr1
-                           --IOC.putMsgs [ EnvData.TXS_CORE_ANY ("expr2 = " ++ (showContextFreeValExpr expr2)) ]
-                           let assertions2 = Solve.add (cstrNot expr2) Solve.empty
-                           (sol2, _) <- MonadState.lift $ MonadState.runStateT (Solve.solve (Set.toList freeVars2) assertions2) smtEnv
-                           case sol2 of
-                             SolveDefs.Unsolvable -> do restoreTdefs tdefs
-                                                        let newSolMap = Map.fromList (map (\v -> (v, Map.findWithDefault (sort2defaultConst tdefs (SortOf.sortOf v)) v solMap)) variables)
-                                                        return (SolveDefs.Solved newSolMap)
-                             _ -> do restoreTdefs tdefs
-                                     return SolveDefs.UnableToSolve
+                if undefs == Set.empty
+                then do restoreTdefs tdefs
+                        return (buildSolution tdefs solMap)
+                else do let freeVars2 = undefs
+                        let blindSubstVars = Set.toList (freeVars1 Set.\\ freeVars2)
+                        let blindSubst = Map.fromList (map (\v -> (v, cstrConst (solMap Map.! v))) blindSubstVars)
+                        expr2 <- doBlindSubst blindSubst expr1
+                        --IOC.putMsgs [ EnvData.TXS_CORE_ANY ("expr2 = " ++ showContextFreeValExpr expr2) ]
+                        let assertions2 = Solve.add (cstrNot expr2) Solve.empty
+                        (sol2, _) <- MonadState.lift $ MonadState.runStateT (Solve.solve (Set.toList freeVars2) assertions2) smtEnv
+                        case sol2 of
+                          SolveDefs.Unsolvable -> do restoreTdefs tdefs
+                                                     return (buildSolution tdefs solMap)
+                          _ -> do restoreTdefs tdefs
+                                  return SolveDefs.UnableToSolve
               otherResult -> do restoreTdefs tdefs
                                 return otherResult
+  where
+    buildSolution :: TxsDefs.TxsDefs -> Map.Map VarId Constant.Constant -> SolveDefs.SolveProblem VarId
+    buildSolution tdefs solMap = SolveDefs.Solved (Map.fromList (map (\v -> (v, Map.findWithDefault (sort2defaultConst tdefs (SortOf.sortOf v)) v solMap)) variables))
 -- getSomeSolution
 
 defaultInvariant :: TxsDefs.VExpr
@@ -92,15 +92,15 @@ defaultInvariant = cstrConst (Constant.Cbool True)
 
 -- Checks if the specified expression cannot be false.
 isTautology :: TxsDefs.VExpr -> TxsDefs.VExpr -> IOC.IOC Bool
-isTautology expr invariant = isNotSatisfiable (cstrNot expr) invariant
+isTautology expr = isNotSatisfiable (cstrNot expr)
 
 -- Checks if the specified expression can be true.
 couldBeSatisfiable :: TxsDefs.VExpr -> TxsDefs.VExpr -> IOC.IOC Bool
 couldBeSatisfiable expr invariant = do
     sol <- getSomeSolution expr invariant []
     case sol of
-      SolveDefs.Unsolvable -> do return False
-      _ -> do return True
+      SolveDefs.Unsolvable -> return False
+      _ -> return True
 -- couldBeSatisfiable
 
 -- Checks if the specified expression can be true.
@@ -108,8 +108,8 @@ isSatisfiable :: TxsDefs.VExpr -> TxsDefs.VExpr -> IOC.IOC Bool
 isSatisfiable expr invariant = do
     sol <- getSomeSolution expr invariant []
     case sol of
-      SolveDefs.Solved _ -> do return True
-      _ -> do return False
+      SolveDefs.Solved _ -> return True
+      _ -> return False
 -- isSatisfiable
 
 -- Checks if the specified expression cannot be true.
@@ -122,14 +122,14 @@ isNotSatisfiable expr invariant = do
 -- Checks if all specified expressions could be true.
 -- Note that each expression is considered in a vacuum, e.g. input [X == 0, X == 1] would yield true!
 areSatisfiable :: [TxsDefs.VExpr] -> TxsDefs.VExpr -> IOC.IOC Bool
-areSatisfiable expressions invariant = do sat <- Monad.mapM (\e -> isSatisfiable e invariant) expressions
+areSatisfiable expressions invariant = do sat <- Monad.mapM (`isSatisfiable` invariant) expressions
                                           return (List.and sat)
 -- areSatisfiable
 
 -- Checks if none of the specified expressions not be true.
 -- Note that each expression is considered in a vacuum, e.g. input [X == 0, false] would yield false!
 areNotSatisfiable :: [TxsDefs.VExpr] -> TxsDefs.VExpr -> IOC.IOC Bool
-areNotSatisfiable expressions invariant = do sat <- Monad.mapM (\e -> isNotSatisfiable e invariant) expressions
+areNotSatisfiable expressions invariant = do sat <- Monad.mapM (`isNotSatisfiable` invariant) expressions
                                              return (List.and sat)
 -- areNotSatisfiable
 
@@ -153,13 +153,8 @@ showSolution :: SolveDefs.SolveProblem VarId -> String
 showSolution SolveDefs.Unsolvable = "Unsolvable"
 showSolution SolveDefs.UnableToSolve = "UnableToSolve"
 showSolution (SolveDefs.Solved solMap) =
-    let f (p, v) = (Text.unpack (VarId.name p)) ++ " := " ++ (showValExpr (cstrConst v)) in
-      "Solved [" ++ (separatedList (map f (Map.toList solMap)) ", ") ++ "]"
-  where
-    separatedList :: [String] -> String -> String
-    separatedList [] _ = ""
-    separatedList [x] _ = x
-    separatedList (x1:x2:xs) separator = x1 ++ separator ++ (separatedList (x2:xs) separator)
+    let f (p, v) = Text.unpack (VarId.name p) ++ " := " ++ showValExpr (cstrConst v) in
+      "Solved [" ++ List.intercalate ", " (map f (Map.toList solMap)) ++ "]"
 -- showSolution
 
 

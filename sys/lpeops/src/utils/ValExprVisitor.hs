@@ -47,14 +47,14 @@ data ValExprVisitorOutput t = ValExprVisitorOutput { expression :: TxsDefs.VExpr
 -- ValExprVisitorOutput
 
 instance DeepSeq.NFData t => DeepSeq.NFData (ValExprVisitorOutput t) where
-    rnf (ValExprVisitorOutput { expression = e, multiplicity = m, customData = c }) = (DeepSeq.rnf e) `seq` (DeepSeq.rnf m) `seq` (DeepSeq.rnf c)
+    rnf ValExprVisitorOutput { expression = e, multiplicity = m, customData = c } = DeepSeq.rnf e `seq` DeepSeq.rnf m `seq` DeepSeq.rnf c
 -- DeepSeq.NFData t => DeepSeq.NFData (ValExprVisitorOutput t)
 
 type ValExprVisitor t = [ValExprVisitorOutput t] -> TxsDefs.VExpr -> ValExprVisitorOutput t
 type ValExprVisitorM m t = Monad.Monad m => [ValExprVisitorOutput t] -> TxsDefs.VExpr -> m (ValExprVisitorOutput t)
 
 visitValExpr :: ValExprVisitor t -> TxsDefs.VExpr -> ValExprVisitorOutput t
-visitValExpr f expr = MonadState.evalState (visitValExprM (\xs x -> do return (f xs x)) expr) ()
+visitValExpr f expr = MonadState.evalState (visitValExprM (\xs x -> return (f xs x)) expr) ()
 
 -- Function that applies a visitor pattern to the given value expression.
 -- Children are always evaluated before the parent, and the result is a composition
@@ -64,9 +64,9 @@ visitValExprM f expr = do
     let visitValExprM1 = visitValExprMK f 1
     case expr of
       (view -> Vconst _) ->
-          do f [] expr
+          f [] expr
       (view -> Vvar _) ->
-          do f [] expr
+          f [] expr
       (view -> Vfunc _fid vexps) ->
           do newVExps <- Monad.mapM visitValExprM1 vexps
              f newVExps expr
@@ -85,13 +85,9 @@ visitValExprM f expr = do
              newVExp2 <- visitValExprM1 vexp2
              f [newCond, newVExp1, newVExp2] expr
       (view -> Vdivide t n) ->
-          do newT <-visitValExprM1 t
-             newN <- visitValExprM1 n
-             f [newT, newN] expr
+          visitValExprWithDivision f t n expr
       (view -> Vmodulo t n) ->
-          do newT <- visitValExprM1 t
-             newN <- visitValExprM1 n
-             f [newT, newN] expr
+          visitValExprWithDivision f t n expr
       (view -> Vgez v) ->
           do newV <- visitValExprM1 v
              f [newV] expr
@@ -128,7 +124,7 @@ visitValExprM f expr = do
       (view -> Vpredef _kd _fid vexps) ->
           do newVExps <- Monad.mapM visitValExprM1 vexps
              f newVExps expr
-      _ -> error ("VisitValExprM not defined for " ++ (show expr) ++ "!")
+      _ -> error ("VisitValExprM not defined for " ++ show expr ++ "!")
 -- visitValExprM
 
 -- Here, we think we know better (which we do) and
@@ -138,6 +134,14 @@ visitValExprMK f k expr = do
     expr' <- visitValExprM f expr
     return (expr' { multiplicity = k })
 -- visitValExprMK
+
+visitValExprWithDivision :: Monad.Monad m => ValExprVisitorM m t -> TxsDefs.VExpr -> TxsDefs.VExpr -> TxsDefs.VExpr -> m (ValExprVisitorOutput t)
+visitValExprWithDivision f t n expr = do
+    let visitValExprM1 = visitValExprMK f 1
+    newT <- visitValExprM1 t
+    newN <- visitValExprM1 n
+    f [newT, newN] expr
+-- visitValExprWithDivision
 
 defaultValExprVisitor :: t -> ValExprVisitor t
 defaultValExprVisitor defaultDat subExps expr = MonadState.evalState (defaultValExprVisitorM defaultDat subExps expr) ()
@@ -149,23 +153,23 @@ defaultValExprVisitorM defaultDat subExps expr = do
                   (view -> Vvar _)           -> expr
                   (view -> Vfunc fid _)      -> cstrFunc emptyFis fid (map expression subExps)
                   (view -> Vcstr cid _)      -> cstrCstr cid (map expression subExps)
-                  (view -> Viscstr cid _)    -> cstrIsCstr cid (expression (subExps !! 0))
-                  (view -> Vaccess cid p _)  -> cstrAccess cid p (expression (subExps !! 0))
-                  (view -> Vite{})           -> cstrITE (expression (subExps !! 0)) (expression (subExps !! 1)) (expression (subExps !! 2))
-                  (view -> Vdivide _ _)      -> cstrDivide (expression (subExps !! 0)) (expression (subExps !! 1))
-                  (view -> Vmodulo _ _)      -> cstrModulo (expression (subExps !! 0)) (expression (subExps !! 1))
-                  (view -> Vgez _)           -> cstrGEZ (expression (subExps !! 0))
+                  (view -> Viscstr cid _)    -> cstrIsCstr cid (expression (head subExps))
+                  (view -> Vaccess cid p _)  -> cstrAccess cid p (expression (head subExps))
+                  (view -> Vite{})           -> cstrITE (expression (head subExps)) (expression (subExps !! 1)) (expression (subExps !! 2))
+                  (view -> Vdivide _ _)      -> cstrDivide (expression (head subExps)) (expression (subExps !! 1))
+                  (view -> Vmodulo _ _)      -> cstrModulo (expression (head subExps)) (expression (subExps !! 1))
+                  (view -> Vgez _)           -> cstrGEZ (expression (head subExps))
                   (view -> Vsum _)           -> cstrSum (FMX.fromOccurListT (map (\x -> (expression x, multiplicity x)) subExps))
                   (view -> Vproduct _)       -> cstrProduct (FMX.fromOccurListT (map (\x -> (expression x, multiplicity x)) subExps))
-                  (view -> Vequal _ _)       -> cstrEqual (expression (subExps !! 0)) (expression (subExps !! 1))
+                  (view -> Vequal _ _)       -> cstrEqual (expression (head subExps)) (expression (subExps !! 1))
                   (view -> Vand _)           -> cstrAnd (Set.fromList (map expression subExps))
-                  (view -> Vnot _)           -> cstrNot (expression (subExps !! 0))
-                  (view -> Vlength _)        -> cstrLength (expression (subExps !! 0))
-                  (view -> Vat _ _)          -> cstrAt (expression (subExps !! 0)) (expression (subExps !! 1))
+                  (view -> Vnot _)           -> cstrNot (expression (head subExps))
+                  (view -> Vlength _)        -> cstrLength (expression (head subExps))
+                  (view -> Vat _ _)          -> cstrAt (expression (head subExps)) (expression (subExps !! 1))
                   (view -> Vconcat _)        -> cstrConcat (map expression subExps)
-                  (view -> Vstrinre _ _)     -> cstrStrInRe (expression (subExps !! 0)) (expression (subExps !! 1))
+                  (view -> Vstrinre _ _)     -> cstrStrInRe (expression (head subExps)) (expression (subExps !! 1))
                   (view -> Vpredef kd fid _) -> cstrPredef kd fid (map expression subExps)
-                  _                          -> error ("DefaultValExprVisitorM not defined for " ++ (show expr) ++ "!")
+                  _                          -> error ("DefaultValExprVisitorM not defined for " ++ show expr ++ "!")
     return (ValExprVisitorOutput expr' 1 defaultDat)
   where
     emptyFis :: Map.Map FuncId (FuncDef VarId)

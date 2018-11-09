@@ -14,7 +14,6 @@ See LICENSE at root directory of this repository.
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE ViewPatterns        #-}
 module VarFactory (
 createFreshVar,
 createFreshVarFromVar,
@@ -35,9 +34,7 @@ import VarId
 
 -- Creates a variable of the specified sort, using the specified string as part of the name.
 createFreshVar :: SortId.SortId -> IOC.IOC VarId.VarId
-createFreshVar sort = do
-    createFreshVarFromPrefix "__FV" sort
--- createVar
+createFreshVar = createFreshVarFromPrefix "__FV"
 
 -- Creates a variable of the specified sort, using the specified string as part of the name.
 createFreshVarFromPrefix :: String -> SortId.SortId -> IOC.IOC VarId.VarId
@@ -49,9 +46,7 @@ createFreshVarFromPrefix prefix sort = do
 -- createFreshVarFromPrefix
 
 createFreshVarFromVar :: VarId -> IOC.IOC VarId.VarId
-createFreshVarFromVar varId = do
-    createFreshVarFromPrefix (Text.unpack (name varId)) (SortOf.sortOf varId)
--- createFreshVarFromVar
+createFreshVarFromVar varId = createFreshVarFromPrefix (Text.unpack (name varId)) (SortOf.sortOf varId)
 
 createFreshIntVar :: IOC.IOC VarId.VarId
 createFreshIntVar = createFreshVar (getStdSort "Int")

@@ -53,11 +53,11 @@ lpeOperations :: [LPEOp] -> TxsDefs.BExpr -> String -> TxsDefs.VExpr -> IOC.IOC 
 lpeOperations operations procInst out invariant = do
     eitherLPEInstance <- toLPEInstance procInst
     case eitherLPEInstance of
-      Left msgs -> do return (Left msgs)
+      Left msgs -> return (Left msgs)
       Right lpeInstance -> do eitherNewLPEInstances <- lpeOperation operations operations [lpeInstance, lpeInstance] out invariant
                               case eitherNewLPEInstances of
-                                Left msgs -> do return (Left msgs)
-                                Right [] -> do return (Left ["No output LPE found!"])
+                                Left msgs -> return (Left msgs)
+                                Right [] -> return (Left ["No output LPE found!"])
                                 Right (newLPE:_) -> do temp <- fromLPEInstance newLPE out
                                                        if newLPE /= lpeInstance
                                                        then IOC.putMsgs [ EnvData.TXS_CORE_ANY "LPE instance has been rewritten!" ]
@@ -66,24 +66,24 @@ lpeOperations operations procInst out invariant = do
 -- lpeOperations
 
 lpeOperation :: [LPEOp] -> [LPEOp] -> [LPEInstance] -> String -> TxsDefs.VExpr -> IOC.IOC (Either [String] [LPEInstance])
-lpeOperation _ops _ [] _out _invariant = do return (Left ["No input LPE found!"])
-lpeOperation _ops [] lpeInstances _out _invariant = do return (Right lpeInstances)
+lpeOperation _ops _ [] _out _invariant = return (Left ["No input LPE found!"])
+lpeOperation _ops [] lpeInstances _out _invariant = return (Right lpeInstances)
 lpeOperation ops (LPEOpLoop:xs) (lpeInstance:ys) out invariant =
     if lpeInstance `elem` ys
-    then do lpeOperation ops xs (lpeInstance:ys) out invariant
-    else do lpeOperation ops ops (lpeInstance:lpeInstance:ys) out invariant
-lpeOperation ops ((LPEOp op):xs) (lpeInstance:ys) out invariant = do
+    then lpeOperation ops xs (lpeInstance:ys) out invariant
+    else lpeOperation ops ops (lpeInstance:lpeInstance:ys) out invariant
+lpeOperation ops (LPEOp op:xs) (lpeInstance:ys) out invariant = do
     eitherNewLPEInstance <- op lpeInstance out invariant
     case eitherNewLPEInstance of
-      Left msgs -> do return (Left msgs)
+      Left msgs -> return (Left msgs)
       Right newLPE -> let scopeProblems = getScopeProblems newLPE in
-                        if scopeProblems == []
-                        then do lpeOperation ops xs (newLPE:ys) out invariant
-                        else do return (Left scopeProblems)
+                        if null scopeProblems
+                        then lpeOperation ops xs (newLPE:ys) out invariant
+                        else return (Left scopeProblems)
 -- lpeOperation
 
 discardLPE :: LPEOperation
-discardLPE _lpeInstance _out _invariant = do return (Left ["LPE discarded!"])
+discardLPE _lpeInstance _out _invariant = return (Left ["LPE discarded!"])
 
 showLPE :: LPEOperation
 showLPE lpeInstance _out _invariant = do

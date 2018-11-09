@@ -61,8 +61,8 @@ eliminateAny expr = do
   where
     eliminateAnyVisitorM :: [ValExprVisitorOutput (Set.Set VarId)] -> TxsDefs.VExpr -> IOC.IOC (ValExprVisitorOutput (Set.Set VarId))
     eliminateAnyVisitorM _ (view -> Vconst (Cany sort)) = do
-        do varId <- createFreshVar sort
-           return (ValExprVisitorOutput (cstrVar varId) 1 (Set.singleton varId))
+        varId <- createFreshVar sort
+        return (ValExprVisitorOutput (cstrVar varId) 1 (Set.singleton varId))
     eliminateAnyVisitorM xs x = do
         vo <- MonadState.liftIO $ tryDefaultValExprVisitor (Set.unions (map customData xs)) xs x
         case vo of
@@ -79,17 +79,17 @@ doBlindSubst subst expr = do
   where
     substVisitor :: [ValExprVisitorOutput ()] -> TxsDefs.VExpr -> IOC.IOC (ValExprVisitorOutput ())
     -- If we find a variable, substitute it (only if it is present in substEqs, of course):
-    substVisitor _ (view -> Vvar varId) = do
+    substVisitor _ (view -> Vvar varId) =
         case Map.lookup varId subst of
-          Just v -> do return (ValExprVisitorOutput v 1 ())
-          Nothing -> do return (ValExprVisitorOutput (cstrVar varId) 1 ())
+          Just v -> return (ValExprVisitorOutput v 1 ())
+          Nothing -> return (ValExprVisitorOutput (cstrVar varId) 1 ())
     -- In other cases, the parent expression inherits undefined variables from its sub-expressions.
     -- However, reconstruction of the parent expression might fail (because something was substituted incorrectly),
     -- in which case we return 'ANY <sort>' instead:
     substVisitor subExps parentExpr = do
         vo <- MonadState.liftIO $ tryDefaultValExprVisitor () subExps parentExpr
         case vo of
-          Left _ -> do return (ValExprVisitorOutput (cstrConst (Cany (SortOf.sortOf parentExpr))) 1 ())
+          Left _ -> return (ValExprVisitorOutput (cstrConst (Cany (SortOf.sortOf parentExpr))) 1 ())
           Right r -> return r
 -- doBlindSubst
 
@@ -115,10 +115,10 @@ doConfidentSubst contextSummand subst expr = do
   where
     substVisitor :: TxsDefs.TxsDefs -> [ValExprVisitorOutput ()] -> TxsDefs.VExpr -> IOC.IOC (ValExprVisitorOutput ())
     -- If we find a variable, substitute it (only if it is present in substEqs, of course):
-    substVisitor _ _ (view -> Vvar varId) = do
+    substVisitor _ _ (view -> Vvar varId) =
         case Map.lookup varId subst of
-          Just v -> do return (ValExprVisitorOutput v 1 ())
-          Nothing -> do return (ValExprVisitorOutput (cstrVar varId) 1 ())
+          Just v -> return (ValExprVisitorOutput v 1 ())
+          Nothing -> return (ValExprVisitorOutput (cstrVar varId) 1 ())
     -- In other cases, the parent expression inherits undefined variables from its sub-expressions.
     -- However, reconstruction of the parent expression might fail (because something was substituted incorrectly),
     -- in which case we return 'ANY <sort>' instead:
@@ -126,9 +126,9 @@ doConfidentSubst contextSummand subst expr = do
         vo <- MonadState.liftIO $ tryDefaultValExprVisitor () subExps parentExpr
         case vo of
           Left _ -> do let defaultValue = sort2defaultValue tdefs (SortOf.sortOf parentExpr)
-                       IOC.putMsgs [ EnvData.TXS_CORE_RUNTIME_WARNING ("WARNING: Confidently substituted " ++ (showValExpr defaultValue) ++ " for " ++ (showValExpr parentExpr) ++ (showSubst subst)
-                                       ++ "\nExpression: " ++ (showValExpr expr)
-                                       ++ "\nSummand: " ++ (showLPESummand contextSummand)) ]
+                       IOC.putMsgs [ EnvData.TXS_CORE_RUNTIME_WARNING ("WARNING: Confidently substituted " ++ showValExpr defaultValue ++ " for " ++ showValExpr parentExpr ++ showSubst subst
+                                       ++ "\nExpression: " ++ showValExpr expr
+                                       ++ "\nSummand: " ++ showLPESummand contextSummand) ]
                        return (ValExprVisitorOutput defaultValue 1 ())
           Right r -> return r
 -- doConfidentSubst

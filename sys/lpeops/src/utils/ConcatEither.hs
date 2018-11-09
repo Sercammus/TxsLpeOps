@@ -20,11 +20,11 @@ concatEither
 
 concatEither :: [Either [a] [b]] -> Either [a] [b]
 concatEither [] = Right []
-concatEither ((Left xs):ys) =
+concatEither (Left xs:ys) =
     case concatEither ys of
       Left zs -> Left (xs ++ zs)
       Right _ -> Left xs
-concatEither ((Right xs):ys) =
+concatEither (Right xs:ys) =
     case concatEither ys of
       Left zs -> Left zs
       Right zs -> Right (xs ++ zs)

@@ -33,10 +33,10 @@ import           VarId
 -- Occurrences of the parameters in expressions are substituted by their initial values.
 removeParsFromLPE :: Set.Set VarId -> LPEInstance -> IOC.IOC LPEInstance
 removeParsFromLPE targetParams lpeInstance@(channels, paramEqs, summands)
-    | targetParams == Set.empty = do
+    | targetParams == Set.empty =
         return lpeInstance
     | otherwise = do
-        Monad.mapM_ (\p -> IOC.putMsgs [ EnvData.TXS_CORE_ANY ("Removed parameter " ++ (Text.unpack (VarId.name p))) ]) (Set.toList targetParams)
+        Monad.mapM_ (\p -> IOC.putMsgs [ EnvData.TXS_CORE_ANY ("Removed parameter " ++ Text.unpack (VarId.name p)) ]) (Set.toList targetParams)
         let rho = Map.restrictKeys paramEqs targetParams
         newSummands <- Monad.mapM (removeParsFromSummand rho) (Set.toList summands)
         return (channels, Map.withoutKeys paramEqs targetParams, Set.fromList newSummands)
@@ -53,31 +53,10 @@ removeParsFromLPE targetParams lpeInstance@(channels, paramEqs, summands)
     removeParsFromProcInst :: LPESummand -> Map.Map VarId TxsDefs.VExpr -> LPEProcInst -> IOC.IOC LPEProcInst
     removeParsFromProcInst contextSummand rho (LPEProcInst eqs) = do
         let withoutTargetParams = Map.toList (Map.withoutKeys eqs targetParams)
-        newAssignments <- Monad.mapM (doConfidentSubst contextSummand rho) (map snd withoutTargetParams)
+        newAssignments <- Monad.mapM (doConfidentSubst contextSummand rho . snd) withoutTargetParams
         let newEqs = Map.fromList (zip (map fst withoutTargetParams) newAssignments)
         return (LPEProcInst newEqs)
-    removeParsFromProcInst _ _ LPEStop = do return LPEStop
+    removeParsFromProcInst _ _ LPEStop = return LPEStop
 -- removeParsFromLPE
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 

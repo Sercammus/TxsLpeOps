@@ -35,7 +35,7 @@ import           Constant
 -- LPE rewrite method.
 -- Eliminates parameters that always have the same value from an LPE.
 constElm :: LPEOperation
-constElm lpe@((_channels, initParamEqs, _summands)) _out invariant = do
+constElm lpe@(_channels, initParamEqs, _summands) _out invariant = do
     IOC.putMsgs [ EnvData.TXS_CORE_ANY "<<constElm>>" ]
     constParams <- getConstParams lpe invariant (Map.keysSet initParamEqs)
     newLPE <- removeParsFromLPE constParams lpe
@@ -64,7 +64,7 @@ getConstParamsForSummand subst invariant constParams summand = do
 -- getConstParamsForSummand
 
 isConstParamForSummand :: Map.Map VarId TxsDefs.VExpr -> TxsDefs.VExpr -> LPESummand -> VarId -> IOC.IOC (Set.Set VarId)
-isConstParamForSummand _ _ (LPESummand _ _ _ LPEStop) _ = do return Set.empty
+isConstParamForSummand _ _ (LPESummand _ _ _ LPEStop) _ = return Set.empty
 isConstParamForSummand subst invariant (LPESummand _ _ guard (LPEProcInst paramEqs)) testParam = do
     let expr = cstrITE guard (cstrEqual (paramEqs Map.! testParam) (cstrVar testParam)) (cstrConst (Cbool True))
     expr' <- doBlindSubst subst expr

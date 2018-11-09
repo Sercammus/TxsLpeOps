@@ -30,7 +30,7 @@ import LPEParRemoval
 
 -- Eliminates inert parameters (=parameters that do not contribute to the behavior of a process) from an LPE:
 parElm :: LPEOperation
-parElm lpeInstance@((_channels, paramEqs, summands)) _out _invariant = do
+parElm lpeInstance@(_channels, paramEqs, summands) _out _invariant = do
     IOC.putMsgs [ EnvData.TXS_CORE_ANY "<<parElm>>" ]
     let allParams = Set.fromList (Map.keys paramEqs)
     let guardParams = Set.unions (map (Set.fromList . FreeVar.freeVars . getGuard) (Set.toList summands))
@@ -57,7 +57,7 @@ getInertParams lpeInstance@(_channels, _paramEqs, summands) inertParams =
 -- Removes from the set of inert parameter all variables (=superset of parameters) that are assigned to parameters that are NOT inert:
 removeVarsAssignedToNonInertParams :: [LPESummand] -> Set.Set VarId.VarId -> Set.Set VarId.VarId
 removeVarsAssignedToNonInertParams summands inertParams =
-    inertParams Set.\\ (Set.unions (map (getParamsAssignedToNonInertParams inertParams) summands))
+    inertParams Set.\\ Set.unions (map (getParamsAssignedToNonInertParams inertParams) summands)
   where
     getParamsAssignedToNonInertParams :: Set.Set VarId.VarId -> LPESummand -> Set.Set VarId.VarId
     getParamsAssignedToNonInertParams _ (LPESummand _ _ _ LPEStop) = Set.empty

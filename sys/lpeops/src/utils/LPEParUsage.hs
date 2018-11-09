@@ -57,19 +57,19 @@ data LPEParamUsage = LPEParamUsage { directlyUsedParams :: Set.Set VarId
 
 showLPEParamUsage :: LPEParamUsage -> String
 showLPEParamUsage paramUsage =
-    "|-> Directly used = {" ++ (showVarIds (directlyUsedParams paramUsage)) ++ "}\n" ++
-    "|-> Changed = {" ++ (showVarIds (changedParams paramUsage)) ++ "}\n" ++
-    "|-> Used = {" ++ (showVarIds (usedParams paramUsage)) ++ "}\n" ++
-    "|-> Ruling = {" ++ (showVarIds (rulingParams paramUsage)) ++ "}\n" ++
-    "|-> Sources = " ++ (showSubst (paramSources paramUsage)) ++ "\n" ++
-    "\\-> Destinations = " ++ (showSubst (paramDestinations paramUsage)) ++ "\n"
+    "|-> Directly used = {" ++ showVarIds (directlyUsedParams paramUsage) ++ "}\n" ++
+    "|-> Changed = {" ++ showVarIds (changedParams paramUsage) ++ "}\n" ++
+    "|-> Used = {" ++ showVarIds (usedParams paramUsage) ++ "}\n" ++
+    "|-> Ruling = {" ++ showVarIds (rulingParams paramUsage) ++ "}\n" ++
+    "|-> Sources = " ++ showSubst (paramSources paramUsage) ++ "\n" ++
+    "\\-> Destinations = " ++ showSubst (paramDestinations paramUsage) ++ "\n"
   where
     showVarIds :: Set.Set VarId -> String
     showVarIds vs = List.intercalate ", " (map (Text.unpack . VarId.name) (Set.toList vs))
 -- showLPEParamUsage
 
 showLPEParamUsagePerSummand :: Map.Map LPESummand LPEParamUsage -> String
-showLPEParamUsagePerSummand paramUsages = concat (map (\(s, m) -> "\nSummand:\n\\-> " ++ (showLPESummand s) ++ "\nParameter usage:\n" ++ m) (Map.toList (Map.map showLPEParamUsage paramUsages)))
+showLPEParamUsagePerSummand paramUsages = concatMap (\(s, m) -> "\nSummand:\n\\-> " ++ showLPESummand s ++ "\nParameter usage:\n" ++ m) (Map.toList (Map.map showLPEParamUsage paramUsages))
 
 getParamUsagePerSummand :: LPESummands -> Set.Set VarId -> TxsDefs.VExpr -> IOC.IOC (Map.Map LPESummand LPEParamUsage)
 getParamUsagePerSummand summands params invariant = do
@@ -98,15 +98,15 @@ getParamSourcesPerSummand summands params invariant = do
     getParamSources :: LPESummand -> IOC.IOC LPEParamEqs
     getParamSources summand = do
         dests <- Monad.mapM (getParamSource summand) (Set.toList params)
-        do return (Map.unions dests)
+        return (Map.unions dests)
     -- getParamSources
     
     getParamSource :: LPESummand -> VarId -> IOC.IOC LPEParamEqs
     getParamSource (LPESummand _ _ guard _) param = do
         guardSolution <- getUniqueSolution guard invariant [] [param]
         case guardSolution of
-          SolveDefs.Solved gdSolMap -> do return (Map.singleton param (cstrConst (gdSolMap Map.! param)))
-          _ -> do return Map.empty
+          SolveDefs.Solved gdSolMap -> return (Map.singleton param (cstrConst (gdSolMap Map.! param)))
+          _ -> return Map.empty
     -- getParamSource
 -- getParamSourcesPerSummand
 
@@ -119,7 +119,7 @@ getParamDestinationsPerSummand summands params invariant = do
     getParamDestinations :: LPESummand -> IOC.IOC LPEParamEqs
     getParamDestinations summand = do
         dests <- Monad.mapM (getParamDestination summand) (Set.toList params)
-        do return (Map.unions dests)
+        return (Map.unions dests)
     -- getParamDestinations
     
     getParamDestination :: LPESummand -> VarId -> IOC.IOC LPEParamEqs
@@ -127,8 +127,8 @@ getParamDestinationsPerSummand summands params invariant = do
         (destVar, destSatExpr) <- constructDestSatExpr summand param
         destSolution <- getUniqueSolution destSatExpr invariant [] [destVar]
         case destSolution of
-          SolveDefs.Solved destSolMap -> do return (Map.singleton param (cstrConst (destSolMap Map.! destVar)))
-          _ -> do return Map.empty
+          SolveDefs.Solved destSolMap -> return (Map.singleton param (cstrConst (destSolMap Map.! destVar)))
+          _ -> return Map.empty
     -- getParamDestination
 -- getParamDestinationsPerSummand
 
@@ -160,7 +160,7 @@ getChangedParamsPerSummand summands params invariant = do
     getChangedParams :: LPESummand -> IOC.IOC (Set.Set VarId)
     getChangedParams summand = do
         unchangedParams <- Monad.filterM (isParamUnchanged summand) (Set.toList params)
-        return (params Set.\\ (Set.fromList unchangedParams))
+        return (params Set.\\ Set.fromList unchangedParams)
     -- getChangedParams
     
     isParamUnchanged :: LPESummand -> VarId -> IOC.IOC Bool
@@ -191,10 +191,10 @@ getDirectlyUsedParamsPerSummand summands params = Map.fromSet getDirectlyUsedPar
 --      p2 is the first element in the pair returned by this function, and
 --      p1 is the variable provided as the second parameter to this function.
 constructDestSatExpr :: LPESummand -> VarId -> IOC.IOC (VarId, TxsDefs.VExpr)
-constructDestSatExpr (LPESummand _ _ _ LPEStop) param = do return (param, cstrConst (Cbool False))
+constructDestSatExpr (LPESummand _ _ _ LPEStop) param = return (param, cstrConst (Cbool False))
 constructDestSatExpr (LPESummand _channelVars _channelOffers guard (LPEProcInst paramEqs)) param = do
     paramClone <- createFreshVarFromVar param
-    let eq = cstrAnd (Set.fromList ([guard, cstrEqual (cstrVar paramClone) (paramEqs Map.! param)]))
+    let eq = cstrAnd (Set.fromList [guard, cstrEqual (cstrVar paramClone) (paramEqs Map.! param)])
     -- IOC.putMsgs [ EnvData.TXS_CORE_ANY ("destSatExpr for " ++ (Text.unpack (VarId.name param)) ++ "/" ++ (Text.unpack (VarId.name paramClone)) ++ " is " ++ (showValExpr eq)) ]
     return (paramClone, eq)
 -- constructDestSatExpr
