@@ -15,19 +15,13 @@ See LICENSE at root directory of this repository.
 -----------------------------------------------------------------------------
 
 module LPETypes (
-LPEInstance,
-LPESummand(..),
-LPESummands,
-LPEProcInst(..),
-LPEChannelOffer,
-LPEChannelOffers,
-LPEParamEqs,
 newLPESummand,
 newLPEInstance,
 paramEqsLookup,
 toLPEInstance,
 fromLPEInstance,
-getScopeProblems
+getScopeProblems,
+module LPETypeDefs
 ) where
 
 import qualified Control.Monad.State as MonadState
@@ -46,35 +40,8 @@ import           ChanId
 import           Constant
 import           ValExpr
 import           ConcatEither
-
--- Type around which this module revolves.
--- It consists of the following parts:
---  - Channels used by the LPE (included mostly so that conversion to TXS is possible without additional channel information).
---  - Parameters used by the LPE and their initial values (each pair forms a 'parameter equation').
---  - List of summands of the LPE.
-type LPEInstance = ([TxsDefs.ChanId], LPEParamEqs, LPESummands)
-
--- Main building block of an LPE.
--- Each summand provides the following pieces of critical information:
---  - All channel variables, including hidden variables.
---  - Channel offers (action prefices and the *fresh* variables - also found in the earlier list - used per action prefix for synchronization).
---  - Guard (restriction on when the summand can be 'applied').
---  - STOP, or a number of parameter equations to be used for the recursive instantiation.
-data LPESummand = LPESummand [VarId] LPEChannelOffers TxsDefs.VExpr LPEProcInst deriving (Eq, Ord, Show)
-type LPESummands = Set.Set LPESummand
-
--- Summands can end with a recursive instantiation of the LPE or with a STOP:
-data LPEProcInst = LPEStop | LPEProcInst LPEParamEqs deriving (Eq, Ord, Show)
-
--- Convenience type.
--- Relates a channel with communication variables over which that channel must be synchronized.
-type LPEChannelOffer = (TxsDefs.ChanId, [VarId])
-type LPEChannelOffers = [LPEChannelOffer]
-
--- Convenience type.
--- Relates a parameter with the (initial) value of that parameter
--- (in the case of a particular process instantiation).
-type LPEParamEqs = Map.Map VarId TxsDefs.VExpr
+import           LPEPrettyPrint
+import           LPETypeDefs
 
 paramEqsLookup :: [VarId] -> LPEParamEqs -> [TxsDefs.VExpr]
 paramEqsLookup orderedParams paramEqs = map (\p -> paramEqs Map.! p) orderedParams
@@ -136,7 +103,7 @@ getLPESummands expectedProcId expectedProcDef@(TxsDefs.ProcDef defChanIds params
                                                                        let scopeProblems = getSummandScopeProblems (Set.fromList params) constructedSummand in
                                                                          if null scopeProblems
                                                                          then Right [constructedSummand]
-                                                                         else Left (("Invalid summand: " ++ TxsShow.fshow expr):scopeProblems ++ [""])
+                                                                         else Left (("Invalid summand: " ++ showLPESummand constructedSummand):scopeProblems ++ ["----------------------------------------------------------------------------------------------------------------------------------------------------------------"])
             _ -> Left ["Expected process instantiation, but found " ++ TxsShow.fshow (TxsDefs.view procInst) ++ "!"]
       _ -> Left ["Expected choice or channel, but found " ++ TxsShow.fshow (TxsDefs.view expr) ++ "!"]
 -- getLPESummands

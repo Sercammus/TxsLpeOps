@@ -31,7 +31,7 @@ import           LPETypes
 import           LPEPrettyPrint
 
 lpeOpsVersion :: String
-lpeOpsVersion = "0.7.7"
+lpeOpsVersion = "0.7.8"
 
 data LPEOp = LPEOpLoop | LPEOp LPEOperation
 
@@ -87,7 +87,7 @@ discardLPE _lpeInstance _out _invariant = return (Left ["LPE discarded!"])
 
 showLPE :: LPEOperation
 showLPE lpeInstance _out _invariant = do
-    IOC.putMsgs [ EnvData.TXS_CORE_ANY (showLPEInstance lpeInstance) ]
+    IOC.putMsgs [ EnvData.TXS_CORE_ANY (showContextFreeLPEInstance lpeInstance) ]
     return (Right lpeInstance)
 -- showLPE
 

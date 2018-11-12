@@ -17,13 +17,13 @@ See LICENSE at root directory of this repository.
 {-# LANGUAGE ViewPatterns        #-}
 {-# LANGUAGE FlexibleContexts    #-}
 module LPEPrettyPrint (
+showLPEInstance,
+showContextFreeLPEInstance,
+showLPESummand,
+showContextFreeLPESummand,
+showSubst,
 showValExpr,
 showContextFreeValExpr,
-showLPEChannelOffer,
-showLPEParamEq,
-showLPESummand,
-showLPEInstance,
-showSubst
 ) where
 
 import qualified Data.List as List
@@ -40,9 +40,142 @@ import qualified CstrId
 import qualified SortId
 import qualified ChanId
 import qualified FreeVar
-import LPETypes
+import LPETypeDefs
 
-showCFValExpr :: Map.Map VarId String -> TxsDefs.VExpr -> String
+type VarContext = Map.Map VarId String
+
+createDefaultContextFromVarList :: [VarId] -> VarContext
+createDefaultContextFromVarList = createDefaultContextFromVars . Set.fromList
+
+createDefaultContextFromVars :: Set.Set VarId -> VarContext
+createDefaultContextFromVars = Map.fromSet (Text.unpack . VarId.name)
+
+createFreeContextFromVarList :: String -> [VarId] -> VarContext
+createFreeContextFromVarList prefix vars = Map.fromList (map (\(v, n) -> (v, prefix ++ show (n::Integer))) (zip vars [1..]))
+
+createFreeContextFromVars :: String -> Set.Set VarId -> VarContext
+createFreeContextFromVars prefix = createFreeContextFromVarList prefix . Set.toList
+
+getLPEInstanceFreeContext :: LPEInstance -> VarContext
+getLPEInstanceFreeContext lpe@(_, initParamEqs, _) =
+    let lpeParams = Map.keysSet initParamEqs in
+    let lpeVars = getLPEInstanceVariables lpe Set.\\ lpeParams in
+      Map.union (createFreeContextFromVars "par" lpeParams) (createFreeContextFromVars "var" lpeVars)
+-- getLPEInstanceContext
+
+getLPESummandFreeContext :: LPESummand -> VarContext
+getLPESummandFreeContext summand = createFreeContextFromVars "var" (getLPESummandVariables summand)
+
+-- Lists all variables that occur in an LPE:
+getLPEInstanceVariables :: LPEInstance -> Set.Set VarId
+getLPEInstanceVariables (_, initParamEqs, summands) =
+    Set.union (getParamEqsVariables initParamEqs) (Set.unions (map getLPESummandVariables (Set.toList summands)))
+-- getLPEInstanceVariables
+
+getLPESummandVariables :: LPESummand -> Set.Set VarId
+getLPESummandVariables (LPESummand channelVars channelOffers guard procInst) =
+    Set.unions ([Set.fromList channelVars, Set.fromList (FreeVar.freeVars guard), getProcInstVariables procInst] ++ map (Set.fromList . snd) channelOffers)
+-- getLPESummandVariables
+
+getProcInstVariables :: LPEProcInst -> Set.Set VarId
+getProcInstVariables LPEStop = Set.empty
+getProcInstVariables (LPEProcInst eqs) = getParamEqsVariables eqs
+
+getParamEqsVariables :: LPEParamEqs -> Set.Set VarId
+getParamEqsVariables eqs = Set.union (Map.keysSet eqs) (Set.unions (map (Set.fromList . FreeVar.freeVars) (Map.elems eqs)))
+
+-- Shows an LPE in the default 'context'; that is,
+-- variables are displayed using their actual names:
+showLPEInstance :: LPEInstance -> String
+showLPEInstance lpe = showCFLPEInstance (createDefaultContextFromVars (getLPEInstanceVariables lpe)) lpe
+
+-- Shows an LPE in a 'free context'; that is,
+-- fresh (short) names are introduces for each unique variable, and those names are used to display them:
+showContextFreeLPEInstance :: LPEInstance -> String
+showContextFreeLPEInstance lpe = showCFLPEInstance (getLPEInstanceFreeContext lpe) lpe
+
+-- Shows an LPE in the specified 'context'; that is,
+-- using specific names for specific variables when they occur:
+showCFLPEInstance :: VarContext -> LPEInstance -> String
+showCFLPEInstance f (chanIds, initParamEqs, summands) =
+    "LPE[" ++ List.intercalate "; " (map showChanDecl chanIds) ++ "] (" ++
+    showParamEqs initParamEqs ++ ") ::=\n        " ++
+    List.intercalate "\n     ## " (map (showCFLPESummand f) (Set.toList summands)) ++ "\n;"
+  where
+    showChanDecl :: ChanId.ChanId -> String
+    showChanDecl chanId =
+        let chanSortStrings = map (Text.unpack . SortId.name) (ChanId.chansorts chanId) in
+          Text.unpack (ChanId.name chanId) ++ " :: " ++ List.intercalate " # " chanSortStrings
+    -- showChanDecl
+    
+    showParamEqs :: LPEParamEqs -> String
+    showParamEqs paramEqs = List.intercalate ", " (map showParamEq (Map.toList paramEqs))
+    
+    showParamEq :: (VarId, TxsDefs.VExpr) -> String
+    showParamEq (varId, expr) = Text.unpack (VarId.name varId) ++ " = " ++ showCFValExpr f expr
+-- showCFLPEInstance
+
+-- Shows a summand in the default 'context'; that is,
+-- variables are displayed using their actual names:
+showLPESummand :: LPESummand -> String
+showLPESummand summand = showCFLPESummand (createDefaultContextFromVars (getLPESummandVariables summand)) summand
+
+-- Shows a summand in a 'free context'; that is,
+-- fresh (short) names are introduces for each unique variable, and those names are used to display them:
+showContextFreeLPESummand :: LPESummand -> String
+showContextFreeLPESummand summand = showCFLPESummand (getLPESummandFreeContext summand) summand
+
+-- Shows a summand in the specified 'context'; that is,
+-- using specific names for specific variables when they occur:
+showCFLPESummand :: VarContext -> LPESummand -> String
+showCFLPESummand f (LPESummand channelVars channelOffers guard procInst) =
+    let usedChannelVars = concatMap snd channelOffers in
+    let hiddenChannelVars = Set.toList (Set.fromList channelVars Set.\\ Set.fromList usedChannelVars) in
+      showChannelOffers channelOffers ++
+      showHiddenVars hiddenChannelVars ++
+      "[[ " ++ showCFValExpr f guard ++ " ]] >-> " ++ showProcInst procInst
+  where
+    showChannelOffers :: LPEChannelOffers -> String
+    showChannelOffers [] = ""
+    showChannelOffers offers = List.intercalate " | " (map showChannelOffer offers) ++ " "
+    
+    showChannelOffer :: LPEChannelOffer -> String
+    showChannelOffer (chanId, vars) = Text.unpack (ChanId.name chanId) ++ concatMap (\v -> " ? " ++ f Map.! v) vars
+    
+    showHiddenVars :: [VarId] -> String
+    showHiddenVars [] = ""
+    showHiddenVars hiddenVars = "(" ++ List.intercalate ", " (map (f Map.!) hiddenVars) ++ ") "
+    
+    showProcInst :: LPEProcInst -> String
+    showProcInst LPEStop = "STOP"
+    showProcInst (LPEProcInst paramEqs) = "LPE(" ++ showParamEqs paramEqs ++ ")"
+    
+    showParamEqs :: LPEParamEqs -> String
+    showParamEqs paramEqs = List.intercalate ", " (map showParamEq (Map.toList paramEqs))
+    
+    showParamEq :: (VarId, TxsDefs.VExpr) -> String
+    showParamEq (varId, expr) = f Map.! varId ++ " = " ++ showCFValExpr f expr
+-- showCFLPESummand
+
+-- Shows the given expression in the default 'context'; that is,
+-- variables are displayed using their actual names:
+showValExpr :: TxsDefs.VExpr -> String
+showValExpr expr = showCFValExpr (createDefaultContextFromVarList (FreeVar.freeVars expr)) expr
+
+-- Shows the given expression in a 'free context'; that is,
+-- fresh (short) names are introduces for each unique variable, and those names are used to display them:
+showContextFreeValExpr :: TxsDefs.VExpr -> String
+showContextFreeValExpr expr =
+    showCFValExpr (createFreeContextFromVarList "var" (FreeVar.freeVars expr)) expr
+-- showContextFreeValExpr
+
+-- Shows a substitution:
+showSubst :: Map.Map VarId TxsDefs.VExpr -> String
+showSubst subst = "[" ++ List.intercalate ", " (map (\(p, v) -> Text.unpack (VarId.name p) ++ " := " ++ showValExpr v) (Map.toList subst)) ++ "]"
+
+-- Shows the given expression in the specified 'context'; that is,
+-- using specific names for specific variables when they occur:
+showCFValExpr :: VarContext -> TxsDefs.VExpr -> String
 showCFValExpr _ (view -> Vconst (Cbool val))      = show val
 showCFValExpr _ (view -> Vconst (Cint val))       = show val
 showCFValExpr _ (view -> Vconst (Cstring val))    = show val
@@ -81,63 +214,8 @@ showCFValExpr f (view -> Vpredef kd fid vexps)    = let newVExps = map (showCFVa
 showCFValExpr _ expr                              = error ("LPEPrettyPrint.showCFValExpr not defined for " ++ show expr)
 -- showCFValExpr
 
-visitcOccur :: Map.Map VarId String -> (TxsDefs.VExpr, Integer) -> String
+-- Helper function to showCFValExpr:
+visitcOccur :: VarContext -> (TxsDefs.VExpr, Integer) -> String
 visitcOccur f (v, 1) = showCFValExpr f v
 visitcOccur f (v, n) = showCFValExpr f v ++ " times " ++ show n
-
-showValExpr :: TxsDefs.VExpr -> String
-showValExpr expr =
-    let f = Map.fromList (map (\v -> (v, Text.unpack (VarId.name v))) (FreeVar.freeVars expr)) in
-      showCFValExpr f expr
--- showValExpr
-
-showContextFreeValExpr :: TxsDefs.VExpr -> String
-showContextFreeValExpr expr =
-    let f = Map.fromList (map (\(v, n) -> (v, "var" ++ show (n::Integer))) (zip (FreeVar.freeVars expr) [1..])) in
-      showCFValExpr f expr
--- showContextFreeValExpr
-
-showLPEChannelOffer :: LPEChannelOffer -> String
-showLPEChannelOffer (chanId, vars) = Text.unpack (ChanId.name chanId) ++ concatMap (\v -> " ? " ++ Text.unpack (VarId.name v)) vars
-
-showLPEChannelOffers :: LPEChannelOffers -> String
-showLPEChannelOffers [] = ""
-showLPEChannelOffers channelOffers = List.intercalate " | " (map showLPEChannelOffer channelOffers) ++ " "
-
-showHiddenVars :: [VarId] -> String
-showHiddenVars [] = ""
-showHiddenVars hiddenVars = "(" ++ List.intercalate ", " (map (Text.unpack . VarId.name) hiddenVars) ++ ") "
-
-showLPEParamEq :: (VarId, TxsDefs.VExpr) -> String
-showLPEParamEq (varId, expr) = Text.unpack (VarId.name varId) ++ " = " ++ showValExpr expr
-
-showLPEParamEqs :: LPEParamEqs -> String
-showLPEParamEqs paramEqs = List.intercalate ", " (map showLPEParamEq (Map.toList paramEqs))
-
-showProcInst :: LPEProcInst -> String
-showProcInst LPEStop = "STOP"
-showProcInst (LPEProcInst paramEqs) = "LPE(" ++ showLPEParamEqs paramEqs ++ ")"
-
-showLPESummand :: LPESummand -> String
-showLPESummand (LPESummand channelVars channelOffers guard procInst) =
-    let usedChannelVars = concatMap snd channelOffers in
-    let hiddenChannelVars = Set.toList (Set.fromList channelVars Set.\\ Set.fromList usedChannelVars) in
-      showLPEChannelOffers channelOffers ++ showHiddenVars hiddenChannelVars ++ "[[ " ++ showValExpr guard ++ " ]] >-> " ++ showProcInst procInst
--- showLPESummand
-
-showChanDecl :: ChanId.ChanId -> String
-showChanDecl chanId =
-    let chanSortStrings = map (Text.unpack . SortId.name) (ChanId.chansorts chanId) in
-      Text.unpack (ChanId.name chanId) ++ " :: " ++ List.intercalate " # " chanSortStrings
--- showChanDecl
-
-showLPEInstance :: LPEInstance -> String
-showLPEInstance (chanIds, initParamEqs, summands) =
-    "LPE[" ++ List.intercalate "; " (map showChanDecl chanIds) ++ "] (" ++
-    showLPEParamEqs initParamEqs ++ ") ::=\n        " ++
-    List.intercalate "\n     ## " (map showLPESummand (Set.toList summands)) ++ "\n;"
--- showLPEInstance
-
-showSubst :: Map.Map VarId TxsDefs.VExpr -> String
-showSubst subst = "[" ++ List.intercalate ", " (map (\(p, v) -> Text.unpack (VarId.name p) ++ " := " ++ showValExpr v) (Map.toList subst)) ++ "]"
 

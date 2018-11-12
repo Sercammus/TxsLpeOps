@@ -24,6 +24,7 @@ library
                     , LPEDataReset
                     , LPEParReset
                     , LPETypes
+                    , LPETypeDefs
                     , LPEConfCheck
                     , LPE2MCRL2
                     , LPEParRemoval
@@ -76,6 +77,7 @@ test-suite lpeops-test
                       , LPEDataReset
                       , LPEParReset
                       , LPETypes
+                      , LPETypeDefs
                       , LPEConfCheck
                       , LPE2MCRL2
                       , LPEParRemoval
