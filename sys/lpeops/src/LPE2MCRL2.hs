@@ -143,7 +143,7 @@ function2mapping (funcId, FuncDef.FuncDef params _expr) = do
 
 -- Converts a list of mCRL2 sorts into a (binary) tree of multi-sorts:
 sorts2multiSort :: [MCRL2Defs.Sort] -> MCRL2Defs.Sort
-sorts2multiSort [] = error "Cannot create MultiSort from empty Sort list!"
+sorts2multiSort [] = MCRL2Defs.ImplicitSort
 sorts2multiSort [x] = x
 sorts2multiSort xs = MCRL2Defs.MultiSort xs
 -- sorts2multiSort
