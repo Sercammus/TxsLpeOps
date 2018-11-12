@@ -31,7 +31,7 @@ import           LPETypes
 import           LPEPrettyPrint
 
 lpeOpsVersion :: String
-lpeOpsVersion = "0.7.6"
+lpeOpsVersion = "0.7.7"
 
 data LPEOp = LPEOpLoop | LPEOp LPEOperation
 

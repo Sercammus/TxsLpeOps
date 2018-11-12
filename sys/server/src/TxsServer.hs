@@ -63,9 +63,9 @@ import qualified VarId
 
 -- imports added for changes to cmdLPE
 import qualified EnvCore as IOC
-import qualified ModelId
 import qualified ProcId
 import qualified ChanId
+import ModelIdFactory
 
 -- import from valexpr
 import qualified Constant
@@ -985,7 +985,7 @@ cmdLPE :: String -> IOS.IOS ()
 cmdLPE args = do
      tdefs <- lift TxsCore.txsGetTDefs
      let mdefs = TxsDefs.modelDefs tdefs
-         mids  = [ m | m@((TxsDefs.ModelId nm _uid), _) <- Map.toList mdefs
+         mids  = [ m | m@(TxsDefs.ModelId nm _uid, _) <- Map.toList mdefs
                            , T.unpack nm == args
                  ]
          chids = Set.toList $ Set.unions [ Set.unions (chins ++ chouts ++ spls)
@@ -993,25 +993,22 @@ cmdLPE args = do
                                            <- Map.toList mdefs
                                          ]
      case mids of
-       [ (modelId, TxsDefs.ModelDef chins chouts spls body) ]
+       [ (_, TxsDefs.ModelDef chins chouts spls body) ]
        -- [ (modelId, _) ]
          -> do -- Create a new model and process:
                -- - The new model instantiates the new process;
                -- - The new process uses the body of the old model.
                -- By doing this, LPEs can be generated for models that do not
                -- have a body that consists of only a process instantiation:
-               newProcUnid <- lift $ IOC.newUnid
-               let newProcId = TxsDefs.ProcId { ProcId.name = (T.pack "proxyProcess")
+               newProcUnid <- lift IOC.newUnid
+               let newProcId = TxsDefs.ProcId { ProcId.name = T.pack "proxyProcess"
                                               , ProcId.unid = newProcUnid
                                               , ProcId.procchans = map (ProcId.ChanSort . ChanId.chansorts) chids
                                               , ProcId.procvars = []
                                               , ProcId.procexit = ProcId.NoExit }
                let newProcDef = TxsDefs.ProcDef chids [] body
                let newProcInit = TxsDefs.procInst newProcId chids []
-               newModelUnid <- lift $ IOC.newUnid
-               let newModelId = modelId { ModelId.name = (T.pack "proxyModel")
-                                        , ModelId.unid = newModelUnid
-                                        }
+               newModelId <- lift $ getModelIdFromName "proxyModel"
                let newModelDef = TxsDefs.ModelDef chins chouts spls newProcInit
                let tdefs' = tdefs { TxsDefs.procDefs = Map.insert newProcId newProcDef (TxsDefs.procDefs tdefs)
                                   , TxsDefs.modelDefs = Map.insert newModelId newModelDef (TxsDefs.modelDefs tdefs)
@@ -1136,7 +1133,7 @@ readBExpr chids args = do
 readVExpr :: String -> IOS.IOS TxsDefs.VExpr
 readVExpr args =
      if args == ""
-     then do return (ValExpr.cstrConst (Constant.Cbool True))
+     then return (ValExpr.cstrConst (Constant.Cbool True))
      else do env              <- get
              let uid           = IOS.uid env
                  sigs          = IOS.sigs env
@@ -1151,7 +1148,7 @@ readVExpr args =
                                    ( \e -> return ((uid, Nothing),show (e::ErrorCall)))
 
              case vexp' of
-              Just vexp'' -> do return vexp''
+              Just vexp'' -> return vexp''
               Nothing -> do IFS.nack "ERROR" [ "incorrect value expression: " ++ e ]
                             return (ValExpr.cstrConst (Constant.Cbool False))
 

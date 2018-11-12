@@ -191,6 +191,7 @@ import qualified LPEParReset
 import qualified LPEConfCheck
 import qualified LPE2MCRL2
 import ConcatEither
+import ModelIdFactory
 
 -- import from valexpr
 import qualified ModelId
@@ -1154,14 +1155,12 @@ txsLPE (Right modelid@(TxsDefs.ModelId modname _moduid))  =  do
                    lift $ hPrint stderr lpe'
                    case lpe' of
                      Just (Left procinst'@(TxsDefs.view -> TxsDefs.ProcInst{}))
-                       -> do uid'   <- IOC.newUnid
-                             tdefs' <- gets (IOC.tdefs . IOC.state)
-                             let modelid' = TxsDefs.ModelId ("LPE_"<>modname) uid'
-                                 modeldef'= TxsDefs.ModelDef insyncs outsyncs splsyncs procinst'
-                                 tdefs''  = tdefs'
-                                   { TxsDefs.modelDefs = Map.insert modelid' modeldef'
-                                                                    (TxsDefs.modelDefs tdefs')
-                                   }
+                       -> do tdefs' <- gets (IOC.tdefs . IOC.state)
+                             --uid'   <- IOC.newUnid
+                             --let modelid' = TxsDefs.ModelId ("LPE_"<>modname) uid'
+                             modelid' <- getModelIdFromName (T.unpack ("LPE_"<>modname))
+                             let modeldef' = TxsDefs.ModelDef insyncs outsyncs splsyncs procinst'
+                             let tdefs'' = tdefs' { TxsDefs.modelDefs = Map.insert modelid' modeldef' (TxsDefs.modelDefs tdefs') }
                              IOC.modifyCS $ \st -> st { IOC.tdefs = tdefs'' }
                              return $ Just (Right modelid')
                      _ -> do IOC.putMsgs [ EnvData.TXS_CORE_SYSTEM_ERROR $ "LPE: " ++
@@ -1182,23 +1181,22 @@ txsLPEOp opChain inName outName invariant = do
         case getModels (TxsDefs.modelDefs tdefs) inName of
           [TxsDefs.ModelDef insyncs outsyncs splsyncs bexpr] ->
             case concatEither (map getLPEOperation (filter (\opName -> opName /= []) (splitByArrow opChain))) of
-              Left msgs -> do return msgs
+              Left msgs -> return msgs
               Right ops -> do
                 manipulatedLPE <- LPEOps.lpeOperations ops bexpr outName invariant
                 case manipulatedLPE of
-                  Left msgs -> do return msgs
+                  Left msgs -> return msgs
                   Right (newProcInst, newProcId, newProcDef) -> do
-                    newModelUid <- IOC.newUnid
-                    let newModelId = TxsDefs.ModelId (T.pack outName) newModelUid
+                    newModelId <- getModelIdFromName outName
                     let newModelDef = TxsDefs.ModelDef insyncs outsyncs splsyncs newProcInst
                     tdefs' <- gets (IOC.tdefs . IOC.state)
                     let tdefs'' = tdefs' { TxsDefs.procDefs = Map.insert newProcId newProcDef (TxsDefs.procDefs tdefs') }
                     let tdefs''' = tdefs'' { TxsDefs.modelDefs = Map.insert newModelId newModelDef (TxsDefs.modelDefs tdefs'') }
                     IOC.modifyCS $ \st -> st { IOC.tdefs = tdefs''' }
-                    return ["LPE transformation complete; result saved to model " ++ (TxsShow.fshow newModelId) ++ "!"]
+                    return ["LPE transformation complete; result saved to model " ++ TxsShow.fshow newModelId ++ "!"]
           _ -> do let definedModelNames = List.intercalate " or " (map (T.unpack . ModelId.name) (Map.keys (TxsDefs.modelDefs tdefs)))
                   return ["Expected " ++ definedModelNames ++ ", found " ++ inName ++ "!"]
-      _ -> do return ["TorXakis core is not initialized!"]
+      _ -> return ["TorXakis core is not initialized!"]
   where
     getModels :: Map.Map TxsDefs.ModelId TxsDefs.ModelDef -> String -> [TxsDefs.ModelDef]
     getModels mdefs modelName = [ modelDef | (TxsDefs.ModelId nm _uid, modelDef) <- Map.toList mdefs, T.unpack nm == modelName ]
@@ -1206,7 +1204,7 @@ txsLPEOp opChain inName outName invariant = do
     splitByArrow :: String -> [String]
     splitByArrow [] = [[]]
     splitByArrow [x] = [[x]]
-    splitByArrow ('-':'>':xs) = [[]] ++ (splitByArrow xs)
+    splitByArrow ('-':'>':xs) = []:splitByArrow xs
     splitByArrow (x:xs) =
         case splitByArrow xs of
           [] -> [[x]] -- (Should not happen, but anyway.)

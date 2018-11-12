@@ -32,6 +32,7 @@ library
                     , LPESuccessors
                     , Satisfiability
                     , ValExprVisitor
+                    , ModelIdFactory
                     , ValFactory
                     , VarFactory
                     , ConcatEither
@@ -83,6 +84,7 @@ test-suite lpeops-test
                       , LPESuccessors
                       , Satisfiability
                       , ValExprVisitor
+                      , ModelIdFactory
                       , ValFactory
                       , VarFactory
                       , ConcatEither
