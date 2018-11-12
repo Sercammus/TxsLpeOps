@@ -136,7 +136,7 @@ getLPESummands expectedProcId expectedProcDef@(TxsDefs.ProcDef defChanIds params
                                                                        let scopeProblems = getSummandScopeProblems (Set.fromList params) constructedSummand in
                                                                          if null scopeProblems
                                                                          then Right [constructedSummand]
-                                                                         else Left (("Invalid summand: " ++ TxsShow.fshow expr):scopeProblems)
+                                                                         else Left (("Invalid summand: " ++ TxsShow.fshow expr):scopeProblems ++ [""])
             _ -> Left ["Expected process instantiation, but found " ++ TxsShow.fshow (TxsDefs.view procInst) ++ "!"]
       _ -> Left ["Expected choice or channel, but found " ++ TxsShow.fshow (TxsDefs.view expr) ++ "!"]
 -- getLPESummands
@@ -166,10 +166,10 @@ getParamEqs [] (x:_) = Left ["Too many expressions, found '" ++ TxsShow.fshow x 
 getParamEqs (x:params) (y:paramValues) =
     case getParamEqs params paramValues of
       Left msgs -> if SortOf.sortOf x /= SortOf.sortOf y
-                   then Left (("Mismatching sorts, found " ++ Text.unpack (VarId.name x) ++ " and " ++ TxsShow.fshow y ++ "!"):msgs)
+                   then Left (("Mismatching sorts, found " ++ Text.unpack (VarId.name x) ++ " and " ++ TxsShow.fshow (SortOf.sortOf y) ++ "!"):msgs)
                    else Left msgs
       Right eqs -> if SortOf.sortOf x /= SortOf.sortOf y
-                   then Left ["Mismatching sorts, found " ++ Text.unpack (VarId.name x) ++ " and " ++ TxsShow.fshow y ++ "!"]
+                   then Left ["Mismatching sorts, found " ++ Text.unpack (VarId.name x) ++ " and " ++ TxsShow.fshow (SortOf.sortOf y) ++ "!"]
                    else Right (Map.insert x y eqs)
 -- getParamEqs
 
