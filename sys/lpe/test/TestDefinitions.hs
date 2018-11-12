@@ -34,12 +34,12 @@ procIdGen name' chans vars' = ProcId   {  ProcId.name       = T.pack name'
                                     }
 
 
-pshowProcDefs :: Map.Map ProcId ProcDef -> String
-pshowProcDefs procDefs' = pshowProcDefs' $ Map.toList procDefs'
+pshow_procDefs :: (Map.Map ProcId ProcDef) -> String
+pshow_procDefs procDefs' = pshow_procDefs' $ Map.toList procDefs'
   where
-      pshowProcDefs' :: [(ProcId, ProcDef)] -> String
-      pshowProcDefs' [] = ""
-      pshowProcDefs' ((procId, procDef'):rest) = "\n ** " ++ pshow procId ++ "\n" ++ pshow (DefProc procDef') ++ pshowProcDefs' rest
+      pshow_procDefs' :: [(ProcId, ProcDef)] -> String
+      pshow_procDefs' [] = ""
+      pshow_procDefs' ((procId, procDef'):rest) = "\n ** " ++ pshow procId ++ "\n" ++ (pshow $ DefProc procDef') ++ pshow_procDefs' rest
 
 
 ---------------------------------------------------------------------------
@@ -122,6 +122,10 @@ varIdPpcLHS :: VarId
 varIdPpcLHS = VarId (T.pack "P$lhs$pc$P$lhs") 33 intSort
 varIdPpcRHS :: VarId
 varIdPpcRHS = VarId (T.pack "P$rhs$pc$P$rhs") 33 intSort
+varIdPpcInterruptLHS :: VarId
+varIdPpcInterruptLHS = VarId (T.pack "P$lhs$pc$P$interrupt$lhs") 33 intSort
+varIdPpcInterruptRHS :: VarId
+varIdPpcInterruptRHS = VarId (T.pack "P$rhs$pc$P$interrupt$rhs") 33 intSort
 
 vexprPdisable :: VExpr
 vexprPdisable = cstrVar varIdPdisable
@@ -129,7 +133,10 @@ vexprPpcLHS :: VExpr
 vexprPpcLHS = cstrVar varIdPpcLHS
 vexprPpcRHS :: VExpr
 vexprPpcRHS = cstrVar varIdPpcRHS
-
+vexprPpcInterruptLHS :: VExpr
+vexprPpcInterruptLHS = cstrVar varIdPpcInterruptLHS
+vexprPpcInterruptRHS :: VExpr
+vexprPpcInterruptRHS = cstrVar varIdPpcInterruptRHS
 
 
 
