@@ -19,6 +19,7 @@ dataReset
 ) where
 
 import qualified Control.Monad as Monad
+-- import qualified Data.List as List
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -36,7 +37,7 @@ mapGet m k =
     --trace ("mapGet(" ++ (show k) ++ ")") (
       if Map.member k m
       then m Map.! k
-      else error ("Could not find " ++ show k ++ " in map!")
+      else error ("Could not find " ++ (show k) ++ " in map!")
     --)
 -- mapGet
 
@@ -47,22 +48,32 @@ dataReset :: LPEOperation
 dataReset (channels, initParamEqs, summands) _out invariant = do
     IOC.putMsgs [ EnvData.TXS_CORE_ANY "<<dataReset>>" ]
     let params = Map.keysSet initParamEqs
+    IOC.putMsgs [ EnvData.TXS_CORE_ANY "Collecting information on parameter usage..." ]
     paramUsagePerSummand <- getParamUsagePerSummand summands params invariant
     -- IOC.putMsgs [ EnvData.TXS_CORE_ANY (showLPEParamUsagePerSummand paramUsagePerSummand) ]
     let controlFlowParams = getControlFlowParams paramUsagePerSummand params
     let dataParams = params Set.\\ controlFlowParams
-    let controlFlowGraphs = getControlFlowGraphs paramUsagePerSummand controlFlowParams
     let belongsToRelation = getBelongsToRelation paramUsagePerSummand controlFlowParams dataParams
+    --Monad.mapM_ (\(d, cfps) -> IOC.putMsgs [ EnvData.TXS_CORE_ANY ((Text.unpack (VarId.name d)) ++ " belongs to " ++ (List.intercalate ", " (map (Text.unpack . VarId.name) cfps))) ]) (Map.toList belongsToRelation)
+    let controlFlowGraphs = getControlFlowGraphs paramUsagePerSummand controlFlowParams
+    IOC.putMsgs [ EnvData.TXS_CORE_ANY "Building relevance relation..." ]
     let initialRelevanceRelation = concat [
                                      concat [
                                        [ (dk, dj, s) | (dj', s) <- Map.toList (paramSources paramUsage), dj' == dj ]
-                                     | dj <- djs, paramUsage <- Map.elems paramUsagePerSummand, dk `elem` directlyUsedParams paramUsage ]
+                                     | dj <- djs, paramUsage <- Map.elems paramUsagePerSummand, dk `elem` (directlyUsedParams paramUsage) ]
                                    | (dk, djs) <- Map.toList belongsToRelation ]
     let relevanceRelation = repeatUntilFixpoint (updateRelevanceRelation paramUsagePerSummand controlFlowGraphs belongsToRelation) (Set.fromList initialRelevanceRelation)
+    -- IOC.putMsgs [ EnvData.TXS_CORE_ANY (showRelevanceRelation "Full relevance relation:" relevanceRelation) ]
+    IOC.putMsgs [ EnvData.TXS_CORE_ANY "Constructing new LPE..." ]
     let newSummands = map (resetParamsInSummand initParamEqs paramUsagePerSummand belongsToRelation relevanceRelation) (Set.toList summands)
-    Monad.mapM_ (\m -> IOC.putMsgs [ EnvData.TXS_CORE_ANY m ]) (concatMap snd newSummands)
+    Monad.mapM_ (\m -> IOC.putMsgs [ EnvData.TXS_CORE_ANY m ]) (concat (map snd newSummands))
     return (Right (channels, initParamEqs, Set.fromList (map fst newSummands)))
 -- dataReset
+
+-- showRelevanceRelation :: String -> Set.Set (VarId, VarId, TxsDefs.VExpr) -> String
+-- showRelevanceRelation caption relation =
+    -- caption ++ "\n" ++ concatMap (\(d, c, v) -> "    " ++ ((Text.unpack (VarId.name d)) ++ " is relevant when " ++ (Text.unpack (VarId.name c)) ++ " equals " ++ (showValExpr v) ++ "\n")) (Set.toList relation)
+-- showRelevanceRelation
 
 resetParamsInSummand :: Map.Map VarId TxsDefs.VExpr             -- initParamEqs
                      -> Map.Map LPESummand LPEParamUsage        -- paramUsagePerSummand
@@ -70,26 +81,30 @@ resetParamsInSummand :: Map.Map VarId TxsDefs.VExpr             -- initParamEqs
                      -> Set.Set (VarId, VarId, TxsDefs.VExpr)   -- relevanceRelation
                      -> LPESummand                              -- summand
                      -> (LPESummand, [String])                  -- result
-resetParamsInSummand _initParamEqs _paramUsagePerSummand _belongsToRelation _relevanceRelation summand@(LPESummand _ _ _ LPEStop) = (summand, [])
+resetParamsInSummand _initParamEqs _paramUsagePerSummand _belongsToRelation _relevanceRelation (summand@(LPESummand _ _ _ LPEStop)) = (summand, [])
 resetParamsInSummand initParamEqs paramUsagePerSummand belongsToRelation relevanceRelation summand@(LPESummand channelVars channelOffers guard (LPEProcInst paramEqs)) =
     let paramUsage = paramUsagePerSummand Map.! summand in
     let newParamEqs = map (resetParam paramUsage) (Map.toList paramEqs) in
-      (LPESummand channelVars channelOffers guard (LPEProcInst (Map.fromList newParamEqs)), concatMap getParamChange newParamEqs)
+      --(LPESummand channelVars channelOffers guard (LPEProcInst (Map.fromList (map fst newParamEqs))), ["{", showLPESummand summand] ++ concat (map snd newParamEqs) ++ concat (map getParamChange (map fst newParamEqs)) ++ ["}"])
+      (LPESummand channelVars channelOffers guard (LPEProcInst (Map.fromList (map fst newParamEqs))), concat (map getParamChange (map fst newParamEqs)))
   where
-    resetParam :: LPEParamUsage -> (VarId, TxsDefs.VExpr) -> (VarId, TxsDefs.VExpr)
+    resetParam :: LPEParamUsage -> (VarId, TxsDefs.VExpr) -> ((VarId, TxsDefs.VExpr), [String])
     resetParam paramUsage (p, v) =
         let requiredElements = Set.fromList (
                                  concat [
-                                   [ (dk, dj, mapGet (paramDestinations paramUsage) dj) | dj <- djs, dj `elem` rulingParams paramUsage ]
+                                   [ (dk, dj, mapGet (paramDestinations paramUsage) dj) | dj <- djs, dj `elem` (rulingParams paramUsage) ]
                                  | (dk, djs) <- Map.toList belongsToRelation, dk == p ]
                                ) in
-          if Set.intersection relevanceRelation requiredElements == requiredElements
-          then (p, v)
-          else (p, mapGet initParamEqs p)
+          if requiredElements `Set.isSubsetOf` relevanceRelation
+          then ((p, v), []) -- showRelevanceRelation ("Elements that show relevance of " ++ (Text.unpack (VarId.name p)) ++ ":") requiredElements])
+          else ((p, mapGet initParamEqs p), []) -- showRelevanceRelation ("Elements that show irrelevance of " ++ (Text.unpack (VarId.name p)) ++ ":") requiredElements])
     -- resetParam
     
     getParamChange :: (VarId, TxsDefs.VExpr) -> [String]
-    getParamChange (p, v) = ["Setting " ++ Text.unpack (VarId.name p) ++ " to " ++ showValExpr v ++ " instead of " ++ showValExpr (mapGet paramEqs p) | mapGet paramEqs p /= v]
+    getParamChange (p, v) =
+        if (mapGet paramEqs p) /= v
+        then ["Setting " ++ (Text.unpack (VarId.name p)) ++ " to " ++ (showValExpr v) ++ " instead of " ++ (showValExpr (mapGet paramEqs p))]
+        else []
     -- getParamChange
 -- resetParamsInSummand
 
@@ -102,20 +117,22 @@ updateRelevanceRelation paramUsagePerSummand controlFlowGraphs belongsToRelation
     let update1 = concat [
                     concat [
                       concat [
-                        [ (dk, dj, s) | (s, i, t') <- Map.findWithDefault [] dj controlFlowGraphs, t' == t, dk `elem` extractParamEqVars i dl ]
+                        [ (dk, dj, s) | (s, i, t') <- controlFlowGraphs Map.! dj, t' == t, dk `elem` (extractParamEqVars i dl) ]
                         | (dl, dj', t) <- Set.toList relevanceRelationSoFar, dj' == dj ]
                       | dj <- djs ]
                     | (dk, djs) <- Map.toList belongsToRelation ] in
+    let relevanceRelationAfterUpdate1 = Set.union relevanceRelationSoFar (Set.fromList update1) in
     let update2 = concat [
                     concat [
                       concat [
                         concat [
                           [ (dk, dj, s) | (dj', s) <- Map.toList (paramSources (mapGet paramUsagePerSummand i)), dj' == dj ]
-                        | (_r, i, t') <- Map.findWithDefault [] dp controlFlowGraphs, t' == t, dk `elem` extractParamEqVars i dl ]
-                      | (dl', dp, t) <- update1, dl' == dl ]
-                    | dj <- dkjs, dj `notElem` dljs ]
+                        | (_r, i, t') <- controlFlowGraphs Map.! dp, t' == t, dk `elem` (extractParamEqVars i dl) ]
+                      | (dl', dp, t) <- Set.toList relevanceRelationAfterUpdate1, dl' == dl ]
+                    | dj <- dkjs, not (dj `elem` dljs) ]
                   | (dk, dkjs) <- Map.toList belongsToRelation, (dl, dljs) <- Map.toList belongsToRelation ] in
-      Set.union relevanceRelationSoFar (Set.fromList update2)
+    let relevanceRelationAfterUpdate2 = Set.union relevanceRelationAfterUpdate1 (Set.fromList update2) in
+      relevanceRelationAfterUpdate2
 -- updateRelevanceRelation
 
 extractParamEqVars :: LPESummand -> VarId -> [VarId]
@@ -128,14 +145,12 @@ extractParamEqVars (LPESummand _ _ _ (LPEProcInst paramEqs)) varId =
 -- Determines which of the specified data parameters belong to which (set of) specified control flow parameters.
 -- A data parameter belongs to a control flow parameter if the data parameter is only changed or used in summands that are ruled by the control flow parameter.
 getBelongsToRelation :: Map.Map LPESummand LPEParamUsage -> Set.Set VarId -> Set.Set VarId -> Map.Map VarId [VarId]
-getBelongsToRelation paramUsagePerSummand controlFlowParams dataParams
-    | dataParams == Set.empty = Map.empty
-    | otherwise =
-        let whereDataParamsAreChangedOrUsed = Map.fromSet getWhereDataParamIsChangedOrUsed dataParams in
-          Map.map (Set.toList . getCfpsToWhichDataParamsBelong) whereDataParamsAreChangedOrUsed
+getBelongsToRelation paramUsagePerSummand controlFlowParams dataParams =
+    let whereDataParamsAreChangedOrUsed = Map.fromSet getWhereDataParamIsChangedOrUsed dataParams in
+      Map.map (Set.toList . getCfpsToWhichDataParamsBelong) whereDataParamsAreChangedOrUsed
   where
     getWhereDataParamIsChangedOrUsed :: VarId -> Map.Map LPESummand LPEParamUsage
-    getWhereDataParamIsChangedOrUsed param = Map.filter (\paramUsage -> (param `elem` changedParams paramUsage) || (param `elem` changedParams paramUsage)) paramUsagePerSummand
+    getWhereDataParamIsChangedOrUsed param = Map.filter (\paramUsage -> (param `elem` (changedParams paramUsage)) || (param `elem` (usedParams paramUsage))) paramUsagePerSummand
     
     getCfpsToWhichDataParamsBelong :: Map.Map LPESummand LPEParamUsage -> Set.Set VarId
     getCfpsToWhichDataParamsBelong whereDataParamIsChangedOrUsed =
@@ -145,16 +160,17 @@ getBelongsToRelation paramUsagePerSummand controlFlowParams dataParams
 -- getBelongsToRelation
 
 getControlFlowGraphs :: Map.Map LPESummand LPEParamUsage -> Set.Set VarId -> Map.Map VarId [(TxsDefs.VExpr, LPESummand, TxsDefs.VExpr)]
-getControlFlowGraphs paramUsagePerSummand = Map.fromSet (Set.toList . getControlFlowGraph)
+getControlFlowGraphs paramUsagePerSummand controlFlowParams =
+    Map.fromSet (Set.toList . getControlFlowGraph) controlFlowParams
   where
     getControlFlowGraph :: VarId -> Set.Set (TxsDefs.VExpr, LPESummand, TxsDefs.VExpr)
     getControlFlowGraph controlFlowParam = Set.unions (map (getControlFlowGraphEdges controlFlowParam) (Map.toList paramUsagePerSummand))
     
     getControlFlowGraphEdges :: VarId -> (LPESummand, LPEParamUsage) -> Set.Set (TxsDefs.VExpr, LPESummand, TxsDefs.VExpr)
     getControlFlowGraphEdges controlFlowParam (summand, paramUsage) =
-        if controlFlowParam `elem` rulingParams paramUsage
-        then let paramSource = paramSources paramUsage Map.! controlFlowParam in
-             let paramDestination = paramDestinations paramUsage Map.! controlFlowParam in
+        if controlFlowParam `elem` (rulingParams paramUsage)
+        then let paramSource = (paramSources paramUsage) Map.! controlFlowParam in
+             let paramDestination = (paramDestinations paramUsage) Map.! controlFlowParam in
                Set.singleton (paramSource, summand, paramDestination)
         else Set.empty
 -- getControlFlowGraphs
@@ -164,15 +180,16 @@ getControlFlowGraphs paramUsagePerSummand = Map.fromSet (Set.toList . getControl
 -- This function requires information about which parameters are ruling the summands of the LPE; typically,
 -- getRulingParamsPerSummand is used to obtain this information.
 getControlFlowParams :: Map.Map LPESummand LPEParamUsage -> Set.Set VarId -> Set.Set VarId
-getControlFlowParams paramUsagePerSummand = Set.filter isControlFlowParam
+getControlFlowParams paramUsagePerSummand params =
+    Set.filter isControlFlowParam params
   where
     isControlFlowParam :: VarId -> Bool
-    isControlFlowParam param = Map.filter (isUnchangedOrRulingParam param) paramUsagePerSummand == paramUsagePerSummand
+    isControlFlowParam param = (Map.filter (isUnchangedOrRulingParam param) paramUsagePerSummand) == paramUsagePerSummand
     
     isUnchangedOrRulingParam :: VarId -> LPEParamUsage -> Bool
     isUnchangedOrRulingParam param paramUsage =
-        let unchanged = param `notElem` changedParams paramUsage in
-        let ruling = param `elem` rulingParams paramUsage in
+        let unchanged = not (param `elem` (changedParams paramUsage)) in
+        let ruling = param `elem` (rulingParams paramUsage) in
           unchanged || ruling
 -- getControlFlowParams
 
