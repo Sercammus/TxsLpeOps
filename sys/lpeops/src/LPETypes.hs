@@ -24,6 +24,7 @@ getScopeProblems,
 module LPETypeDefs
 ) where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.State as MonadState
 import qualified Data.List as List
 import qualified Data.Map as Map
@@ -36,10 +37,12 @@ import qualified TxsShow
 import qualified FreeVar
 import qualified ProcId
 import           VarId
+import           ValExpr
 import           ChanId
 import           ConcatEither
 import           LPEPrettyPrint
 import           LPETypeDefs
+import           BlindSubst
 
 paramEqsLookup :: [VarId] -> LPEParamEqs -> [TxsDefs.VExpr]
 paramEqsLookup orderedParams paramEqs = map (\p -> paramEqs Map.! p) orderedParams
@@ -68,16 +71,36 @@ toLPEInstance procInst = do
                 Left msgs -> return (Left msgs)
                 Right eqs -> case getLPESummands procId procDef body of
                                Left msgs -> return (Left msgs)
-                               Right summands -> let result = (chans, eqs, Set.fromList summands) in
-                                                 let scopeProblems = getScopeProblems result in
-                                                   if null scopeProblems
-                                                   then return (Right result)
-                                                   else return (Left scopeProblems)
+                               Right summands -> do normalizedSummands <- normalizeLPESummands summands
+                                                    let result = (chans, eqs, Set.fromList normalizedSummands)
+                                                    let scopeProblems = getScopeProblems result
+                                                    if null scopeProblems
+                                                    then return (Right result)
+                                                    else return (Left scopeProblems)
             Nothing -> do let definedProcessNames = List.intercalate " or " (map (Text.unpack . ProcId.name) (Map.keys procDefs))
                           return (Left ["Expected " ++ definedProcessNames ++ ", found " ++ show (Text.unpack (ProcId.name procId)) ++ "!"])
           _ -> return (Left ["Expression must be process instantiation, found " ++ TxsShow.fshow (TxsDefs.view procInst) ++ "!"])
       _ -> return (Left ["TorXakis core is not initialized!"])
 -- toLPEInstance
+
+normalizeLPESummands :: [LPESummand] -> IOC.IOC [LPESummand]
+normalizeLPESummands summands = do
+    let (summandsWithoutAction, summandsWithAction) = List.partition (\(LPESummand _ offers _ _) -> null offers) summands
+    combinedSummands <- Monad.mapM (combineSummand summandsWithAction) summandsWithoutAction
+    return (summandsWithAction ++ concat combinedSummands)
+  where
+    combineSummand :: [LPESummand] -> LPESummand -> IOC.IOC [LPESummand]
+    combineSummand summandsWithAction summandWithoutAction =
+        Monad.mapM (combineTwoSummands summandWithoutAction) summandsWithAction
+    -- combineSummand
+    
+    combineTwoSummands :: LPESummand -> LPESummand -> IOC.IOC LPESummand
+    combineTwoSummands (LPESummand chanVars1 _ guard1 paramEqs1) summand@(LPESummand chanVars2 chanOffers2 guard2 paramEqs2) = do
+        newGuard2 <- doConfidentSubst summand paramEqs1 guard2
+        let newGuard = cstrAnd (Set.fromList [guard1, newGuard2])
+        newParamEqs <- doConfidentParamEqsSubst summand paramEqs1 paramEqs2
+        return (LPESummand (List.union chanVars1 chanVars2) chanOffers2 newGuard newParamEqs)
+-- normalizeLPESummands
 
 -- Helper function.
 -- Constructs one or more summands from a TXS process expression (unless there are problems):

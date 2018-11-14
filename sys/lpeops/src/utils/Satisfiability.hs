@@ -94,7 +94,7 @@ defaultInvariant = cstrConst (Constant.Cbool True)
 isTautology :: TxsDefs.VExpr -> TxsDefs.VExpr -> IOC.IOC Bool
 isTautology expr = isNotSatisfiable (cstrNot expr)
 
--- Checks if the specified expression can be true.
+-- Checks if a solution for the specified expression might exist.
 couldBeSatisfiable :: TxsDefs.VExpr -> TxsDefs.VExpr -> IOC.IOC Bool
 couldBeSatisfiable expr invariant = do
     sol <- getSomeSolution expr invariant []
@@ -103,7 +103,7 @@ couldBeSatisfiable expr invariant = do
       _ -> return True
 -- couldBeSatisfiable
 
--- Checks if the specified expression can be true.
+-- Checks if a solution for the specified expression definitely exists.
 isSatisfiable :: TxsDefs.VExpr -> TxsDefs.VExpr -> IOC.IOC Bool
 isSatisfiable expr invariant = do
     sol <- getSomeSolution expr invariant []

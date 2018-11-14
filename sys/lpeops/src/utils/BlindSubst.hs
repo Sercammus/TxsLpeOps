@@ -21,7 +21,9 @@ eliminateAny,
 doBlindSubst,
 doBlindParamEqSubst,
 doBlindParamEqsSubst,
-doConfidentSubst
+doConfidentSubst,
+doConfidentParamEqSubst,
+doConfidentParamEqsSubst
 ) where
 
 import qualified Control.Monad as Monad
@@ -38,7 +40,7 @@ import ValExpr hiding (subst)
 import ValExprVisitor
 import VarFactory
 import ValFactory
-import LPETypes
+import LPETypeDefs
 import LPEPrettyPrint
 
 -- Manipulating expressions (e.g. blind substitutions before SAT-solving) may require helper variables.
@@ -133,7 +135,18 @@ doConfidentSubst contextSummand subst expr = do
           Right r -> return r
 -- doConfidentSubst
 
+-- Convenience method:
+doConfidentParamEqSubst :: LPESummand -> Map.Map VarId TxsDefs.VExpr -> (VarId, TxsDefs.VExpr) -> IOC.IOC (VarId, TxsDefs.VExpr)
+doConfidentParamEqSubst summand subst (varId, expr) = do
+    expr' <- doConfidentSubst summand subst expr
+    return (varId, expr')
+-- doConfidentParamEqSubst
 
+doConfidentParamEqsSubst :: LPESummand -> Map.Map VarId TxsDefs.VExpr -> Map.Map VarId TxsDefs.VExpr -> IOC.IOC (Map.Map VarId TxsDefs.VExpr)
+doConfidentParamEqsSubst summand subst target = do
+    paramEqs <- Monad.mapM (doConfidentParamEqSubst summand subst) (Map.toList target)
+    return (Map.fromList paramEqs)
+-- doConfidentParamEqsSubst
 
 
 
