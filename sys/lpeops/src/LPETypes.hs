@@ -37,8 +37,6 @@ import qualified FreeVar
 import qualified ProcId
 import           VarId
 import           ChanId
-import           Constant
-import           ValExpr
 import           ConcatEither
 import           LPEPrettyPrint
 import           LPETypeDefs
@@ -50,7 +48,7 @@ toLPEParamEqs :: [(VarId, TxsDefs.VExpr)] -> LPEParamEqs
 toLPEParamEqs = Map.fromList
 
 newLPESummand :: [VarId] -> LPEChannelOffers -> TxsDefs.VExpr -> [(VarId, TxsDefs.VExpr)] -> LPESummand
-newLPESummand chanVarIds chanOffers guard procInstParamEqs = LPESummand chanVarIds chanOffers guard (LPEProcInst (toLPEParamEqs procInstParamEqs))
+newLPESummand chanVarIds chanOffers guard procInstParamEqs = LPESummand chanVarIds chanOffers guard (toLPEParamEqs procInstParamEqs)
 
 newLPEInstance :: ([TxsDefs.ChanId], [(VarId, TxsDefs.VExpr)], [LPESummand]) -> LPEInstance
 newLPEInstance (chanIds, initParamEqs, summands) = (chanIds, toLPEParamEqs initParamEqs, Set.fromList summands)
@@ -86,9 +84,7 @@ toLPEInstance procInst = do
 getLPESummands :: TxsDefs.ProcId -> TxsDefs.ProcDef -> TxsDefs.BExpr -> Either [String] [LPESummand]
 getLPESummands expectedProcId expectedProcDef@(TxsDefs.ProcDef defChanIds params _body) expr =
     case TxsDefs.view expr of
-      TxsDefs.Choice choices -> if choices == Set.empty -- (An 'empty choice' is equivalent to STOP.)
-                                then Right [LPESummand [] [] (cstrConst (Cbool True)) LPEStop]
-                                else concatEither (map (getLPESummands expectedProcId expectedProcDef) (Set.toList choices))
+      TxsDefs.Choice choices -> concatEither (map (getLPESummands expectedProcId expectedProcDef) (Set.toList choices))
       TxsDefs.ActionPref TxsDefs.ActOffer { TxsDefs.offers = offers, TxsDefs.hiddenvars = hiddenvars, TxsDefs.constraint = constraint } procInst ->
           case TxsDefs.view procInst of
             TxsDefs.ProcInst procId chanIds paramValues
@@ -99,7 +95,7 @@ getLPESummands expectedProcId expectedProcDef@(TxsDefs.ProcDef defChanIds params
                                  Right eqs -> case concatEither (map (getChannelOffer params) (Set.toList offers)) of
                                                 Left msgs -> Left (("Recursion " ++ TxsShow.fshow procInst ++ " is invalid because"):msgs)
                                                 Right channelOffers -> let channelVars = concatMap snd channelOffers ++ Set.toList hiddenvars in
-                                                                       let constructedSummand = LPESummand channelVars channelOffers constraint (LPEProcInst eqs) in
+                                                                       let constructedSummand = LPESummand channelVars channelOffers constraint eqs in
                                                                        let scopeProblems = getSummandScopeProblems (Set.fromList params) constructedSummand in
                                                                          if null scopeProblems
                                                                          then Right [constructedSummand]
@@ -158,14 +154,12 @@ fromLPEInstance (chans, paramEqs, summands) procName = do
   where
       -- Constructs a process expression from a summand:
       summandToBExpr :: TxsDefs.ProcId -> [VarId] -> LPESummand -> TxsDefs.BExpr
-      summandToBExpr lpeProcId lpeOrderedParams (LPESummand chanVars chanOffers gd inst) =
+      summandToBExpr lpeProcId lpeOrderedParams (LPESummand chanVars chanOffers gd eqs) =
           let usedChanVars = concatMap snd chanOffers in
           let hiddenChanVars = Set.fromList chanVars Set.\\ Set.fromList usedChanVars in
           let actPref = TxsDefs.ActOffer { TxsDefs.offers = Set.fromList (map offerToOffer chanOffers), TxsDefs.constraint = gd, TxsDefs.hiddenvars = hiddenChanVars } in
-            case inst of
-              LPEStop -> TxsDefs.actionPref actPref TxsDefs.stop
-              LPEProcInst eqs -> let procInst = TxsDefs.procInst lpeProcId chans (paramEqsLookup lpeOrderedParams eqs) in
-                                   TxsDefs.actionPref actPref procInst
+          let procInst = TxsDefs.procInst lpeProcId chans (paramEqsLookup lpeOrderedParams eqs) in
+            TxsDefs.actionPref actPref procInst
       -- summandToBExpr
       
       -- Constructs an offer from an offer:
@@ -178,18 +172,17 @@ getScopeProblems :: LPEInstance -> [String]
 getScopeProblems (_chanIds, initParamEqs, summands) = concatMap (getSummandScopeProblems (Map.keysSet initParamEqs)) (Set.toList summands)
 
 getSummandScopeProblems :: Set.Set VarId -> LPESummand -> [String]
-getSummandScopeProblems scope (LPESummand channelVars _channelOffers guard procInst) =
+getSummandScopeProblems scope (LPESummand channelVars _channelOffers guard paramEqs) =
     let newScope = Set.union scope (Set.fromList channelVars) in
-      checkExpr "Guard" newScope guard ++ checkProcInst newScope procInst
+      checkExpr "Guard" newScope guard ++ checkProcInst newScope
     -- checkSummand
   where
-    checkProcInst :: Set.Set VarId -> LPEProcInst -> [String]
-    checkProcInst _ LPEStop = []
-    checkProcInst scp (LPEProcInst eqs) =
-        let nonExistentParameters = Map.keysSet eqs Set.\\ scope in
+    checkProcInst :: Set.Set VarId -> [String]
+    checkProcInst scp =
+        let nonExistentParameters = Map.keysSet paramEqs Set.\\ scope in
           map (\p -> "Process instantiation initializes non-existent parameter: " ++ Text.unpack (VarId.name p) ++ "!") (Set.toList nonExistentParameters)
           ++
-          concatMap (checkExpr "Process instantiation" scp . snd) (Map.toList eqs)
+          concatMap (checkExpr "Process instantiation" scp . snd) (Map.toList paramEqs)
     -- checkProcInst
     
     checkExpr :: String -> Set.Set VarId -> TxsDefs.VExpr -> [String]

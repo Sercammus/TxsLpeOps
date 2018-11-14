@@ -74,9 +74,7 @@ isConfluentTauSummand (x:xs) invariant tauSummand = do
 -- isConfluentTauSummand
 
 checkConfluenceCondition :: LPESummand -> LPESummand -> TxsDefs.VExpr -> IOC.IOC Bool
-checkConfluenceCondition (LPESummand _ _ _ LPEStop) _ _ = return False
-checkConfluenceCondition _ (LPESummand _ _ _ LPEStop) _ = return False
-checkConfluenceCondition summand1@(LPESummand _channelVars1 _channelOffers1 guard1 (LPEProcInst paramEqs1)) summand2@(LPESummand channelVars2 _channelOffers2 guard2 (LPEProcInst paramEqs2)) invariant =
+checkConfluenceCondition summand1@(LPESummand _channelVars1 _channelOffers1 guard1 paramEqs1) summand2@(LPESummand channelVars2 _channelOffers2 guard2 paramEqs2) invariant =
     if summand1 == summand2
     then return True
     else do -- a1 == a1[g1] && ... && an == an[g1]
@@ -133,12 +131,10 @@ confElm (channels, paramEqs, summands) _out invariant = do
   where
     mergeZippedSummands :: (LPESummand, [LPESummand]) -> IOC.IOC LPESummand
     mergeZippedSummands (summand, []) = return summand
-    mergeZippedSummands (summand@(LPESummand _ _ _ LPEStop), _) = return summand
-    mergeZippedSummands (summand@(LPESummand chanVars chanOffers g1 (LPEProcInst eqs1)), confluentTauSuccessor:_) =
-        case confluentTauSuccessor of
-          LPESummand _ _ _ (LPEProcInst eqs2) -> do newEqs <- doBlindParamEqsSubst eqs1 eqs2
-                                                    return (LPESummand chanVars chanOffers g1 (LPEProcInst newEqs))
-          LPESummand _ _ _ LPEStop -> return summand
+    mergeZippedSummands (LPESummand chanVars chanOffers g1 eqs1, (LPESummand _ _ _ eqs2):_) = do
+        newEqs <- doBlindParamEqsSubst eqs1 eqs2
+        return (LPESummand chanVars chanOffers g1 newEqs)
+
 -- confElm
 
 

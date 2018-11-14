@@ -73,13 +73,9 @@ getLPEInstanceVariables (_, initParamEqs, summands) =
 -- getLPEInstanceVariables
 
 getLPESummandVariables :: LPESummand -> Set.Set VarId
-getLPESummandVariables (LPESummand channelVars channelOffers guard procInst) =
-    Set.unions ([Set.fromList channelVars, Set.fromList (FreeVar.freeVars guard), getProcInstVariables procInst] ++ map (Set.fromList . snd) channelOffers)
+getLPESummandVariables (LPESummand channelVars channelOffers guard paramEqs) =
+    Set.unions ([Set.fromList channelVars, Set.fromList (FreeVar.freeVars guard), getParamEqsVariables paramEqs] ++ map (Set.fromList . snd) channelOffers)
 -- getLPESummandVariables
-
-getProcInstVariables :: LPEProcInst -> Set.Set VarId
-getProcInstVariables LPEStop = Set.empty
-getProcInstVariables (LPEProcInst eqs) = getParamEqsVariables eqs
 
 getParamEqsVariables :: LPEParamEqs -> Set.Set VarId
 getParamEqsVariables eqs = Set.union (Map.keysSet eqs) (Set.unions (map (Set.fromList . FreeVar.freeVars) (Map.elems eqs)))
@@ -128,12 +124,12 @@ showContextFreeLPESummand summand = showCFLPESummand (getLPESummandFreeContext s
 -- Shows a summand in the specified 'context'; that is,
 -- using specific names for specific variables when they occur:
 showCFLPESummand :: VarContext -> LPESummand -> String
-showCFLPESummand f (LPESummand channelVars channelOffers guard procInst) =
+showCFLPESummand f (LPESummand channelVars channelOffers guard paramEqs) =
     let usedChannelVars = concatMap snd channelOffers in
     let hiddenChannelVars = Set.toList (Set.fromList channelVars Set.\\ Set.fromList usedChannelVars) in
       showChannelOffers channelOffers ++
       showHiddenVars hiddenChannelVars ++
-      "[[ " ++ showCFValExpr f guard ++ " ]] >-> " ++ showProcInst procInst
+      "[[ " ++ showCFValExpr f guard ++ " ]] >-> LPE(" ++ showParamEqs paramEqs ++ ")"
   where
     showChannelOffers :: LPEChannelOffers -> String
     showChannelOffers [] = ""
@@ -146,12 +142,8 @@ showCFLPESummand f (LPESummand channelVars channelOffers guard procInst) =
     showHiddenVars [] = ""
     showHiddenVars hiddenVars = "(" ++ List.intercalate ", " (map (f Map.!) hiddenVars) ++ ") "
     
-    showProcInst :: LPEProcInst -> String
-    showProcInst LPEStop = "STOP"
-    showProcInst (LPEProcInst paramEqs) = "LPE(" ++ showParamEqs paramEqs ++ ")"
-    
     showParamEqs :: LPEParamEqs -> String
-    showParamEqs paramEqs = List.intercalate ", " (map showParamEq (Map.toList paramEqs))
+    showParamEqs eqs = List.intercalate ", " (map showParamEq (Map.toList eqs))
     
     showParamEq :: (VarId, TxsDefs.VExpr) -> String
     showParamEq (varId, expr) = f Map.! varId ++ " = " ++ showCFValExpr f expr

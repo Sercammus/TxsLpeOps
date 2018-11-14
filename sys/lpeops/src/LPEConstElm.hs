@@ -64,8 +64,7 @@ getConstParamsForSummand subst invariant constParams summand = do
 -- getConstParamsForSummand
 
 isConstParamForSummand :: Map.Map VarId TxsDefs.VExpr -> TxsDefs.VExpr -> LPESummand -> VarId -> IOC.IOC (Set.Set VarId)
-isConstParamForSummand _ _ (LPESummand _ _ _ LPEStop) _ = return Set.empty
-isConstParamForSummand subst invariant (LPESummand _ _ guard (LPEProcInst paramEqs)) testParam = do
+isConstParamForSummand subst invariant (LPESummand _ _ guard paramEqs) testParam = do
     let expr = cstrITE guard (cstrEqual (paramEqs Map.! testParam) (cstrVar testParam)) (cstrConst (Cbool True))
     expr' <- doBlindSubst subst expr
     taut <- isTautology expr' invariant

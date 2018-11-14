@@ -93,9 +93,7 @@ containsSummand (x:xs) invariant summand = do
 -- containsSummand
 
 isEquivalentSummand :: LPESummand -> LPESummand -> TxsDefs.VExpr -> IOC.IOC Bool
-isEquivalentSummand (LPESummand _ _ _ LPEStop) (LPESummand _ _ _ (LPEProcInst _)) _ = return False
-isEquivalentSummand (LPESummand _ _ _ (LPEProcInst _)) (LPESummand _ _ _ LPEStop) _ = return False
-isEquivalentSummand (LPESummand _vars1 chans1 guard1 procInst1) (LPESummand _vars2 chans2 guard2 procInst2) invariant = do
+isEquivalentSummand (LPESummand _vars1 chans1 guard1 paramEqs1) (LPESummand _vars2 chans2 guard2 paramEqs2) invariant = do
     let sortedChans1 = List.sortOn (ChanId.unid . fst) chans1
     let sortedChans2 = List.sortOn (ChanId.unid . fst) chans2
     if map fst sortedChans1 /= map fst sortedChans2
@@ -105,17 +103,12 @@ isEquivalentSummand (LPESummand _vars1 chans1 guard1 procInst1) (LPESummand _var
             let subst = Map.fromList (zipWith (\cv1 cv2 -> (cv2, ValExpr.cstrVar cv1)) chanVars1 chanVars2)
             guard2' <- doBlindSubst subst guard2
             let guardEq = ValExpr.cstrEqual guard1 guard2'
-            procInstEqs <- getProcInstEqs subst procInst1 procInst2
+            procInstEqs <- Monad.mapM (getProcInstEq subst paramEqs2) (Map.toList paramEqs1)
             isTautology (ValExpr.cstrAnd (Set.fromList (guardEq:procInstEqs))) invariant
   where
-    getProcInstEqs :: Map.Map VarId.VarId TxsDefs.VExpr -> LPEProcInst -> LPEProcInst -> IOC.IOC [TxsDefs.VExpr]
-    getProcInstEqs _ LPEStop _ = return []
-    getProcInstEqs _ _ LPEStop = return []
-    getProcInstEqs subst (LPEProcInst paramEqs1) (LPEProcInst paramEqs2) = Monad.mapM (getProcInstEq subst paramEqs2) (Map.toList paramEqs1)
-    
     getProcInstEq :: Map.Map VarId.VarId TxsDefs.VExpr -> LPEParamEqs -> (VarId.VarId, TxsDefs.VExpr) -> IOC.IOC TxsDefs.VExpr
-    getProcInstEq subst paramEqs2 (p1, v1) = do
-        let v2 = paramEqs2 Map.! p1
+    getProcInstEq subst eqs2 (p1, v1) = do
+        let v2 = eqs2 Map.! p1
         v2' <- doBlindSubst subst v2
         return (ValExpr.cstrEqual v1 v2')
 -- isEquivalentSummand

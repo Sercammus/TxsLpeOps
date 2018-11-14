@@ -18,7 +18,6 @@ module LPETypeDefs (
 LPEInstance,
 LPESummand(..),
 LPESummands,
-LPEProcInst(..),
 LPEChannelOffer,
 LPEChannelOffers,
 LPEParamEqs
@@ -42,11 +41,8 @@ type LPEInstance = ([TxsDefs.ChanId], LPEParamEqs, LPESummands)
 --  - Channel offers (action prefices and the *fresh* variables - also found in the earlier list - used per action prefix for synchronization).
 --  - Guard (restriction on when the summand can be 'applied').
 --  - STOP, or a number of parameter equations to be used for the recursive instantiation.
-data LPESummand = LPESummand [VarId] LPEChannelOffers TxsDefs.VExpr LPEProcInst deriving (Eq, Ord, Show)
+data LPESummand = LPESummand [VarId] LPEChannelOffers TxsDefs.VExpr LPEParamEqs deriving (Eq, Ord, Show)
 type LPESummands = Set.Set LPESummand
-
--- Summands can end with a recursive instantiation of the LPE or with a STOP:
-data LPEProcInst = LPEStop | LPEProcInst LPEParamEqs deriving (Eq, Ord, Show)
 
 -- Convenience type.
 -- Relates a channel with communication variables over which that channel must be synchronized.

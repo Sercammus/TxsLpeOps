@@ -60,8 +60,7 @@ removeVarsAssignedToNonInertParams summands inertParams =
     inertParams Set.\\ Set.unions (map (getParamsAssignedToNonInertParams inertParams) summands)
   where
     getParamsAssignedToNonInertParams :: Set.Set VarId.VarId -> LPESummand -> Set.Set VarId.VarId
-    getParamsAssignedToNonInertParams _ (LPESummand _ _ _ LPEStop) = Set.empty
-    getParamsAssignedToNonInertParams iparams (LPESummand _ _ _ (LPEProcInst paramEqs)) =
+    getParamsAssignedToNonInertParams iparams (LPESummand _ _ _ paramEqs) =
         Set.unions (map (\(p, v) -> if Set.member p iparams then Set.empty else Set.fromList (FreeVar.freeVars v)) (Map.toList paramEqs))
 -- parElmForAllSummands
 

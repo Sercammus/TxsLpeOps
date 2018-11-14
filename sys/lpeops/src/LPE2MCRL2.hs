@@ -56,10 +56,10 @@ lpe2mcrl2 lpeInstance out invariant = do
 -- lpe2mcrl2
 
 lpe2mcrl2' :: LPEInstance -> String -> TxsDefs.VExpr -> T2MMonad (Either [String] LPEInstance)
-lpe2mcrl2' (channels, paramEqs, summands) out _invariant = do
+lpe2mcrl2' (channels, initParamEqs, summands) out _invariant = do
     lift $ IOC.putMsgs [ EnvData.TXS_CORE_ANY "<<mcrl2>>" ]
     tdefs <- gets txsdefs
-    let orderedParams = Map.keys paramEqs
+    let orderedParams = Map.keys initParamEqs
     -- Translate sorts.
     -- (These are just identifiers; they are defined further via constructors.)
     sorts <- Monad.mapM sortDef2sortDef (Map.toList (TxsDefs.sortDefs tdefs))
@@ -83,7 +83,7 @@ lpe2mcrl2' (channels, paramEqs, summands) out _invariant = do
     let newProcess = lpeProc { MCRL2Defs.expr = MCRL2Defs.PChoice newSummands }
     modifySpec (\spec -> spec { MCRL2Defs.processes = Map.insert lpeProcName newProcess (MCRL2Defs.processes spec) })
     -- Translate LPE initialization:
-    lpeInit <- procInst2procInst (lpeProcName, lpeProc) orderedParams (LPEProcInst paramEqs)
+    lpeInit <- procInst2procInst (lpeProcName, lpeProc) orderedParams initParamEqs
     modifySpec (\spec -> spec { MCRL2Defs.init = lpeInit })
     spec <- gets specification
     let filename = out ++ ".mcrl2"
@@ -195,9 +195,8 @@ summand2summand (lpeProcName, lpeProc) orderedParams (LPESummand chanVars chanOf
     return (MCRL2Defs.PSum actionVars (MCRL2Defs.PGuard newGuardExpr (MCRL2Defs.PSeq [newActionExpr, newProcInst]) MCRL2Defs.PDeadlock))
 -- summand2summand
 
-procInst2procInst :: (MCRL2Defs.ObjectId, MCRL2Defs.Process) -> [VarId.VarId] -> LPEProcInst -> T2MMonad MCRL2Defs.PExpr
-procInst2procInst _ _ LPEStop = return MCRL2Defs.PDeadlock
-procInst2procInst (lpeProcName, lpeProc) orderedParams (LPEProcInst paramEqs) = do
+procInst2procInst :: (MCRL2Defs.ObjectId, MCRL2Defs.Process) -> [VarId.VarId] -> LPEParamEqs -> T2MMonad MCRL2Defs.PExpr
+procInst2procInst (lpeProcName, lpeProc) orderedParams paramEqs = do
     paramValues <- Monad.mapM valExpr2dataExpr (paramEqsLookup orderedParams paramEqs)
     return (MCRL2Defs.PInst lpeProcName (zip (MCRL2Defs.processParams lpeProc) paramValues))
 -- paramEqs2procInst

@@ -141,8 +141,7 @@ getUsedParamsPerSummand summands directlyUsedParamsPerSummand changedParamsPerSu
     Map.fromSet getUsedParams summands
   where
     getUsedParams :: LPESummand -> Set.Set VarId
-    getUsedParams summand@(LPESummand _ _ _ LPEStop) = directlyUsedParamsPerSummand Map.! summand
-    getUsedParams summand@(LPESummand _ _ _ (LPEProcInst paramEqs)) =
+    getUsedParams summand@(LPESummand _ _ _ paramEqs) =
         let changedPars = changedParamsPerSummand Map.! summand in
         let changedParsAssignments = Map.restrictKeys paramEqs changedPars in
         let directlyUsedPars = directlyUsedParamsPerSummand Map.! summand in
@@ -191,8 +190,7 @@ getDirectlyUsedParamsPerSummand summands params = Map.fromSet getDirectlyUsedPar
 --      p2 is the first element in the pair returned by this function, and
 --      p1 is the variable provided as the second parameter to this function.
 constructDestSatExpr :: LPESummand -> VarId -> IOC.IOC (VarId, TxsDefs.VExpr)
-constructDestSatExpr (LPESummand _ _ _ LPEStop) param = return (param, cstrConst (Cbool False))
-constructDestSatExpr (LPESummand _channelVars _channelOffers guard (LPEProcInst paramEqs)) param = do
+constructDestSatExpr (LPESummand _channelVars _channelOffers guard paramEqs) param = do
     paramClone <- createFreshVarFromVar param
     let eq = cstrAnd (Set.fromList [guard, cstrEqual (cstrVar paramClone) (paramEqs Map.! param)])
     -- IOC.putMsgs [ EnvData.TXS_CORE_ANY ("destSatExpr for " ++ (Text.unpack (VarId.name param)) ++ "/" ++ (Text.unpack (VarId.name paramClone)) ++ " is " ++ (showValExpr eq)) ]

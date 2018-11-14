@@ -81,12 +81,11 @@ resetParamsInSummand :: Map.Map VarId TxsDefs.VExpr             -- initParamEqs
                      -> Set.Set (VarId, VarId, TxsDefs.VExpr)   -- relevanceRelation
                      -> LPESummand                              -- summand
                      -> (LPESummand, [String])                  -- result
-resetParamsInSummand _initParamEqs _paramUsagePerSummand _belongsToRelation _relevanceRelation summand@(LPESummand _ _ _ LPEStop) = (summand, [])
-resetParamsInSummand initParamEqs paramUsagePerSummand belongsToRelation relevanceRelation summand@(LPESummand channelVars channelOffers guard (LPEProcInst paramEqs)) =
+resetParamsInSummand initParamEqs paramUsagePerSummand belongsToRelation relevanceRelation summand@(LPESummand channelVars channelOffers guard paramEqs) =
     let paramUsage = paramUsagePerSummand Map.! summand in
     let newParamEqs = map (resetParam paramUsage) (Map.toList paramEqs) in
       --(LPESummand channelVars channelOffers guard (LPEProcInst (Map.fromList (map fst newParamEqs))), ["{", showLPESummand summand] ++ concat (map snd newParamEqs) ++ concat (map getParamChange (map fst newParamEqs)) ++ ["}"])
-      (LPESummand channelVars channelOffers guard (LPEProcInst (Map.fromList (map fst newParamEqs))), concatMap (getParamChange . fst) newParamEqs)
+      (LPESummand channelVars channelOffers guard (Map.fromList (map fst newParamEqs)), concatMap (getParamChange . fst) newParamEqs)
   where
     resetParam :: LPEParamUsage -> (VarId, TxsDefs.VExpr) -> ((VarId, TxsDefs.VExpr), [String])
     resetParam paramUsage (p, v) =
@@ -134,8 +133,7 @@ updateRelevanceRelation paramUsagePerSummand controlFlowGraphs belongsToRelation
 -- updateRelevanceRelation
 
 extractParamEqVars :: LPESummand -> VarId -> [VarId]
-extractParamEqVars (LPESummand _ _ _ LPEStop) _varId = []
-extractParamEqVars (LPESummand _ _ _ (LPEProcInst paramEqs)) varId =
+extractParamEqVars (LPESummand _ _ _ paramEqs) varId =
     let assignmentVars = Set.fromList (FreeVar.freeVars (mapGet paramEqs varId)) in
       Set.toList (Set.intersection (Map.keysSet paramEqs) assignmentVars)
 -- extractParamEqVars
