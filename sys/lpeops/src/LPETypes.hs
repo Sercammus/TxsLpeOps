@@ -66,7 +66,7 @@ toLPEInstance procInst = do
         case TxsDefs.view procInst of
           TxsDefs.ProcInst procId _chans paramValues -> case Map.lookup procId procDefs of
             Just procDef@(TxsDefs.ProcDef chans params body) ->
-              case getParamEqs params paramValues of
+              case getParamEqs 1 params paramValues of
                 Left msgs -> return (Left msgs)
                 Right eqs -> case getLPESummands procId procDef body of
                                Left msgs -> return (Left msgs)
@@ -92,20 +92,20 @@ getLPESummands expectedProcId expectedProcDef@(TxsDefs.ProcDef defChanIds params
       TxsDefs.ActionPref TxsDefs.ActOffer { TxsDefs.offers = offers, TxsDefs.hiddenvars = hiddenvars, TxsDefs.constraint = constraint } procInst ->
           case TxsDefs.view procInst of
             TxsDefs.ProcInst procId chanIds paramValues
-                | procId /= expectedProcId -> Left ["Instantiating incorrect process, found " ++ TxsShow.fshow (TxsDefs.view procInst) ++ "!"]
-                | chanIds /= defChanIds -> Left ["Channel mismatch in process instantiation, found " ++ TxsShow.fshow (TxsDefs.view procInst) ++ "!"]
-                | otherwise -> case getParamEqs params paramValues of
-                                 Left msgs -> Left msgs
+                | procId /= expectedProcId -> Left ["Instantiating different process, found " ++ TxsShow.fshow (TxsDefs.view procInst) ++ "!"]
+                | chanIds /= defChanIds -> Left ["Channel mismatch in recursion, found " ++ TxsShow.fshow (TxsDefs.view procInst) ++ "!"]
+                | otherwise -> case getParamEqs 1 params paramValues of
+                                 Left msgs -> Left (("Recursion " ++ TxsShow.fshow procInst ++ " is invalid because"):msgs)
                                  Right eqs -> case concatEither (map (getChannelOffer params) (Set.toList offers)) of
-                                                Left msgs -> Left msgs
+                                                Left msgs -> Left (("Recursion " ++ TxsShow.fshow procInst ++ " is invalid because"):msgs)
                                                 Right channelOffers -> let channelVars = concatMap snd channelOffers ++ Set.toList hiddenvars in
                                                                        let constructedSummand = LPESummand channelVars channelOffers constraint (LPEProcInst eqs) in
                                                                        let scopeProblems = getSummandScopeProblems (Set.fromList params) constructedSummand in
                                                                          if null scopeProblems
                                                                          then Right [constructedSummand]
-                                                                         else Left (("Invalid summand: " ++ showLPESummand constructedSummand):scopeProblems ++ ["----------------------------------------------------------------------------------------------------------------------------------------------------------------"])
-            _ -> Left ["Expected process instantiation, but found " ++ TxsShow.fshow (TxsDefs.view procInst) ++ "!"]
-      _ -> Left ["Expected choice or channel, but found " ++ TxsShow.fshow (TxsDefs.view expr) ++ "!"]
+                                                                         else Left (("Summand " ++ showLPESummand constructedSummand ++ " is invalid because"):scopeProblems)
+            _ -> Left ["Expected recursion, found " ++ TxsShow.fshow (TxsDefs.view procInst) ++ "!"]
+      _ -> Left ["Expected choice or channel, found " ++ TxsShow.fshow (TxsDefs.view expr) ++ "!"]
 -- getLPESummands
 
 -- Helper method.
@@ -126,17 +126,17 @@ getChannelOffer params TxsDefs.Offer { TxsDefs.chanid = chanid, TxsDefs.chanoffe
 
 -- Helper function.
 -- Creates parameter equations from the specified variables and expressions (unless there are problems):
-getParamEqs :: [VarId] -> [TxsDefs.VExpr] -> Either [String] LPEParamEqs
-getParamEqs [] [] = Right Map.empty
-getParamEqs (x:_) [] = Left ["Too few expressions, " ++ Text.unpack (VarId.name x) ++ " is unassigned!"]
-getParamEqs [] (x:_) = Left ["Too many expressions, found '" ++ TxsShow.fshow x ++ "'!"]
-getParamEqs (x:params) (y:paramValues) =
-    case getParamEqs params paramValues of
+getParamEqs :: Int -> [VarId] -> [TxsDefs.VExpr] -> Either [String] LPEParamEqs
+getParamEqs _ [] [] = Right Map.empty
+getParamEqs n (_:xs) [] = Left ["Expected " ++ show (n + length xs) ++ " arguments, found " ++ show (n - 1) ++ "!"]
+getParamEqs n [] (_:xs) = Left ["Expected " ++ show (n - 1) ++ " arguments, found " ++ show (n + length xs) ++ "!"]
+getParamEqs n (x:params) (y:paramValues) =
+    case getParamEqs (n + 1) params paramValues of
       Left msgs -> if SortOf.sortOf x /= SortOf.sortOf y
-                   then Left (("Mismatching sorts, found " ++ Text.unpack (VarId.name x) ++ " and " ++ TxsShow.fshow (SortOf.sortOf y) ++ "!"):msgs)
+                   then Left (("Sort does not match for parameter " ++ show n ++ ", expected " ++ TxsShow.fshow (SortOf.sortOf x) ++ " but found " ++ TxsShow.fshow (SortOf.sortOf y) ++ "!"):msgs)
                    else Left msgs
       Right eqs -> if SortOf.sortOf x /= SortOf.sortOf y
-                   then Left ["Mismatching sorts, found " ++ Text.unpack (VarId.name x) ++ " and " ++ TxsShow.fshow (SortOf.sortOf y) ++ "!"]
+                   then Left ["Sort does not match for parameter " ++ show n ++ ", expected " ++ TxsShow.fshow (SortOf.sortOf x) ++ " but found " ++ TxsShow.fshow (SortOf.sortOf y) ++ "!"]
                    else Right (Map.insert x y eqs)
 -- getParamEqs
 
