@@ -181,9 +181,12 @@ compileParsedDefs parsedDefs = do
     -- in 'parsedDefs', as well as the predefined Sorts ("Bool", "Int", "Regex",
     -- "String").
     sIds <- compileToSortIds parsedDefs
-
+    
     -- Generate a map from constructor declarations to 'CstrId''s.
-    cstrIds <- compileToCstrId sIds (parsedDefs ^. adts)
+    -- Also create and gather the required accessor functions;
+    -- this should be fine, since they only depend on sorts.
+    
+    (cstrIds, accFuncIdsL) <- compileToCstrId sIds (parsedDefs ^. adts)
 
     -- Generate a map from locations of function declarations to 'FuncId''s.
     -- This map includes the predefined functions (standard functions) such as
@@ -192,12 +195,13 @@ compileParsedDefs parsedDefs = do
     cstrFuncIdsL <- adtsToFuncIds sIds (parsedDefs ^. adts)
     fIdsL        <- funcDeclsToFuncIds sIds (allFuncs parsedDefs)
     checkUnique (NoErrorLoc, Function, "Functions ")
-                (fmap snd $ stdFuncIdsL <> cstrFuncIdsL <> fIdsL)
+                (fmap snd $ stdFuncIdsL <> accFuncIdsL <> cstrFuncIdsL <> fIdsL)
     let
         stdFuncIds = Map.fromList stdFuncIdsL
+        accFuncIds = Map.fromList accFuncIdsL
         cstrFuncIds = Map.fromList cstrFuncIdsL
         fIds = Map.fromList fIdsL
-        allFids = stdFuncIds <> cstrFuncIds <> fIds
+        allFids = stdFuncIds <> accFuncIds <> cstrFuncIds <> fIds
         lfDefs = compileToFuncLocs allFids
 
     -- Generate a map from locations of variable references to the location in

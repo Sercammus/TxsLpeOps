@@ -46,6 +46,7 @@ import           SortId
 import           SortOf
 import           ValExpr
 import           Variable
+import           FuncId
 
 data ParamTrueBins =
     ParamTrueBins { maxDepth     :: Int
@@ -256,7 +257,7 @@ randomValue p sid expr n | n > 0 =
                 processConstructor (cid, CstrDef _isX []) expr' = valExprToString $ cstrIsCstr cid expr'
                 processConstructor (cid, CstrDef _isX _accessors) expr' = do
                     cstr <- valExprToString $ cstrIsCstr cid expr'
-                    args' <- processArguments cid (zip (cstrargs cid) [0..]) expr'
+                    args' <- processArguments cid (zip (map funcsort (cstrargs cid)) [0..]) expr'
                     case args' of
                         [arg]   -> return $ "(ite " <> cstr <> " " <> arg <> " false) "
                         _       -> do

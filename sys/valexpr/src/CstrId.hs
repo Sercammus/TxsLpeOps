@@ -29,12 +29,13 @@ import           GHC.Generics    (Generic)
 import           Id
 import           Name
 import           SortId
+import           FuncId
 
 -- | Identifier for Constructor
 data CstrId = CstrId
     { name     :: Name            -- capid
     , unid     :: Id
-    , cstrargs :: [SortId]
+    , cstrargs :: [FuncId]
     , cstrsort :: SortId
     } deriving (Eq, Ord, Read, Show, Generic, NFData, Data)
 
