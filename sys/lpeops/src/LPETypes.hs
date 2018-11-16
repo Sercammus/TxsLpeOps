@@ -21,6 +21,7 @@ paramEqsLookup,
 toLPEInstance,
 fromLPEInstance,
 getScopeProblems,
+normalizeLPESummands,
 module LPETypeDefs
 ) where
 

@@ -87,7 +87,7 @@ discardLPE _lpeInstance _out _invariant = return (Left ["LPE discarded!"])
 
 showLPE :: LPEOperation
 showLPE lpeInstance _out _invariant = do
-    IOC.putMsgs [ EnvData.TXS_CORE_ANY (showContextFreeLPEInstance lpeInstance) ]
+    IOC.putMsgs [ EnvData.TXS_CORE_ANY (showAbbrevLPEInstance lpeInstance) ]
     return (Right lpeInstance)
 -- showLPE
 

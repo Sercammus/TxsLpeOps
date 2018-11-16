@@ -18,12 +18,12 @@ See LICENSE at root directory of this repository.
 {-# LANGUAGE FlexibleContexts    #-}
 module LPEPrettyPrint (
 showLPEInstance,
-showContextFreeLPEInstance,
+showAbbrevLPEInstance,
 showLPESummand,
-showContextFreeLPESummand,
+showAbbrevLPESummand,
 showSubst,
 showValExpr,
-showContextFreeValExpr,
+showAbbrevValExpr,
 ) where
 
 import qualified Data.List as List
@@ -50,21 +50,21 @@ createDefaultContextFromVarList = createDefaultContextFromVars . Set.fromList
 createDefaultContextFromVars :: Set.Set VarId -> VarContext
 createDefaultContextFromVars = Map.fromSet (Text.unpack . VarId.name)
 
-createFreeContextFromVarList :: String -> [VarId] -> VarContext
-createFreeContextFromVarList prefix vars = Map.fromList (map (\(v, n) -> (v, prefix ++ show (n::Integer))) (zip vars [1..]))
+createAbbrevContextFromVarList :: String -> [VarId] -> VarContext
+createAbbrevContextFromVarList prefix vars = Map.fromList (map (\(v, n) -> (v, prefix ++ show (n::Integer))) (zip vars [1..]))
 
-createFreeContextFromVars :: String -> Set.Set VarId -> VarContext
-createFreeContextFromVars prefix = createFreeContextFromVarList prefix . Set.toList
+createAbbrevContextFromVars :: String -> Set.Set VarId -> VarContext
+createAbbrevContextFromVars prefix = createAbbrevContextFromVarList prefix . Set.toList
 
-getLPEInstanceFreeContext :: LPEInstance -> VarContext
-getLPEInstanceFreeContext lpe@(_, initParamEqs, _) =
+getLPEInstanceAbbrevContext :: LPEInstance -> VarContext
+getLPEInstanceAbbrevContext lpe@(_, initParamEqs, _) =
     let lpeParams = Map.keysSet initParamEqs in
     let lpeVars = getLPEInstanceVariables lpe Set.\\ lpeParams in
-      Map.union (createFreeContextFromVars "par" lpeParams) (createFreeContextFromVars "var" lpeVars)
+      Map.union (createAbbrevContextFromVars "par" lpeParams) (createAbbrevContextFromVars "var" lpeVars)
 -- getLPEInstanceContext
 
-getLPESummandFreeContext :: LPESummand -> VarContext
-getLPESummandFreeContext summand = createFreeContextFromVars "var" (getLPESummandVariables summand)
+getLPESummandAbbrevContext :: LPESummand -> VarContext
+getLPESummandAbbrevContext summand = createAbbrevContextFromVars "var" (getLPESummandVariables summand)
 
 -- Lists all variables that occur in an LPE:
 getLPEInstanceVariables :: LPEInstance -> Set.Set VarId
@@ -83,20 +83,20 @@ getParamEqsVariables eqs = Set.union (Map.keysSet eqs) (Set.unions (map (Set.fro
 -- Shows an LPE in the default 'context'; that is,
 -- variables are displayed using their actual names:
 showLPEInstance :: LPEInstance -> String
-showLPEInstance lpe = showCFLPEInstance (createDefaultContextFromVars (getLPEInstanceVariables lpe)) lpe
+showLPEInstance lpe = showLPEInstanceInContext (createDefaultContextFromVars (getLPEInstanceVariables lpe)) lpe
 
 -- Shows an LPE in a 'free context'; that is,
 -- fresh (short) names are introduces for each unique variable, and those names are used to display them:
-showContextFreeLPEInstance :: LPEInstance -> String
-showContextFreeLPEInstance lpe = showCFLPEInstance (getLPEInstanceFreeContext lpe) lpe
+showAbbrevLPEInstance :: LPEInstance -> String
+showAbbrevLPEInstance lpe = showLPEInstanceInContext (getLPEInstanceAbbrevContext lpe) lpe
 
 -- Shows an LPE in the specified 'context'; that is,
 -- using specific names for specific variables when they occur:
-showCFLPEInstance :: VarContext -> LPEInstance -> String
-showCFLPEInstance f (chanIds, initParamEqs, summands) =
+showLPEInstanceInContext :: VarContext -> LPEInstance -> String
+showLPEInstanceInContext f (chanIds, initParamEqs, summands) =
     "LPE[" ++ List.intercalate "; " (map showChanDecl chanIds) ++ "] (" ++
     showParamEqs initParamEqs ++ ") ::=\n        " ++
-    List.intercalate "\n     ## " (map (showCFLPESummand f) (Set.toList summands)) ++ "\n;"
+    List.intercalate "\n     ## " (map (showLPESummandInContext f) (Set.toList summands)) ++ "\n;"
   where
     showChanDecl :: ChanId.ChanId -> String
     showChanDecl chanId =
@@ -108,28 +108,28 @@ showCFLPEInstance f (chanIds, initParamEqs, summands) =
     showParamEqs paramEqs = List.intercalate ", " (map showParamEq (Map.toList paramEqs))
     
     showParamEq :: (VarId, TxsDefs.VExpr) -> String
-    showParamEq (varId, expr) = Text.unpack (VarId.name varId) ++ " = " ++ showCFValExpr f expr
--- showCFLPEInstance
+    showParamEq (varId, expr) = Text.unpack (VarId.name varId) ++ " = " ++ showValExprInContext f expr
+-- showLPEInstanceInContext
 
 -- Shows a summand in the default 'context'; that is,
 -- variables are displayed using their actual names:
 showLPESummand :: LPESummand -> String
-showLPESummand summand = showCFLPESummand (createDefaultContextFromVars (getLPESummandVariables summand)) summand
+showLPESummand summand = showLPESummandInContext (createDefaultContextFromVars (getLPESummandVariables summand)) summand
 
 -- Shows a summand in a 'free context'; that is,
 -- fresh (short) names are introduces for each unique variable, and those names are used to display them:
-showContextFreeLPESummand :: LPESummand -> String
-showContextFreeLPESummand summand = showCFLPESummand (getLPESummandFreeContext summand) summand
+showAbbrevLPESummand :: LPESummand -> String
+showAbbrevLPESummand summand = showLPESummandInContext (getLPESummandAbbrevContext summand) summand
 
 -- Shows a summand in the specified 'context'; that is,
 -- using specific names for specific variables when they occur:
-showCFLPESummand :: VarContext -> LPESummand -> String
-showCFLPESummand f (LPESummand channelVars channelOffers guard paramEqs) =
+showLPESummandInContext :: VarContext -> LPESummand -> String
+showLPESummandInContext f (LPESummand channelVars channelOffers guard paramEqs) =
     let usedChannelVars = concatMap snd channelOffers in
     let hiddenChannelVars = Set.toList (Set.fromList channelVars Set.\\ Set.fromList usedChannelVars) in
       showChannelOffers channelOffers ++
       showHiddenVars hiddenChannelVars ++
-      "[[ " ++ showCFValExpr f guard ++ " ]] >-> LPE(" ++ showParamEqs paramEqs ++ ")"
+      "[[ " ++ showValExprInContext f guard ++ " ]] >-> LPE(" ++ showParamEqs paramEqs ++ ")"
   where
     showChannelOffers :: LPEChannelOffers -> String
     showChannelOffers [] = ""
@@ -146,20 +146,20 @@ showCFLPESummand f (LPESummand channelVars channelOffers guard paramEqs) =
     showParamEqs eqs = List.intercalate ", " (map showParamEq (Map.toList eqs))
     
     showParamEq :: (VarId, TxsDefs.VExpr) -> String
-    showParamEq (varId, expr) = f Map.! varId ++ " = " ++ showCFValExpr f expr
--- showCFLPESummand
+    showParamEq (varId, expr) = f Map.! varId ++ " = " ++ showValExprInContext f expr
+-- showLPESummandInContext
 
 -- Shows the given expression in the default 'context'; that is,
 -- variables are displayed using their actual names:
 showValExpr :: TxsDefs.VExpr -> String
-showValExpr expr = showCFValExpr (createDefaultContextFromVarList (FreeVar.freeVars expr)) expr
+showValExpr expr = showValExprInContext (createDefaultContextFromVarList (FreeVar.freeVars expr)) expr
 
 -- Shows the given expression in a 'free context'; that is,
 -- fresh (short) names are introduces for each unique variable, and those names are used to display them:
-showContextFreeValExpr :: TxsDefs.VExpr -> String
-showContextFreeValExpr expr =
-    showCFValExpr (createFreeContextFromVarList "var" (FreeVar.freeVars expr)) expr
--- showContextFreeValExpr
+showAbbrevValExpr :: TxsDefs.VExpr -> String
+showAbbrevValExpr expr =
+    showValExprInContext (createAbbrevContextFromVarList "var" (FreeVar.freeVars expr)) expr
+-- showAbbrevValExpr
 
 -- Shows a substitution:
 showSubst :: Map.Map VarId TxsDefs.VExpr -> String
@@ -167,47 +167,47 @@ showSubst subst = "[" ++ List.intercalate ", " (map (\(p, v) -> Text.unpack (Var
 
 -- Shows the given expression in the specified 'context'; that is,
 -- using specific names for specific variables when they occur:
-showCFValExpr :: VarContext -> TxsDefs.VExpr -> String
-showCFValExpr _ (view -> Vconst (Cbool val))      = show val
-showCFValExpr _ (view -> Vconst (Cint val))       = show val
-showCFValExpr _ (view -> Vconst (Cstring val))    = show val
-showCFValExpr _ (view -> Vconst (Cregex val))     = show val
-showCFValExpr f (view -> Vconst (Ccstr cid pars)) = let newPars = map (showCFValExpr f . cstrConst) pars in
-                                                      Text.unpack (CstrId.name cid) ++ "(" ++ List.intercalate ", " newPars ++ ")"
-showCFValExpr _ (view -> Vconst (Cany sort))      = "ANY " ++ Text.unpack (SortId.name sort)
-showCFValExpr f (view -> Vvar vid)                = f Map.! vid
-showCFValExpr f (view -> Vfunc fid vexps)         = let newVExps = map (showCFValExpr f) vexps in
-                                                      Text.unpack (FuncId.name fid) ++ "(" ++ List.intercalate ", " newVExps ++ ")"
-showCFValExpr f (view -> Vcstr cid vexps)         = let newVExps = map (showCFValExpr f) vexps in
-                                                      Text.unpack (CstrId.name cid) ++ "(" ++ List.intercalate ", " newVExps ++ ")"
-showCFValExpr f (view -> Viscstr cid vexp)        = let newVExp = showCFValExpr f vexp in
-                                                      "(" ++ newVExp ++ " is " ++ Text.unpack (CstrId.name cid) ++ ")"
-showCFValExpr f (view -> Vaccess cid p vexp)      = let newVExp = showCFValExpr f vexp in
-                                                      Text.unpack (CstrId.name cid) ++ "(" ++ newVExp ++ ")[" ++ show p ++ "]"
-showCFValExpr f (view -> Vite cond vexp1 vexp2)   = "if " ++ showCFValExpr f cond ++ " then " ++ showCFValExpr f vexp1 ++ " else " ++ showCFValExpr f vexp2 ++ " end"
-showCFValExpr f (view -> Vdivide t n)             = "(" ++ showCFValExpr f t ++ "/" ++ showCFValExpr f n ++ ")"
-showCFValExpr f (view -> Vmodulo t n)             = "(" ++ showCFValExpr f t ++ "%" ++ showCFValExpr f n ++ ")"
-showCFValExpr f (view -> Vgez v)                  = showCFValExpr f v ++ ">=0"
-showCFValExpr f (view -> Vsum s)                  = let newVExps = map (visitcOccur f) (FMX.toDistinctAscOccurListT s) in
-                                                      "(" ++ List.intercalate "+" newVExps ++ ")"
-showCFValExpr f (view -> Vproduct p)              = let newVExps = map (visitcOccur f) (FMX.toDistinctAscOccurListT p) in
-                                                      "(" ++ List.intercalate "*" newVExps ++ ")"
-showCFValExpr f (view -> Vequal vexp1 vexp2)      = "(" ++ showCFValExpr f vexp1 ++ "==" ++ showCFValExpr f vexp2 ++ ")"
-showCFValExpr f (view -> Vand vexps)              = let newVExps = map (showCFValExpr f) (Set.toList vexps) in
-                                                      "(" ++ List.intercalate " && " newVExps ++ ")"
-showCFValExpr f (view -> Vnot vexp)               = "not(" ++ showCFValExpr f vexp ++ ")"
-showCFValExpr f (view -> Vlength vexp)            = "length(" ++ showCFValExpr f vexp ++ ")"
-showCFValExpr f (view -> Vat s p)                 = showCFValExpr f s ++ "[" ++ showCFValExpr f p ++ "]"
-showCFValExpr f (view -> Vconcat vexps)           = let newVExps = map (showCFValExpr f) vexps in
-                                                      List.intercalate ":" newVExps
-showCFValExpr f (view -> Vstrinre s r)            = "regex(" ++ showCFValExpr f s ++ ", " ++ showCFValExpr f r ++ ")"
-showCFValExpr f (view -> Vpredef kd fid vexps)    = let newVExps = map (showCFValExpr f) vexps in
-                                                      Text.unpack (FuncId.name fid) ++ "[" ++ show kd ++ "](" ++ List.intercalate ", " newVExps ++ ")"
-showCFValExpr _ expr                              = error ("LPEPrettyPrint.showCFValExpr not defined for " ++ show expr)
--- showCFValExpr
+showValExprInContext :: VarContext -> TxsDefs.VExpr -> String
+showValExprInContext _ (view -> Vconst (Cbool val))      = show val
+showValExprInContext _ (view -> Vconst (Cint val))       = show val
+showValExprInContext _ (view -> Vconst (Cstring val))    = show val
+showValExprInContext _ (view -> Vconst (Cregex val))     = show val
+showValExprInContext f (view -> Vconst (Ccstr cid pars)) = let newPars = map (showValExprInContext f . cstrConst) pars in
+                                                             Text.unpack (CstrId.name cid) ++ "(" ++ List.intercalate ", " newPars ++ ")"
+showValExprInContext _ (view -> Vconst (Cany sort))      = "ANY " ++ Text.unpack (SortId.name sort)
+showValExprInContext f (view -> Vvar vid)                = f Map.! vid
+showValExprInContext f (view -> Vfunc fid vexps)         = let newVExps = map (showValExprInContext f) vexps in
+                                                             Text.unpack (FuncId.name fid) ++ "(" ++ List.intercalate ", " newVExps ++ ")"
+showValExprInContext f (view -> Vcstr cid vexps)         = let newVExps = map (showValExprInContext f) vexps in
+                                                             Text.unpack (CstrId.name cid) ++ "(" ++ List.intercalate ", " newVExps ++ ")"
+showValExprInContext f (view -> Viscstr cid vexp)        = let newVExp = showValExprInContext f vexp in
+                                                             "(" ++ newVExp ++ " is " ++ Text.unpack (CstrId.name cid) ++ ")"
+showValExprInContext f (view -> Vaccess cid p vexp)      = let newVExp = showValExprInContext f vexp in
+                                                             Text.unpack (CstrId.name cid) ++ "(" ++ newVExp ++ ")[" ++ show p ++ "]"
+showValExprInContext f (view -> Vite cond vexp1 vexp2)   = "if " ++ showValExprInContext f cond ++ " then " ++ showValExprInContext f vexp1 ++ " else " ++ showValExprInContext f vexp2 ++ " end"
+showValExprInContext f (view -> Vdivide t n)             = "(" ++ showValExprInContext f t ++ "/" ++ showValExprInContext f n ++ ")"
+showValExprInContext f (view -> Vmodulo t n)             = "(" ++ showValExprInContext f t ++ "%" ++ showValExprInContext f n ++ ")"
+showValExprInContext f (view -> Vgez v)                  = showValExprInContext f v ++ ">=0"
+showValExprInContext f (view -> Vsum s)                  = let newVExps = map (visitcOccur f) (FMX.toDistinctAscOccurListT s) in
+                                                             "(" ++ List.intercalate "+" newVExps ++ ")"
+showValExprInContext f (view -> Vproduct p)              = let newVExps = map (visitcOccur f) (FMX.toDistinctAscOccurListT p) in
+                                                             "(" ++ List.intercalate "*" newVExps ++ ")"
+showValExprInContext f (view -> Vequal vexp1 vexp2)      = "(" ++ showValExprInContext f vexp1 ++ "==" ++ showValExprInContext f vexp2 ++ ")"
+showValExprInContext f (view -> Vand vexps)              = let newVExps = map (showValExprInContext f) (Set.toList vexps) in
+                                                             "(" ++ List.intercalate " && " newVExps ++ ")"
+showValExprInContext f (view -> Vnot vexp)               = "not(" ++ showValExprInContext f vexp ++ ")"
+showValExprInContext f (view -> Vlength vexp)            = "length(" ++ showValExprInContext f vexp ++ ")"
+showValExprInContext f (view -> Vat s p)                 = showValExprInContext f s ++ "[" ++ showValExprInContext f p ++ "]"
+showValExprInContext f (view -> Vconcat vexps)           = let newVExps = map (showValExprInContext f) vexps in
+                                                             List.intercalate ":" newVExps
+showValExprInContext f (view -> Vstrinre s r)            = "regex(" ++ showValExprInContext f s ++ ", " ++ showValExprInContext f r ++ ")"
+showValExprInContext f (view -> Vpredef kd fid vexps)    = let newVExps = map (showValExprInContext f) vexps in
+                                                             Text.unpack (FuncId.name fid) ++ "[" ++ show kd ++ "](" ++ List.intercalate ", " newVExps ++ ")"
+showValExprInContext _ expr                              = error ("LPEPrettyPrint.showValExprInContext not defined for " ++ show expr)
+-- showValExprInContext
 
--- Helper function to showCFValExpr:
+-- Helper function to showValExprInContext:
 visitcOccur :: VarContext -> (TxsDefs.VExpr, Integer) -> String
-visitcOccur f (v, 1) = showCFValExpr f v
-visitcOccur f (v, n) = showCFValExpr f v ++ " times " ++ show n
+visitcOccur f (v, 1) = showValExprInContext f v
+visitcOccur f (v, n) = showValExprInContext f v ++ " times " ++ show n
 
