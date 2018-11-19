@@ -1,0 +1,156 @@
+-- This file has been generated from package.yaml by hpack version 0.28.2.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: e7a7ff5046aec1ef673695fb388fe462dba89187f5484559e4f5111c9145601d
+
+name:           txs-compiler
+version:        0.1.0.0
+homepage:       https://github.com/TorXakis/TorXakis#readme
+bug-reports:    https://github.com/TorXakis/TorXakis/issues
+author:         Damian Nadales
+maintainer:     damian.nadales@gmail.com
+copyright:      Copyright: (c) 2017 Damian Nadales
+license:        BSD3
+build-type:     Simple
+cabal-version:  >= 1.10
+extra-source-files:
+    README.md
+    test/data/examps/Adder.txs
+    test/data/examps/AdderPurposes.txs
+    test/data/examps/AdderStAut.txs
+    test/data/examps/AllTypeDefsFuncDefs.txs
+    test/data/examps/Ark.txs
+    test/data/examps/ControlLoopModel.txs
+    test/data/examps/CustomersOrders.txs
+    test/data/examps/DisPro.txs
+    test/data/examps/Echo.txs
+    test/data/examps/fibonacci.txs
+    test/data/examps/InFirstQuadrantTestPurpose.txs
+    test/data/examps/LuckyPeople.txs
+    test/data/examps/MAdder.txs
+    test/data/examps/MovingArms.txs
+    test/data/examps/MultipleControlLoops.txs
+    test/data/examps/Point.txs
+    test/data/examps/PurposeExamples.txs
+    test/data/examps/PurposeLuckyByGender.txs
+    test/data/examps/Queue.txs
+    test/data/examps/QueueStAut.txs
+    test/data/examps/ReadWrite.txs
+    test/data/examps/ReadWriteAdvanced.txs
+    test/data/examps/ReadWriteTestPurposes.txs
+    test/data/examps/RestrictedAxisPurpose.txs
+    test/data/examps/SingleAxisPurpose.txs
+    test/data/examps/StimulusResponse.txs
+    test/data/examps/StimulusResponseLoop.txs
+    test/data/parser/success/Adder.txs
+    test/data/parser/success/AdderPurposes.txs
+    test/data/parser/success/AdderReplay.txs
+    test/data/parser/success/AdderStAut.txs
+    test/data/parser/success/MAdder.txs
+    test/data/success/Adder.txs
+    test/data/success/CnectDefs.txs
+    test/data/success/ConstDecls.txs
+    test/data/success/Mapper.txs
+    test/data/success/MinimalAdt.txs
+    test/data/success/MultipleControlLoops.txs
+    test/data/success/Point.txs
+    test/data/success/PurpDefs.txs
+    test/data/success/Queue.txs
+    test/data/success/SimpleFuncDefs.txs
+    test/data/success/SimpleModelDefs.txs
+    test/data/success/SimpleProcDefs.txs
+    test/data/success/StautDefs.txs
+    test/data/success/ValExprs.txs
+
+source-repository head
+  type: git
+  location: https://github.com/TorXakis/TorXakis
+
+library
+  exposed-modules:
+      TorXakis.Compiler
+      TorXakis.Compiler.Error
+      TorXakis.Parser
+      TorXakis.Compiler.MapsTo
+  other-modules:
+      TorXakis.Compiler.Data
+      TorXakis.Compiler.Data.ProcDecl
+      TorXakis.Compiler.Data.VarDecl
+      TorXakis.Compiler.Defs.BehExprDefs
+      TorXakis.Compiler.Defs.FuncTable
+      TorXakis.Compiler.Defs.ModelDef
+      TorXakis.Compiler.Defs.ProcDef
+      TorXakis.Compiler.Defs.Sigs
+      TorXakis.Compiler.Defs.TxsDefs
+      TorXakis.Compiler.Maps
+      TorXakis.Compiler.Maps.DefinesAMap
+      TorXakis.Compiler.Maps.VarRef
+      TorXakis.Compiler.Simplifiable
+      TorXakis.Compiler.ValExpr.Constant
+      TorXakis.Compiler.ValExpr.CstrDef
+      TorXakis.Compiler.ValExpr.CstrId
+      TorXakis.Compiler.ValExpr.ExpDecl
+      TorXakis.Compiler.ValExpr.FuncDef
+      TorXakis.Compiler.ValExpr.FuncId
+      TorXakis.Compiler.ValExpr.SortId
+      TorXakis.Compiler.ValExpr.ValExpr
+      TorXakis.Compiler.ValExpr.VarId
+      TorXakis.Compiler.Validation
+      TorXakis.Parser.BExpDecl
+      TorXakis.Parser.ChanDecl
+      TorXakis.Parser.ChanRef
+      TorXakis.Parser.CnectDecl
+      TorXakis.Parser.Common
+      TorXakis.Parser.ConstDecl
+      TorXakis.Parser.Data
+      TorXakis.Parser.FuncDefs
+      TorXakis.Parser.MapperDecl
+      TorXakis.Parser.ModelDecl
+      TorXakis.Parser.ProcDecl
+      TorXakis.Parser.PurpDecl
+      TorXakis.Parser.StautDecl
+      TorXakis.Parser.TypeDefs
+      TorXakis.Parser.ValExprDecl
+      TorXakis.Parser.VarDecl
+      Paths_txs_compiler
+  hs-source-dirs:
+      src
+  ghc-options: -Werror -Wall -O -fconstraint-solver-iterations=10 -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints
+  build-depends:
+      MissingH
+    , Unique
+    , base >=4.7 && <5
+    , bexpr
+    , containers
+    , defs
+    , ilist
+    , lens
+    , mtl
+    , parsec
+    , text
+    , transformers
+    , valexpr
+  default-language: Haskell2010
+
+test-suite txs-compiler-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      TorXakis.Compiler.MapsToSpec
+      TorXakis.CompilerSpec
+      TorXakis.ParserSpec
+      Paths_txs_compiler
+  hs-source-dirs:
+      test
+  ghc-options: -Werror -Wall -O -fconstraint-solver-iterations=10 -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N -Werror -Wall -O
+  build-depends:
+      base >=4.7 && <5
+    , containers
+    , filemanip
+    , filepath
+    , hspec
+    , lens
+    , raw-strings-qq
+    , txs-compiler
+  default-language: Haskell2010

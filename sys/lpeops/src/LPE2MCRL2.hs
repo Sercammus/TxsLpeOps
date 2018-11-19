@@ -113,7 +113,7 @@ constructor2constructor (cstrId, CstrDef.CstrDef recognizer projections) = do
     constructorName <- getFreshName (CstrId.name cstrId)
     recognizerName <- getFreshName (FuncId.name recognizer)
     projectionNames <- Monad.mapM (getFreshName . FuncId.name) projections
-    projectionSorts <- Monad.mapM sort2sort (CstrId.cstrargs cstrId)
+    projectionSorts <- Monad.mapM (sort2sort . FuncId.funcsort) (CstrId.cstrargs cstrId)
     let fields = zipWith (\x y -> MCRL2Defs.Variable { MCRL2Defs.varName = x, MCRL2Defs.varSort = y }) projectionNames projectionSorts
     let newConstructor = MCRL2Defs.Constructor { MCRL2Defs.cstrName = constructorName, MCRL2Defs.fields = fields, MCRL2Defs.recognizer = recognizerName }
     -- Look up the (already created) mCRL2 sort that corresponds with the TXS sort of the constructor:

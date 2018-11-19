@@ -192,16 +192,17 @@ compileParsedDefs parsedDefs = do
     -- This map includes the predefined functions (standard functions) such as
     -- '*', '++', 'toString', 'fromString'.
     stdFuncIdsL  <- getStdFuncIds
-    cstrFuncIdsL <- adtsToFuncIds sIds (parsedDefs ^. adts)
+    isCstrFuncIdsL <- adtsToFuncIds sIds (parsedDefs ^. adts)
+    -- Reuse the original variable, so that we do not have to change the rest of the code:
+    let cstrFuncIdsL = accFuncIdsL <> isCstrFuncIdsL
     fIdsL        <- funcDeclsToFuncIds sIds (allFuncs parsedDefs)
     checkUnique (NoErrorLoc, Function, "Functions ")
-                (fmap snd $ stdFuncIdsL <> accFuncIdsL <> cstrFuncIdsL <> fIdsL)
+                (fmap snd $ stdFuncIdsL <> cstrFuncIdsL <> fIdsL)
     let
         stdFuncIds = Map.fromList stdFuncIdsL
-        accFuncIds = Map.fromList accFuncIdsL
         cstrFuncIds = Map.fromList cstrFuncIdsL
         fIds = Map.fromList fIdsL
-        allFids = stdFuncIds <> accFuncIds <> cstrFuncIds <> fIds
+        allFids = stdFuncIds <> cstrFuncIds <> fIds
         lfDefs = compileToFuncLocs allFids
 
     -- Generate a map from locations of variable references to the location in
