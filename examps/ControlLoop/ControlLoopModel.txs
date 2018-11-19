@@ -8,6 +8,10 @@ TYPEDEF ProduceReport ::= ProduceReport { id, value :: Int } ENDDEF
 TYPEDEF MeasureReport ::= MeasureReport { id, value :: Int } ENDDEF
 TYPEDEF Correction    ::= Correction    { id, value :: Int } ENDDEF
 
+TYPEDEF IntList ::=
+    Nil | Cons { hd :: Int; tl :: IntList }
+ENDDEF
+
 FUNCDEF sgn ( x :: Int ) :: Int ::=
     IF x > 0 
         THEN 1
@@ -51,7 +55,7 @@ PROCDEF produceLoop [ In_Material           :: Int
     NI
 ENDDEF
 
-PROCDEF measure [ In_Material   :: Int
+PROCDEF measure_ORIGINAL [ In_Material   :: Int
                 ; Out_Report    :: MeasureReport
                 ; Out_Material  :: Int
                 ]( ) ::=
@@ -66,7 +70,7 @@ PROCDEF measure [ In_Material   :: Int
         )
 ENDDEF
 
-PROCDEF measure_ORIGINAL [ In_Material   :: Int
+PROCDEF measure [ In_Material   :: Int
                 ; Out_Report    :: MeasureReport
                 ; Out_Material  :: Int
                 ]( ) ::=
@@ -85,11 +89,11 @@ ENDDEF
 PROCDEF correct [ In_ProduceReport      :: ProduceReport
                 ; In_MeasureReport      :: MeasureReport
                 ; Out_Correction        :: Correction
-                ] ( ) ::=
+                ] ( v :: Int ) ::=
         In_ProduceReport ? pr | In_MeasureReport ? mr [[ id(pr) == id(mr) ]]
     >-> Out_Correction ? correction [[ ( id(correction) == id(mr) ) /\
                                    ( sgn(value(correction)) == sgn( value(pr) - value(mr) ) )]]
-    >-> correct [ In_ProduceReport, In_MeasureReport, Out_Correction ] ( )
+    >-> correct [ In_ProduceReport, In_MeasureReport, Out_Correction ] ( v )
 ENDDEF
 
 PROCDEF model [ In_Material                 :: Int
@@ -98,14 +102,14 @@ PROCDEF model [ In_Material                 :: Int
               ; Material                    :: Int
               ; MeasureReport               :: MeasureReport
               ; Out_Material                :: Int
-              ]( ) ::=
+              ]( intList :: IntList ) ::=
         (
                 produce [ In_Material, Correction, Material, ProduceReport ] ( )
             |[ Material]|
                 measure [ Material, MeasureReport, Out_Material ] ( )
         )
     |[ ProduceReport, MeasureReport, Correction ]|
-        correct [ ProduceReport, MeasureReport, Correction ] ( )
+        correct [ ProduceReport, MeasureReport, Correction ] ( hd(intList) )
 ENDDEF
 
 CHANDEF Chans ::=    In_Material     :: Int
@@ -134,5 +138,5 @@ MODELDEF Model ::=
     ,           {ProduceReport | MeasureReport}
 
     BEHAVIOUR
-        model [In_Material, Correction, ProduceReport, Material, MeasureReport, Out_Material]()
+        model [In_Material, Correction, ProduceReport, Material, MeasureReport, Out_Material]( Nil )
 ENDDEF
