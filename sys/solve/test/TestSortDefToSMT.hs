@@ -54,8 +54,8 @@ testPresentConditionalInt :: Test
 testPresentConditionalInt = TestCase $ do
     let conditionalIntSortId = SortId "ConditionalInt" 1234
     let intSortId = SortId "Int" 8765
-    let presentCstrId    = CstrId "_present" 2345 [intSortId] conditionalIntSortId
     let valueAccessor = FuncId "value" 6565 [] intSortId
+    let presentCstrId    = CstrId "_present" 2345 [valueAccessor] conditionalIntSortId
     let mapI = EnvNames (Map.fromList [ (intSortId, "Int")
                                       , (conditionalIntSortId, "conditionalInt")
                                       ])
@@ -73,8 +73,8 @@ testConditionalInt = TestCase $ do
     let conditionalIntSortId = SortId "ConditionalInt" 1234
     let intSortId = SortId "Int" 8765
     let absentCstrId    = CstrId "_absent" 2345 [] conditionalIntSortId
-    let presentCstrId    = CstrId "_present" 2345 [intSortId] conditionalIntSortId
     let valueAccessor = FuncId "value" 6565 [] intSortId
+    let presentCstrId    = CstrId "_present" 2345 [valueAccessor] conditionalIntSortId
 
     let mapI = EnvNames (Map.fromList [ (intSortId, "Int")
                                       , (conditionalIntSortId, "conditionalInt")

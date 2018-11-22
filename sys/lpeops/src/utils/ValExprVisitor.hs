@@ -135,6 +135,7 @@ visitValExprMK f k expr = do
     return (expr' { multiplicity = k })
 -- visitValExprMK
 
+-- Separate function because otherwise hlint complains:
 visitValExprWithDivision :: Monad.Monad m => ValExprVisitorM m t -> TxsDefs.VExpr -> TxsDefs.VExpr -> TxsDefs.VExpr -> m (ValExprVisitorOutput t)
 visitValExprWithDivision f t n expr = do
     let visitValExprM1 = visitValExprMK f 1
