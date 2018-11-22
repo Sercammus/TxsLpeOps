@@ -30,17 +30,17 @@ import qualified Data.List as List
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import qualified FreeMonoidX as FMX
-import Constant hiding (sort)
-import VarId
-import ValExpr hiding (subst)
 import qualified TxsDefs
 import qualified FuncId
 import qualified CstrId
 import qualified SortId
 import qualified ChanId
 import qualified FreeVar
-import LPETypeDefs
+import           Constant hiding (sort)
+import           ValExpr hiding (subst)
+import           VarId
+import           LPETypeDefs
+import           ValExprVisitor
 
 type VarContext = Map.Map VarId String
 
@@ -168,46 +168,39 @@ showSubst subst = "[" ++ List.intercalate ", " (map (\(p, v) -> Text.unpack (Var
 -- Shows the given expression in the specified 'context'; that is,
 -- using specific names for specific variables when they occur:
 showValExprInContext :: VarContext -> TxsDefs.VExpr -> String
-showValExprInContext _ (view -> Vconst (Cbool val))      = show val
-showValExprInContext _ (view -> Vconst (Cint val))       = show val
-showValExprInContext _ (view -> Vconst (Cstring val))    = show val
-showValExprInContext _ (view -> Vconst (Cregex val))     = show val
-showValExprInContext f (view -> Vconst (Ccstr cid pars)) = let newPars = map (showValExprInContext f . cstrConst) pars in
-                                                             Text.unpack (CstrId.name cid) ++ "(" ++ List.intercalate ", " newPars ++ ")"
-showValExprInContext _ (view -> Vconst (Cany sort))      = "ANY " ++ Text.unpack (SortId.name sort)
-showValExprInContext f (view -> Vvar vid)                = f Map.! vid
-showValExprInContext f (view -> Vfunc fid vexps)         = let newVExps = map (showValExprInContext f) vexps in
-                                                             Text.unpack (FuncId.name fid) ++ "(" ++ List.intercalate ", " newVExps ++ ")"
-showValExprInContext f (view -> Vcstr cid vexps)         = let newVExps = map (showValExprInContext f) vexps in
-                                                             Text.unpack (CstrId.name cid) ++ "(" ++ List.intercalate ", " newVExps ++ ")"
-showValExprInContext f (view -> Viscstr cid vexp)        = let newVExp = showValExprInContext f vexp in
-                                                             "(" ++ newVExp ++ " is " ++ Text.unpack (CstrId.name cid) ++ ")"
-showValExprInContext f (view -> Vaccess cid p vexp)      = let newVExp = showValExprInContext f vexp in
-                                                             Text.unpack (CstrId.name cid) ++ "(" ++ newVExp ++ ")[" ++ show p ++ "]"
-showValExprInContext f (view -> Vite cond vexp1 vexp2)   = "if " ++ showValExprInContext f cond ++ " then " ++ showValExprInContext f vexp1 ++ " else " ++ showValExprInContext f vexp2 ++ " end"
-showValExprInContext f (view -> Vdivide t n)             = "(" ++ showValExprInContext f t ++ "/" ++ showValExprInContext f n ++ ")"
-showValExprInContext f (view -> Vmodulo t n)             = "(" ++ showValExprInContext f t ++ "%" ++ showValExprInContext f n ++ ")"
-showValExprInContext f (view -> Vgez v)                  = showValExprInContext f v ++ ">=0"
-showValExprInContext f (view -> Vsum s)                  = let newVExps = map (visitcOccur f) (FMX.toDistinctAscOccurListT s) in
-                                                             "(" ++ List.intercalate "+" newVExps ++ ")"
-showValExprInContext f (view -> Vproduct p)              = let newVExps = map (visitcOccur f) (FMX.toDistinctAscOccurListT p) in
-                                                             "(" ++ List.intercalate "*" newVExps ++ ")"
-showValExprInContext f (view -> Vequal vexp1 vexp2)      = "(" ++ showValExprInContext f vexp1 ++ "==" ++ showValExprInContext f vexp2 ++ ")"
-showValExprInContext f (view -> Vand vexps)              = let newVExps = map (showValExprInContext f) (Set.toList vexps) in
-                                                             "(" ++ List.intercalate " && " newVExps ++ ")"
-showValExprInContext f (view -> Vnot vexp)               = "not(" ++ showValExprInContext f vexp ++ ")"
-showValExprInContext f (view -> Vlength vexp)            = "length(" ++ showValExprInContext f vexp ++ ")"
-showValExprInContext f (view -> Vat s p)                 = showValExprInContext f s ++ "[" ++ showValExprInContext f p ++ "]"
-showValExprInContext f (view -> Vconcat vexps)           = let newVExps = map (showValExprInContext f) vexps in
-                                                             List.intercalate ":" newVExps
-showValExprInContext f (view -> Vstrinre s r)            = "regex(" ++ showValExprInContext f s ++ ", " ++ showValExprInContext f r ++ ")"
-showValExprInContext f (view -> Vpredef kd fid vexps)    = let newVExps = map (showValExprInContext f) vexps in
-                                                             Text.unpack (FuncId.name fid) ++ "[" ++ show kd ++ "](" ++ List.intercalate ", " newVExps ++ ")"
-showValExprInContext _ expr                              = error ("LPEPrettyPrint.showValExprInContext not defined for " ++ show expr)
+showValExprInContext f = customData . visitValExpr showVisitor
+  where
+    showVisitor :: [ValExprVisitorOutput String] -> TxsDefs.VExpr -> ValExprVisitorOutput String
+    showVisitor subExps expr =
+        let pars = map customData subExps in
+        let str = case expr of
+                    (view -> Vconst (Cbool val))      -> show val
+                    (view -> Vconst (Cint val))       -> show val
+                    (view -> Vconst (Cstring val))    -> show val
+                    (view -> Vconst (Cregex val))     -> show val
+                    (view -> Vconst (Ccstr cid _))    -> Text.unpack (CstrId.name cid) ++ "(" ++ List.intercalate ", " pars ++ ")"
+                    (view -> Vconst (Cany sort))      -> "ANY " ++ Text.unpack (SortId.name sort)
+                    (view -> Vvar vid)                -> f Map.! vid
+                    (view -> Vfunc fid _)             -> Text.unpack (FuncId.name fid) ++ "(" ++ List.intercalate ", " pars ++ ")"
+                    (view -> Vcstr cid _)             -> Text.unpack (CstrId.name cid) ++ "(" ++ List.intercalate ", " pars ++ ")"
+                    (view -> Viscstr cid _)           -> "is" ++ Text.unpack (CstrId.name cid) ++ "(" ++ head pars ++ ")"
+                    (view -> Vaccess cid p _)         -> Text.unpack (FuncId.name (CstrId.cstrargs cid !! p)) ++ "(" ++ head pars ++ ")"
+                    (view -> Vite _ _ _)              -> "IF " ++ head pars ++ " THEN " ++ pars !! 1 ++ " ELSE " ++ pars !! 2 ++ " ENDIF"
+                    (view -> Vdivide _ _)             -> "(" ++ head pars ++ "/" ++ pars !! 1 ++ ")"
+                    (view -> Vmodulo _ _)             -> "(" ++ head pars ++ "%" ++ pars !! 1 ++ ")"
+                    (view -> Vgez _)                  -> head pars ++ ">=0"
+                    (view -> Vsum _)                  -> "(" ++ List.intercalate "+" pars ++ ")"
+                    (view -> Vproduct _)              -> "(" ++ List.intercalate "*" pars ++ ")"
+                    (view -> Vequal _ _)              -> "(" ++ head pars ++ "==" ++ pars !! 1 ++ ")"
+                    (view -> Vand _)                  -> "(" ++ List.intercalate " && " pars ++ ")"
+                    (view -> Vnot _)                  -> "not(" ++ head pars ++ ")"
+                    (view -> Vlength _)               -> "length(" ++ head pars ++ ")"
+                    (view -> Vat _ _)                 -> head pars ++ "[" ++ pars !! 1 ++ "]"
+                    (view -> Vconcat _)               -> List.intercalate ":" pars
+                    (view -> Vstrinre _ _)            -> "regex(" ++ head pars ++ ", " ++ pars !! 1 ++ ")"
+                    (view -> Vpredef _ fid _)         -> Text.unpack (FuncId.name fid) ++ "(" ++ List.intercalate ", " pars ++ ")"
+                    _                                 -> error ("ShowValExprInContext.showVisitor not defined for " ++ show expr ++ "!")
+        in ValExprVisitorOutput expr 1 str
 -- showValExprInContext
 
--- Helper function to showValExprInContext:
-visitcOccur :: VarContext -> (TxsDefs.VExpr, Integer) -> String
-visitcOccur f (v, 1) = showValExprInContext f v
-visitcOccur f (v, n) = showValExprInContext f v ++ " times " ++ show n
 
