@@ -21,6 +21,7 @@ library
                       , ShowBExpr
                       , TxsUtils
                       , StdTDefs
+                      , Ident
                       , Utils
                       , XmlFormat
                       , CnectId
@@ -32,7 +33,6 @@ library
                       , Sigs
 
   other-modules:        ConnectionDefs
-                      , Ident
                       , TxsDef
                       , CnectDef
                       , MapperDef

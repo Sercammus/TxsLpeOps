@@ -18,6 +18,8 @@ library
 
   exposed-modules:    BlindSubst
                     , LPEOps
+                    , LPEContexts
+                    , LPEContextIds
                     , LPEClean
                     , LPEConstElm
                     , LPEParElm
@@ -71,6 +73,8 @@ test-suite lpeops-test
 
   other-modules:        BlindSubst
                       , LPEOps
+                      , LPEContexts
+                      , LPEContextIds
                       , LPEClean
                       , LPEConstElm
                       , LPEParElm
