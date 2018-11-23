@@ -1214,6 +1214,7 @@ txsLPEOp opChain inName outName invariant = do
     getLPEOperation opName = case opName of
                                "stop" -> Right [LPEOps.LPEOp LPEOps.discardLPE]
                                "show" -> Right [LPEOps.LPEOp LPEOps.showLPE]
+                               "export" -> Right [LPEOps.LPEOp LPEOps.exportLPE]
                                "loop" -> Right [LPEOps.LPEOpLoop]
                                "clean" -> Right [LPEOps.LPEOp LPEClean.cleanLPE]
                                "cstElm" -> Right [LPEOps.LPEOp LPEConstElm.constElm]

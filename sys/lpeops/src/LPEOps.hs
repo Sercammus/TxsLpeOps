@@ -21,9 +21,11 @@ LPEOperation,
 lpeOperations,
 discardLPE,
 showLPE,
+exportLPE,
 module LPETypes
 ) where
 
+import qualified Control.Monad.State as MonadState
 import qualified EnvCore as IOC
 import qualified EnvData
 import qualified TxsDefs
@@ -31,7 +33,7 @@ import           LPETypes
 import           LPEPrettyPrint
 
 lpeOpsVersion :: String
-lpeOpsVersion = "0.7.8"
+lpeOpsVersion = "0.8.0"
 
 data LPEOp = LPEOpLoop | LPEOp LPEOperation
 
@@ -91,4 +93,11 @@ showLPE lpeInstance _out _invariant = do
     return (Right lpeInstance)
 -- showLPE
 
+exportLPE :: LPEOperation
+exportLPE lpeInstance out _invariant = do
+    let filename = out ++ ".txs"
+    tdefs <- MonadState.gets (IOC.tdefs . IOC.state)
+    MonadState.liftIO $ writeFile filename (showLPEModel tdefs lpeInstance)
+    return (Left ["Model exported to " ++ filename ++ "!"])
+-- exportLPE
 
