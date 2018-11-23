@@ -15,12 +15,17 @@ See LICENSE at root directory of this repository.
 -----------------------------------------------------------------------------
 
 module LPETypeDefs (
-LPEInstance,
+LPEModel,
+LPEProcess,
 LPESummand(..),
 LPESummands,
 LPEChannelOffer,
 LPEChannelOffers,
-LPEParamEqs
+LPEParamEqs,
+newLPESummand,
+newLPEProcess,
+newLPEModel,
+paramEqsLookup
 ) where
 
 import qualified Data.Map as Map
@@ -28,12 +33,14 @@ import qualified Data.Set as Set
 import qualified TxsDefs
 import           VarId
 
+type LPEModel = (TxsDefs.TxsDefs, LPEProcess)
+
 -- Type around which this module revolves.
 -- It consists of the following parts:
 --  - Channels used by the LPE (included mostly so that conversion to TXS is possible without additional channel information).
 --  - Parameters used by the LPE and their initial values (each pair forms a 'parameter equation').
 --  - List of summands of the LPE.
-type LPEInstance = ([TxsDefs.ChanId], LPEParamEqs, LPESummands)
+type LPEProcess = ([TxsDefs.ChanId], LPEParamEqs, LPESummands)
 
 -- Main building block of an LPE.
 -- Each summand provides the following pieces of critical information:
@@ -53,4 +60,20 @@ type LPEChannelOffers = [LPEChannelOffer]
 -- Relates a parameter with the (initial) value of that parameter
 -- (in the case of a particular process instantiation).
 type LPEParamEqs = Map.Map VarId TxsDefs.VExpr
+
+paramEqsLookup :: [VarId] -> LPEParamEqs -> [TxsDefs.VExpr]
+paramEqsLookup orderedParams paramEqs = map (\p -> paramEqs Map.! p) orderedParams
+
+toLPEParamEqs :: [(VarId, TxsDefs.VExpr)] -> LPEParamEqs
+toLPEParamEqs = Map.fromList
+
+newLPESummand :: [VarId] -> LPEChannelOffers -> TxsDefs.VExpr -> [(VarId, TxsDefs.VExpr)] -> LPESummand
+newLPESummand chanVarIds chanOffers guard procInstParamEqs = LPESummand chanVarIds chanOffers guard (toLPEParamEqs procInstParamEqs)
+
+newLPEProcess :: ([TxsDefs.ChanId], [(VarId, TxsDefs.VExpr)], [LPESummand]) -> LPEProcess
+newLPEProcess (chanIds, initParamEqs, summands) = (chanIds, toLPEParamEqs initParamEqs, Set.fromList summands)
+
+newLPEModel :: ([TxsDefs.ChanId], [(VarId, TxsDefs.VExpr)], [LPESummand]) -> LPEModel
+newLPEModel contents = (TxsDefs.empty, newLPEProcess contents)
+
 

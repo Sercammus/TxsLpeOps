@@ -15,9 +15,6 @@ See LICENSE at root directory of this repository.
 -----------------------------------------------------------------------------
 
 module LPETypes (
-newLPESummand,
-newLPEInstance,
-paramEqsLookup,
 toLPEInstance,
 fromLPEInstance,
 getScopeProblems,
@@ -44,18 +41,6 @@ import           ConcatEither
 import           LPEPrettyPrint
 import           LPETypeDefs
 import           BlindSubst
-
-paramEqsLookup :: [VarId] -> LPEParamEqs -> [TxsDefs.VExpr]
-paramEqsLookup orderedParams paramEqs = map (\p -> paramEqs Map.! p) orderedParams
-
-toLPEParamEqs :: [(VarId, TxsDefs.VExpr)] -> LPEParamEqs
-toLPEParamEqs = Map.fromList
-
-newLPESummand :: [VarId] -> LPEChannelOffers -> TxsDefs.VExpr -> [(VarId, TxsDefs.VExpr)] -> LPESummand
-newLPESummand chanVarIds chanOffers guard procInstParamEqs = LPESummand chanVarIds chanOffers guard (toLPEParamEqs procInstParamEqs)
-
-newLPEInstance :: ([TxsDefs.ChanId], [(VarId, TxsDefs.VExpr)], [LPESummand]) -> LPEInstance
-newLPEInstance (chanIds, initParamEqs, summands) = (chanIds, toLPEParamEqs initParamEqs, Set.fromList summands)
 
 -- Constructs an LPEInstance from a process expression (unless there is a problem).
 -- The process expression should be the instantiation of a process that is already linear.
