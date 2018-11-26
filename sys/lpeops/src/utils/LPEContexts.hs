@@ -34,30 +34,29 @@ import qualified Data.Text as Text
 import qualified TxsDefs
 import           LPETypeDefs
 import           LPEContextIds
-import           Ident
 
-type LPEContext = Map.Map Ident String
+type LPEContext = Map.Map TxsDefs.Ident String
 
-getContextFromIds :: Set.Set Ident -> LPEContext
-getContextFromIds = Map.fromSet (Text.unpack . name)
+getContextFromIds :: Set.Set TxsDefs.Ident -> LPEContext
+getContextFromIds = Map.fromSet (Text.unpack . TxsDefs.name)
 
-getAbbrevContextFromIds :: Set.Set Ident -> LPEContext
+getAbbrevContextFromIds :: Set.Set TxsDefs.Ident -> LPEContext
 getAbbrevContextFromIds ids =
     Map.mapWithKey abbrevName (Map.fromList (zip (Set.toList ids) [1..]))
   where
-    abbrevName :: Ident -> Int -> String
-    abbrevName (IdSort _) i   = "sort" ++ (show i)
-    abbrevName (IdCstr _) i   = "cstr" ++ (show i)
-    abbrevName (IdFunc _) i   = "func" ++ (show i)
-    abbrevName (IdProc _) i   = "proc" ++ (show i)
-    abbrevName (IdChan _) i   = "chan" ++ (show i)
-    abbrevName (IdVar _) i    = "var" ++ (show i)
-    abbrevName (IdStat _) i   = "stat" ++ (show i)
-    abbrevName (IdModel _) i  = "model" ++ (show i)
-    abbrevName (IdPurp _) i   = "purp" ++ (show i)
-    abbrevName (IdGoal _) i   = "goal" ++ (show i)
-    abbrevName (IdMapper _) i = "mapper" ++ (show i)
-    abbrevName (IdCnect _) i  = "cnect" ++ (show i)
+    abbrevName :: TxsDefs.Ident -> Int -> String
+    abbrevName (TxsDefs.IdSort _) i   = "sort" ++ (show i)
+    abbrevName (TxsDefs.IdCstr _) i   = "cstr" ++ (show i)
+    abbrevName (TxsDefs.IdFunc _) i   = "func" ++ (show i)
+    abbrevName (TxsDefs.IdProc _) i   = "proc" ++ (show i)
+    abbrevName (TxsDefs.IdChan _) i   = "chan" ++ (show i)
+    abbrevName (TxsDefs.IdVar _) i    = "var" ++ (show i)
+    abbrevName (TxsDefs.IdStat _) i   = "stat" ++ (show i)
+    abbrevName (TxsDefs.IdModel _) i  = "model" ++ (show i)
+    abbrevName (TxsDefs.IdPurp _) i   = "purp" ++ (show i)
+    abbrevName (TxsDefs.IdGoal _) i   = "goal" ++ (show i)
+    abbrevName (TxsDefs.IdMapper _) i = "mapper" ++ (show i)
+    abbrevName (TxsDefs.IdCnect _) i  = "cnect" ++ (show i)
 -- getAbbrevContextFromIds
 
 getModelContext :: LPEModel -> LPEContext
