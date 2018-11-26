@@ -7,7 +7,7 @@ module TestUtils
 (
 createTestEnvC,
 printInputExpectedFound,
-validateLPEInstance,
+validateLPEModel,
 tryLPEOperation
 )
 where
@@ -63,39 +63,39 @@ putMsgs msgs = do printMsg msgs
                          return ()
 -- putMsgs
 
-printInputExpectedFound :: LPEInstance -> LPEInstance -> LPEInstance -> String
+printInputExpectedFound :: LPEModel -> LPEModel -> LPEModel -> String
 printInputExpectedFound input expected found =
-    "\nInput:\n\n" ++ showLPEInstance input ++
-    "\n\nExpected output:\n\n" ++ showLPEInstance expected ++
-    "\n\nActual output:\n\n" ++ showLPEInstance found ++ "\n"
+    "\nInput:\n\n" ++ showLPEModel input ++
+    "\n\nExpected output:\n\n" ++ showLPEModel expected ++
+    "\n\nActual output:\n\n" ++ showLPEModel found ++ "\n"
 -- printInputExpectedFound
 
-validateLPEInstance' :: LPEInstance -> IOC.IOC (Maybe [String])
-validateLPEInstance' lpeInstance = do
-    (procInit, newProcId, newProcDef) <- fromLPEInstance lpeInstance "LPE" -- (This function is called within a new environment, so the name does not really matter.)
+validateLPEModel' :: LPEModel -> IOC.IOC (Maybe [String])
+validateLPEModel' model = do
+    (procInit, newProcId, newProcDef) <- fromLPEModel model "LPE" -- (This function is called within a new environment, so the name does not really matter.)
     tdefs <- gets (IOC.tdefs . IOC.state)
     let tdefs' = tdefs { TxsDefs.procDefs = Map.insert newProcId newProcDef (TxsDefs.procDefs tdefs) }
     IOC.modifyCS $ \st -> st { IOC.tdefs = tdefs' }
-    eitherLpeInstance <- toLPEInstance procInit
-    case eitherLpeInstance of
+    eitherModel <- toLPEModel procInit
+    case eitherModel of
       Left msgs -> return (Just msgs)
       Right _ -> return Nothing
--- validateLPEInstance
+-- validateLPEModel'
 
-validateLPEInstance :: LPEInstance -> IO (Maybe [String])
-validateLPEInstance lpeInstance = do
+validateLPEModel :: LPEModel -> IO (Maybe [String])
+validateLPEModel model = do
     env <- createTestEnvC
-    evalStateT (validateLPEInstance' lpeInstance) env
--- validateLPEInstance
+    evalStateT (validateLPEModel' model) env
+-- validateLPEModel
 
-tryLPEOperation :: LPEOperation -> LPEInstance -> LPEInstance -> IO ()
+tryLPEOperation :: LPEOperation -> LPEModel -> LPEModel -> IO ()
 tryLPEOperation op input expected = do
-    maybeV1 <- validateLPEInstance input
+    maybeV1 <- validateLPEModel input
     case maybeV1 of
-      Just msgs -> assertBool ("\nInvalid input LPE:\n\n" ++ showLPEInstance input ++ "\nProblems:\n\n" ++ List.intercalate "\n" msgs ++ "\n") False
-      Nothing -> do maybeV2 <- validateLPEInstance expected
+      Just msgs -> assertBool ("\nInvalid input LPE:\n\n" ++ showLPEModel input ++ "\nProblems:\n\n" ++ List.intercalate "\n" msgs ++ "\n") False
+      Nothing -> do maybeV2 <- validateLPEModel expected
                     case maybeV2 of
-                      Just msgs -> assertBool ("\nInvalid expected LPE:\n\n" ++ showLPEInstance expected ++ "\nProblems:\n\n" ++ List.intercalate "\n" msgs ++ "\n") False
+                      Just msgs -> assertBool ("\nInvalid expected LPE:\n\n" ++ showLPEModel expected ++ "\nProblems:\n\n" ++ List.intercalate "\n" msgs ++ "\n") False
                       Nothing -> do env <- createTestEnvC
                                     eitherFound <- evalStateT (op input "Out" (cstrConst (Cbool True))) env
                                     case eitherFound of

@@ -36,7 +36,7 @@ import TestUtils
 {-# ANN module "HLint: ignore Reduce duplication" #-}
 
 testCleanBasic :: Test
-testCleanBasic = TestCase $ tryLPEOperation cleanLPE lpeInstance1 lpeInstance2
+testCleanBasic = TestCase $ tryLPEOperation cleanLPE model1 model2
   where
     summand1_1 :: LPESummand
     summand1_1 = newLPESummand -- A ? z [x==0] >-> P(1)
@@ -62,8 +62,8 @@ testCleanBasic = TestCase $ tryLPEOperation cleanLPE lpeInstance1 lpeInstance2
         [(chanIdA, [varIdZ])]
         (cstrEqual vexprX vexpr2)
         [(varIdX, vexpr0)]
-    lpeInstance1 :: LPEInstance
-    lpeInstance1 = newLPEInstance ([chanIdA], [(varIdX, vexpr0)], [summand1_1, summand1_2, summand1_3, summand1_4])
+    model1 :: LPEModel
+    model1 = newLPEModel ([chanIdA], [(varIdX, vexpr0)], [summand1_1, summand1_2, summand1_3, summand1_4])
     
     summand2_1 :: LPESummand
     summand2_1 = newLPESummand -- A ? z [x==0] >-> P(1)
@@ -83,12 +83,12 @@ testCleanBasic = TestCase $ tryLPEOperation cleanLPE lpeInstance1 lpeInstance2
         [(chanIdA, [varIdZ])]
         (cstrEqual vexprX vexpr2)
         [(varIdX, vexpr0)]
-    lpeInstance2 :: LPEInstance
-    lpeInstance2 = newLPEInstance ([chanIdA], [(varIdX, vexpr0)], [summand2_1, summand2_2, summand2_4])
+    model2 :: LPEModel
+    model2 = newLPEModel ([chanIdA], [(varIdX, vexpr0)], [summand2_1, summand2_2, summand2_4])
 -- testCleanBasic
 
 testCleanUnreachable :: Test
-testCleanUnreachable = TestCase $ tryLPEOperation cleanLPE lpeInstance1 lpeInstance2
+testCleanUnreachable = TestCase $ tryLPEOperation cleanLPE model1 model2
   where
     summand1_1 :: LPESummand
     summand1_1 = newLPESummand -- A ? z [x==0] >-> P(1)
@@ -114,8 +114,8 @@ testCleanUnreachable = TestCase $ tryLPEOperation cleanLPE lpeInstance1 lpeInsta
         [(chanIdA, [varIdZ])]
         (cstrEqual vexprX vexpr2)
         [(varIdX, vexpr0)]
-    lpeInstance1 :: LPEInstance
-    lpeInstance1 = newLPEInstance ([chanIdA], [(varIdX, vexpr0)], [summand1_1, summand1_2, summand1_3, summand1_4])
+    model1 :: LPEModel
+    model1 = newLPEModel ([chanIdA], [(varIdX, vexpr0)], [summand1_1, summand1_2, summand1_3, summand1_4])
     
     summand2_1 :: LPESummand
     summand2_1 = newLPESummand -- A ? z [x==0] >-> P(1)
@@ -129,8 +129,8 @@ testCleanUnreachable = TestCase $ tryLPEOperation cleanLPE lpeInstance1 lpeInsta
         [(chanIdA, [varIdY])]
         (cstrAnd (Set.fromList [cstrEqual vexprX vexpr1]))
         [(varIdX, vexpr0)]
-    lpeInstance2 :: LPEInstance
-    lpeInstance2 = newLPEInstance ([chanIdA], [(varIdX, vexpr0)], [summand2_1, summand2_2])
+    model2 :: LPEModel
+    model2 = newLPEModel ([chanIdA], [(varIdX, vexpr0)], [summand2_1, summand2_2])
 -- testCleanUnreachable
 
 ---------------------------------------------------------------------------

@@ -35,7 +35,7 @@ import TestUtils
 {-# ANN module "HLint: ignore Reduce duplication" #-}
 
 testParResetBasic :: Test
-testParResetBasic = TestCase $ tryLPEOperation parReset lpeInstance1 lpeInstance2
+testParResetBasic = TestCase $ tryLPEOperation parReset model1 model2
   where
     summand1_1 :: LPESummand
     summand1_1 = newLPESummand -- A ? z [x==0] >-> P(1, z)
@@ -61,8 +61,8 @@ testParResetBasic = TestCase $ tryLPEOperation parReset lpeInstance1 lpeInstance
         []
         (cstrEqual vexprX vexpr3)
         [(varIdX, vexpr0), (varIdY, vexprY)]
-    lpeInstance1 :: LPEInstance
-    lpeInstance1 = newLPEInstance ([chanIdA], [(varIdX, vexpr0), (varIdY, anyInt)], [summand1_1, summand1_2, summand1_3, summand1_4])
+    model1 :: LPEModel
+    model1 = newLPEModel ([chanIdA], [(varIdX, vexpr0), (varIdY, anyInt)], [summand1_1, summand1_2, summand1_3, summand1_4])
     
     summand2_1 :: LPESummand
     summand2_1 = newLPESummand -- A ? z [x==0] >-> P(1, z)
@@ -88,8 +88,8 @@ testParResetBasic = TestCase $ tryLPEOperation parReset lpeInstance1 lpeInstance
         []
         (cstrEqual vexprX vexpr3)
         [(varIdX, vexpr0), (varIdY, anyInt)]
-    lpeInstance2 :: LPEInstance
-    lpeInstance2 = newLPEInstance ([chanIdA], [(varIdX, vexpr0), (varIdY, anyInt)], [summand2_1, summand2_2, summand2_3, summand2_4])
+    model2 :: LPEModel
+    model2 = newLPEModel ([chanIdA], [(varIdX, vexpr0), (varIdY, anyInt)], [summand2_1, summand2_2, summand2_3, summand2_4])
 -- testParResetBasic
 
 ---------------------------------------------------------------------------

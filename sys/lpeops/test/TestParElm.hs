@@ -36,7 +36,7 @@ import TestUtils
 {-# ANN module "HLint: ignore Reduce duplication" #-}
 
 testParElmBasic :: Test
-testParElmBasic = TestCase $ tryLPEOperation parElm lpeInstance1 lpeInstance2
+testParElmBasic = TestCase $ tryLPEOperation parElm model1 model2
   where
     summand1_1 :: LPESummand
     summand1_1 = newLPESummand -- A ? y >-> P(x)
@@ -50,8 +50,8 @@ testParElmBasic = TestCase $ tryLPEOperation parElm lpeInstance1 lpeInstance2
         [(chanIdA, [varIdZ])]
         vexprTrue
         [(varIdX, vexprSum vexprX vexpr1)]
-    lpeInstance1 :: LPEInstance
-    lpeInstance1 = newLPEInstance ([chanIdA], [(varIdX, vexpr0)], [summand1_1, summand1_2])
+    model1 :: LPEModel
+    model1 = newLPEModel ([chanIdA], [(varIdX, vexpr0)], [summand1_1, summand1_2])
     
     summand2_1 :: LPESummand
     summand2_1 = newLPESummand -- A ? y >-> P()
@@ -65,12 +65,12 @@ testParElmBasic = TestCase $ tryLPEOperation parElm lpeInstance1 lpeInstance2
         [(chanIdA, [varIdZ])]
         vexprTrue
         []
-    lpeInstance2 :: LPEInstance
-    lpeInstance2 = newLPEInstance ([chanIdA], [], [summand2_1, summand2_2])
+    model2 :: LPEModel
+    model2 = newLPEModel ([chanIdA], [], [summand2_1, summand2_2])
 -- testParElmBasic
 
 testParElmXUpperBound :: Test
-testParElmXUpperBound = TestCase $ tryLPEOperation parElm lpeInstance1 lpeInstance2
+testParElmXUpperBound = TestCase $ tryLPEOperation parElm model1 model2
   where
     summand1_1 :: LPESummand
     summand1_1 = newLPESummand -- A ? y [x == 2] >-> P(x)
@@ -84,8 +84,8 @@ testParElmXUpperBound = TestCase $ tryLPEOperation parElm lpeInstance1 lpeInstan
         [(chanIdA, [varIdZ])]
         (cstrNot (cstrEqual vexprX vexpr2))
         [(varIdX, vexprSum vexprX vexpr1)]
-    lpeInstance1 :: LPEInstance
-    lpeInstance1 = newLPEInstance ([chanIdA], [(varIdX, vexpr0)], [summand1_1, summand1_2])
+    model1 :: LPEModel
+    model1 = newLPEModel ([chanIdA], [(varIdX, vexpr0)], [summand1_1, summand1_2])
     
     summand2_1 :: LPESummand
     summand2_1 = newLPESummand -- A ? y [x == 2] >-> P(x)
@@ -99,8 +99,8 @@ testParElmXUpperBound = TestCase $ tryLPEOperation parElm lpeInstance1 lpeInstan
         [(chanIdA, [varIdZ])]
         (cstrNot (cstrEqual vexprX vexpr2))
         [(varIdX, vexprSum vexprX vexpr1)]
-    lpeInstance2 :: LPEInstance
-    lpeInstance2 = newLPEInstance ([chanIdA], [(varIdX, vexpr0)], [summand2_1, summand2_2])
+    model2 :: LPEModel
+    model2 = newLPEModel ([chanIdA], [(varIdX, vexpr0)], [summand2_1, summand2_2])
 -- testParElmXUpperBound
 
 ---------------------------------------------------------------------------
