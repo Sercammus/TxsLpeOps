@@ -45,18 +45,18 @@ getAbbrevContextFromIds ids =
     Map.mapWithKey abbrevName (Map.fromList (zip (Set.toList ids) [1..]))
   where
     abbrevName :: TxsDefs.Ident -> Int -> String
-    abbrevName (TxsDefs.IdSort _) i   = "sort" ++ (show i)
-    abbrevName (TxsDefs.IdCstr _) i   = "cstr" ++ (show i)
-    abbrevName (TxsDefs.IdFunc _) i   = "func" ++ (show i)
-    abbrevName (TxsDefs.IdProc _) i   = "proc" ++ (show i)
-    abbrevName (TxsDefs.IdChan _) i   = "chan" ++ (show i)
-    abbrevName (TxsDefs.IdVar _) i    = "var" ++ (show i)
-    abbrevName (TxsDefs.IdStat _) i   = "stat" ++ (show i)
-    abbrevName (TxsDefs.IdModel _) i  = "model" ++ (show i)
-    abbrevName (TxsDefs.IdPurp _) i   = "purp" ++ (show i)
-    abbrevName (TxsDefs.IdGoal _) i   = "goal" ++ (show i)
-    abbrevName (TxsDefs.IdMapper _) i = "mapper" ++ (show i)
-    abbrevName (TxsDefs.IdCnect _) i  = "cnect" ++ (show i)
+    abbrevName (TxsDefs.IdSort _) i   = "sort" ++ show i
+    abbrevName (TxsDefs.IdCstr _) i   = "cstr" ++ show i
+    abbrevName (TxsDefs.IdFunc _) i   = "func" ++ show i
+    abbrevName (TxsDefs.IdProc _) i   = "proc" ++ show i
+    abbrevName (TxsDefs.IdChan _) i   = "chan" ++ show i
+    abbrevName (TxsDefs.IdVar _) i    = "var" ++ show i
+    abbrevName (TxsDefs.IdStat _) i   = "stat" ++ show i
+    abbrevName (TxsDefs.IdModel _) i  = "model" ++ show i
+    abbrevName (TxsDefs.IdPurp _) i   = "purp" ++ show i
+    abbrevName (TxsDefs.IdGoal _) i   = "goal" ++ show i
+    abbrevName (TxsDefs.IdMapper _) i = "mapper" ++ show i
+    abbrevName (TxsDefs.IdCnect _) i  = "cnect" ++ show i
 -- getAbbrevContextFromIds
 
 getModelContext :: LPEModel -> LPEContext

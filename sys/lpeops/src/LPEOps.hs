@@ -96,7 +96,7 @@ showLPE model _out _invariant = do
 exportLPE :: LPEOperation
 exportLPE model out _invariant = do
     let filename = out ++ ".txs"
-    MonadState.liftIO $ writeFile filename (showLPEModel model)
+    MonadState.liftIO $ writeFile filename (showAbbrevLPEModel model)
     return (Left ["Model exported to " ++ filename ++ "!"])
 -- exportLPE
 

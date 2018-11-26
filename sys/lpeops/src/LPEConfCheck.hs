@@ -131,7 +131,7 @@ confElm (tdefs, (channels, paramEqs, summands)) _out invariant = do
   where
     mergeZippedSummands :: (LPESummand, [LPESummand]) -> IOC.IOC LPESummand
     mergeZippedSummands (summand, []) = return summand
-    mergeZippedSummands (LPESummand chanVars chanOffers g1 eqs1, (LPESummand _ _ _ eqs2):_) = do
+    mergeZippedSummands (LPESummand chanVars chanOffers g1 eqs1, LPESummand _ _ _ eqs2:_) = do
         newEqs <- doBlindParamEqsSubst eqs1 eqs2
         return (LPESummand chanVars chanOffers g1 newEqs)
 

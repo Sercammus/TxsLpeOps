@@ -85,7 +85,7 @@ normalizeLPESummands summands = do
         newGuard2 <- doConfidentSubst summand paramEqs1 guard2
         let newGuard = cstrAnd (Set.fromList [guard1, newGuard2])
         newParamEqs <- doConfidentParamEqsSubst summand paramEqs1 paramEqs2
-        return (LPESummand (List.union chanVars1 chanVars2) chanOffers2 newGuard newParamEqs)
+        return (LPESummand (chanVars1 `List.union` chanVars2) chanOffers2 newGuard newParamEqs)
 -- normalizeLPESummands
 
 -- Helper function.

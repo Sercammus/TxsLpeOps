@@ -65,7 +65,7 @@ getModelIds (tdefs, process) =
     getFuncId _ = Set.empty
     
     getFuncDef :: FuncId.FuncId -> FuncDef.FuncDef VarId.VarId
-    getFuncDef fid = (TxsDefs.funcDefs tdefs) Map.! fid
+    getFuncDef fid = TxsDefs.funcDefs tdefs Map.! fid
     
     getFuncIds :: FuncDef.FuncDef VarId.VarId -> Set.Set TxsDefs.Ident
     getFuncIds (FuncDef.FuncDef params body) = Set.union (getVarsIds params) (getValExprIds body)
@@ -113,14 +113,14 @@ getValExprIds = customData . visitValExpr searchVisitor
                     (view -> Vconst (Cint _))         -> idsInSubExps
                     (view -> Vconst (Cstring _))      -> idsInSubExps
                     (view -> Vconst (Cregex _))       -> idsInSubExps
-                    (view -> Vconst (Ccstr cid _))    -> Set.insert (TxsDefs.IdSort (CstrId.cstrsort cid)) idsInSubExps
+                    (view -> Vconst (Ccstr cid _))    -> Set.union (getCstrIds cid) idsInSubExps
                     (view -> Vconst (Cany sid))       -> Set.insert (TxsDefs.IdSort sid) idsInSubExps
                     (view -> Vvar vid)                -> Set.insert (TxsDefs.IdVar vid) idsInSubExps
                     (view -> Vfunc fid _)             -> Set.insert (TxsDefs.IdFunc fid) idsInSubExps
-                    (view -> Vcstr cid _)             -> Set.insert (TxsDefs.IdSort (CstrId.cstrsort cid)) idsInSubExps
-                    (view -> Viscstr cid _)           -> Set.insert (TxsDefs.IdSort (CstrId.cstrsort cid)) idsInSubExps
-                    (view -> Vaccess cid _ _)         -> Set.insert (TxsDefs.IdSort (CstrId.cstrsort cid)) idsInSubExps
-                    (view -> Vite _ _ _)              -> idsInSubExps
+                    (view -> Vcstr cid _)             -> Set.union (getCstrIds cid) idsInSubExps
+                    (view -> Viscstr cid _)           -> Set.union (getCstrIds cid) idsInSubExps
+                    (view -> Vaccess cid _ _)         -> Set.union (getCstrIds cid) idsInSubExps
+                    (view -> Vite {})                 -> idsInSubExps
                     (view -> Vdivide _ _)             -> idsInSubExps
                     (view -> Vmodulo _ _)             -> idsInSubExps
                     (view -> Vgez _)                  -> idsInSubExps
@@ -133,10 +133,13 @@ getValExprIds = customData . visitValExpr searchVisitor
                     (view -> Vat _ _)                 -> idsInSubExps
                     (view -> Vconcat _)               -> idsInSubExps
                     (view -> Vstrinre _ _)            -> idsInSubExps
-                    (view -> Vpredef _ fid _)         -> Set.insert (TxsDefs.IdFunc fid) idsInSubExps
+                    (view -> Vpredef {})              -> idsInSubExps -- We are not interested in predefined functions!
                     _                                 -> error ("GetValExprIds.searchVisitor not defined for " ++ show expr ++ "!")
         in ValExprVisitorOutput expr 1 ids
     -- searchVisitor
+    
+    getCstrIds :: CstrId.CstrId -> Set.Set TxsDefs.Ident
+    getCstrIds cid = Set.fromList (TxsDefs.IdCstr cid : TxsDefs.IdSort (CstrId.cstrsort cid) : map TxsDefs.IdFunc (CstrId.cstrargs cid)) -- TODO add recognizer function?
 -- getValExprIds
 
 getChansIds :: [ChanId.ChanId] -> Set.Set TxsDefs.Ident

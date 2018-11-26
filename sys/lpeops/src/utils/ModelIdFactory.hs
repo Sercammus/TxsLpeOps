@@ -39,7 +39,7 @@ getModelIdFromName :: String -> IOC.IOC ModelId.ModelId
 getModelIdFromName modelName = do
     matchingModels <- getModelsByName modelName
     case Map.toList matchingModels of
-      [] -> do TxsDefs.ModelId (Text.pack modelName) <$> IOC.newUnid
+      [] -> TxsDefs.ModelId (Text.pack modelName) <$> IOC.newUnid
       (mid, _):_ -> return mid
 -- getModelIdFromName
 
