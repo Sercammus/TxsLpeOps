@@ -49,14 +49,16 @@ import ValFactory
 -- import TxsShow
 
 lpe2mcrl2 :: LPEOperation
-lpe2mcrl2 lpeInstance out invariant = do
-    tdefs' <- gets (IOC.tdefs . IOC.state)
-    let initialEnv = emptyEnv { txsdefs = tdefs' }
-    evalStateT (lpe2mcrl2' lpeInstance out invariant) initialEnv
+lpe2mcrl2 (tdefs, process) out invariant = do
+    let initialEnv = emptyEnv { txsdefs = tdefs }
+    eitherNewProcess <- evalStateT (lpeProcess2mcrl2 process out invariant) initialEnv
+    case eitherNewProcess of
+      Left msgs -> return (Left msgs)
+      Right newProcess -> return (Right (tdefs, newProcess))
 -- lpe2mcrl2
 
-lpe2mcrl2' :: LPEInstance -> String -> TxsDefs.VExpr -> T2MMonad (Either [String] LPEInstance)
-lpe2mcrl2' (channels, initParamEqs, summands) out _invariant = do
+lpeProcess2mcrl2 :: LPEProcess -> String -> TxsDefs.VExpr -> T2MMonad (Either [String] LPEProcess)
+lpeProcess2mcrl2 (channels, initParamEqs, summands) out _invariant = do
     lift $ IOC.putMsgs [ EnvData.TXS_CORE_ANY "<<mcrl2>>" ]
     tdefs <- gets txsdefs
     let orderedParams = Map.keys initParamEqs

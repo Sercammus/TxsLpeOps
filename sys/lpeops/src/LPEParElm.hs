@@ -30,27 +30,27 @@ import LPEParRemoval
 
 -- Eliminates inert parameters (=parameters that do not contribute to the behavior of a process) from an LPE:
 parElm :: LPEOperation
-parElm lpeInstance@(_channels, paramEqs, summands) _out _invariant = do
+parElm (tdefs, process@(_channels, paramEqs, summands)) _out _invariant = do
     IOC.putMsgs [ EnvData.TXS_CORE_ANY "<<parElm>>" ]
     let allParams = Set.fromList (Map.keys paramEqs)
     let guardParams = Set.unions (map (Set.fromList . FreeVar.freeVars . getGuard) (Set.toList summands))
     -- All parameters are initially assumed to be inert, except those used in a guard.
     -- This initial set of inert parameters is reduced until a fixpoint is reached:
-    let inertParams = getInertParams lpeInstance (allParams Set.\\ guardParams)
+    let inertParams = getInertParams process (allParams Set.\\ guardParams)
     -- The remaining inert parameters are removed from the LPE:
-    newLPE <- removeParsFromLPE inertParams lpeInstance
-    return (Right newLPE)
+    newProcess <- removeParsFromLPE inertParams process
+    return (Right (tdefs, newProcess))
   where
     getGuard :: LPESummand -> TxsDefs.VExpr
     getGuard (LPESummand _ _ guard _) = guard
 -- parElm
 
 -- Loops until no more parameters are removed to the set of (presumably) inert parameters:
-getInertParams :: LPEInstance -> Set.Set VarId.VarId -> Set.Set VarId.VarId
-getInertParams lpeInstance@(_channels, _paramEqs, summands) inertParams =
+getInertParams :: LPEProcess -> Set.Set VarId.VarId -> Set.Set VarId.VarId
+getInertParams process@(_channels, _paramEqs, summands) inertParams =
     let newInertParams = removeVarsAssignedToNonInertParams (Set.toList summands) inertParams in
       if newInertParams /= inertParams
-      then getInertParams lpeInstance newInertParams
+      then getInertParams process newInertParams
       else newInertParams
 -- getInertParams
 

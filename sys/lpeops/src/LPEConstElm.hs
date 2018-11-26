@@ -35,22 +35,22 @@ import           Constant
 -- LPE rewrite method.
 -- Eliminates parameters that always have the same value from an LPE.
 constElm :: LPEOperation
-constElm lpe@(_channels, initParamEqs, _summands) _out invariant = do
+constElm (tdefs, process@(_channels, initParamEqs, _summands)) _out invariant = do
     IOC.putMsgs [ EnvData.TXS_CORE_ANY "<<constElm>>" ]
-    constParams <- getConstParams lpe invariant (Map.keysSet initParamEqs)
-    newLPE <- removeParsFromLPE constParams lpe
-    return (Right newLPE)
+    constParams <- getConstParams process invariant (Map.keysSet initParamEqs)
+    newProcess <- removeParsFromLPE constParams process
+    return (Right (tdefs, newProcess))
 -- constElm
 
-getConstParams :: LPEInstance -> TxsDefs.VExpr -> Set.Set VarId -> IOC.IOC (Set.Set VarId)
-getConstParams lpe invariant constParams = do
-    newConstParams <- getConstParamsForAllSummands lpe invariant constParams
+getConstParams :: LPEProcess -> TxsDefs.VExpr -> Set.Set VarId -> IOC.IOC (Set.Set VarId)
+getConstParams process invariant constParams = do
+    newConstParams <- getConstParamsForAllSummands process invariant constParams
     if newConstParams /= constParams
-    then getConstParams lpe invariant newConstParams
+    then getConstParams process invariant newConstParams
     else return newConstParams
 -- getConstParams
 
-getConstParamsForAllSummands :: LPEInstance -> TxsDefs.VExpr -> Set.Set VarId -> IOC.IOC (Set.Set VarId)
+getConstParamsForAllSummands :: LPEProcess -> TxsDefs.VExpr -> Set.Set VarId -> IOC.IOC (Set.Set VarId)
 getConstParamsForAllSummands (_channels, initParamEqs, summands) invariant constParams = do
     let subst = Map.restrictKeys initParamEqs constParams
     constParamsPerSummand <- Monad.mapM (getConstParamsForSummand subst invariant constParams) (Set.toList summands)

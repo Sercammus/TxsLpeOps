@@ -41,11 +41,8 @@ mapGet m k =
     --)
 -- mapGet
 
-repeatUntilFixpoint :: Eq t => (t -> t) -> t -> t
-repeatUntilFixpoint f i = let i' = f i in if i == i' then i else repeatUntilFixpoint f i'
-
 dataReset :: LPEOperation
-dataReset (channels, initParamEqs, summands) _out invariant = do
+dataReset (tdefs, (channels, initParamEqs, summands)) _out invariant = do
     IOC.putMsgs [ EnvData.TXS_CORE_ANY "<<dataReset>>" ]
     let params = Map.keysSet initParamEqs
     IOC.putMsgs [ EnvData.TXS_CORE_ANY "Collecting information on parameter usage..." ]
@@ -62,12 +59,15 @@ dataReset (channels, initParamEqs, summands) _out invariant = do
                                        [ (dk, dj, s) | (dj', s) <- Map.toList (paramSources paramUsage), dj' == dj ]
                                      | dj <- djs, paramUsage <- Map.elems paramUsagePerSummand, dk `elem` directlyUsedParams paramUsage ]
                                    | (dk, djs) <- Map.toList belongsToRelation ]
-    let relevanceRelation = repeatUntilFixpoint (updateRelevanceRelation paramUsagePerSummand controlFlowGraphs belongsToRelation) (Set.fromList initialRelevanceRelation)
+    let relevanceRelation = untilFixpoint (updateRelevanceRelation paramUsagePerSummand controlFlowGraphs belongsToRelation) (Set.fromList initialRelevanceRelation)
     -- IOC.putMsgs [ EnvData.TXS_CORE_ANY (showRelevanceRelation "Full relevance relation:" relevanceRelation) ]
     IOC.putMsgs [ EnvData.TXS_CORE_ANY "Constructing new LPE..." ]
     let newSummands = map (resetParamsInSummand initParamEqs paramUsagePerSummand belongsToRelation relevanceRelation) (Set.toList summands)
     Monad.mapM_ (\m -> IOC.putMsgs [ EnvData.TXS_CORE_ANY m ]) (concatMap snd newSummands)
-    return (Right (channels, initParamEqs, Set.fromList (map fst newSummands)))
+    return (Right (tdefs, (channels, initParamEqs, Set.fromList (map fst newSummands))))
+  where
+    untilFixpoint :: Eq t => (t -> t) -> t -> t
+    untilFixpoint f i = let i' = f i in if i == i' then i else untilFixpoint f i'
 -- dataReset
 
 -- showRelevanceRelation :: String -> Set.Set (VarId, VarId, TxsDefs.VExpr) -> String

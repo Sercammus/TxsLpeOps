@@ -45,12 +45,12 @@ mapGet m k =
     --)
 -- mapGet
 
-mapGetS :: (Show a, Ord a) => LPEInstance -> LPESummand -> Map.Map a b -> a -> b
+mapGetS :: (Show a, Ord a) => LPEProcess -> LPESummand -> Map.Map a b -> a -> b
 mapGetS i s m k =
     --trace ("mapGetS(" ++ (show k) ++ ")") (
       if Map.member k m
       then m Map.! k
-      else error ("Could not find " ++ show k ++ " in map!\nSummand: " ++ showLPESummand s ++ "\nLPE: " ++ showLPEInstance i)
+      else error ("Could not find " ++ show k ++ " in map!\nSummand: " ++ showLPESummand s ++ "\nLPE: " ++ showLPEProcess i)
     --)
 -- mapGetS
 
@@ -58,29 +58,29 @@ mapGetS i s m k =
 -- Eliminates parameters that do not contribute to the behavior of a process from an LPE.
 -- State spaces before and after are strongly bisimilar.
 parReset :: LPEOperation
-parReset lpeInstance@(_channels, paramEqs, summands) _out invariant = do
+parReset (tdefs, process@(_channels, paramEqs, summands)) _out invariant = do
     IOC.putMsgs [ EnvData.TXS_CORE_ANY "<<parReset>>" ]
     IOC.putMsgs [ EnvData.TXS_CORE_ANY "Identifying successors..." ]
     possibleSuccessors <- Monad.mapM (getPossibleSuccessors summands invariant) (Set.toList summands)
     let successorsPerSummand = zipWith (\s i -> (s, i, Map.keys paramEqs)) (Set.toList summands) possibleSuccessors
     IOC.putMsgs [ EnvData.TXS_CORE_ANY "Analyzing control flow..." ]
-    newLPE <- parResetLoop lpeInstance invariant successorsPerSummand
-    return (Right newLPE)
+    newProcess <- parResetLoop process invariant successorsPerSummand
+    return (Right (tdefs, newProcess))
 -- parReset
 
 -- Updates the information collected about summands, in particular their lists of used variables,
 -- until the information no longer changes.
 -- With the final information, assign ANY values to variables that are unused:
-parResetLoop :: LPEInstance -> TxsDefs.VExpr -> [(LPESummand, [LPESummand], [VarId])] -> IOC.IOC LPEInstance
-parResetLoop lpeInstance@(channels, initParamEqs, summands) invariant successorsPerSummand = do
-    let newSuccessorsPerSummand = parResetUpdate lpeInstance successorsPerSummand
+parResetLoop :: LPEProcess -> TxsDefs.VExpr -> [(LPESummand, [LPESummand], [VarId])] -> IOC.IOC LPEProcess
+parResetLoop process@(channels, initParamEqs, summands) invariant successorsPerSummand = do
+    let newSuccessorsPerSummand = parResetUpdate process successorsPerSummand
     if newSuccessorsPerSummand == successorsPerSummand
-    then do newSummands <- Monad.mapM (resetParamsInSummand lpeInstance invariant successorsPerSummand) (Set.toList summands)
+    then do newSummands <- Monad.mapM (resetParamsInSummand process invariant successorsPerSummand) (Set.toList summands)
             return (channels, initParamEqs, Set.fromList newSummands)
-    else parResetLoop lpeInstance invariant newSuccessorsPerSummand
+    else parResetLoop process invariant newSuccessorsPerSummand
 -- parResetLoop
 
-resetParamsInSummand :: LPEInstance -> TxsDefs.VExpr -> [(LPESummand, [LPESummand], [VarId])] -> LPESummand -> IOC.IOC LPESummand
+resetParamsInSummand :: LPEProcess -> TxsDefs.VExpr -> [(LPESummand, [LPESummand], [VarId])] -> LPESummand -> IOC.IOC LPESummand
 resetParamsInSummand (_, initParamEqs, summands) invariant successorsPerSummand summand@(LPESummand channelVars channelOffers guard paramEqs) =
     case [ (sucs, uvars) | (smd, sucs, uvars) <- successorsPerSummand, smd == summand ] of
       [(sucs, uvars)] -> if length uvars == length initParamEqs
@@ -120,7 +120,7 @@ resetParamsInSummand (_, initParamEqs, summands) invariant successorsPerSummand 
 -- resetParamsInSummand
 
 -- Updates the information collected about summands, in particular their lists of used variables:
-parResetUpdate :: LPEInstance -> [(LPESummand, [LPESummand], [VarId])] -> [(LPESummand, [LPESummand], [VarId])]
+parResetUpdate :: LPEProcess -> [(LPESummand, [LPESummand], [VarId])] -> [(LPESummand, [LPESummand], [VarId])]
 parResetUpdate i successorsPerSummand = map updateSummand successorsPerSummand
   where
     -- Initially, all variables are added to the list of used variables of a summand.

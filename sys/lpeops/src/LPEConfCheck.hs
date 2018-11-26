@@ -47,12 +47,12 @@ getConfluentTauSummands summands invariant = do
 -- LPE rewrite method.
 -- Flags confluent ISTEPs by renaming them to CISTEPs.
 confCheck :: LPEOperation
-confCheck (channels, paramEqs, summands) _out invariant = do
+confCheck (tdefs, (channels, paramEqs, summands)) _out invariant = do
     IOC.putMsgs [ EnvData.TXS_CORE_ANY "<<confCheck>>" ]
     confluentTauSummands <- getConfluentTauSummands summands invariant
     let noConfluentTauSummands = summands Set.\\ confluentTauSummands
     let newSummands = Set.union noConfluentTauSummands (Set.map flagTauSummand confluentTauSummands)
-    return (Right (channels, paramEqs, newSummands))
+    return (Right (tdefs, (channels, paramEqs, newSummands)))
 -- confCheck
 
 isTauSummand :: LPESummand -> Bool
@@ -118,16 +118,16 @@ checkConfluenceCondition summand1@(LPESummand _channelVars1 _channelOffers1 guar
 -- LPE rewrite method.
 -- Appends confluent ISTEPs to predecessor summands.
 confElm :: LPEOperation
-confElm (channels, paramEqs, summands) _out invariant = do
+confElm (tdefs, (channels, paramEqs, summands)) _out invariant = do
     IOC.putMsgs [ EnvData.TXS_CORE_ANY "<<confElm>>" ]
     confluentTauSummands <- getConfluentTauSummands summands invariant
     if confluentTauSummands == Set.empty
-    then return $ Right (channels, paramEqs, summands)
+    then return $ Right (tdefs, (channels, paramEqs, summands))
     else do let orderedSummands = Set.toList summands
             definiteSuccessors <- Monad.mapM (getDefiniteSuccessors summands invariant) orderedSummands
             let confluentTauSuccessors = map (Set.toList . Set.intersection confluentTauSummands . Set.fromList) definiteSuccessors
             mergedSummands <- Monad.mapM mergeZippedSummands (zip orderedSummands confluentTauSuccessors)
-            return $ Right (channels, paramEqs, Set.fromList mergedSummands)
+            return $ Right (tdefs, (channels, paramEqs, Set.fromList mergedSummands))
   where
     mergeZippedSummands :: (LPESummand, [LPESummand]) -> IOC.IOC LPESummand
     mergeZippedSummands (summand, []) = return summand
