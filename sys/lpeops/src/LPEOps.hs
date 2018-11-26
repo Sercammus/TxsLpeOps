@@ -33,7 +33,7 @@ import           LPETypes
 import           LPEPrettyPrint
 
 lpeOpsVersion :: String
-lpeOpsVersion = "0.8.0"
+lpeOpsVersion = "0.9.0"
 
 data LPEOp = LPEOpLoop | LPEOp LPEOperation
 
@@ -44,7 +44,7 @@ data LPEOp = LPEOpLoop | LPEOp LPEOperation
 -- An LPE operation yields either
 --  - A list of (error) messages, in case there was a problem or some other event happened; or
 --  - A new LPE instance.
-type LPEOperation = LPEInstance -> String -> TxsDefs.VExpr -> IOC.IOC (Either [String] LPEInstance)
+type LPEOperation = LPEModel -> String -> TxsDefs.VExpr -> IOC.IOC (Either [String] LPEModel)
 
 -- Core method that does the following:
 --  1. Transforms a closed process expression to an LPE instance;
@@ -53,51 +53,50 @@ type LPEOperation = LPEInstance -> String -> TxsDefs.VExpr -> IOC.IOC (Either [S
 --     a process expression that creates an instance of this process definition.
 lpeOperations :: [LPEOp] -> TxsDefs.BExpr -> String -> TxsDefs.VExpr -> IOC.IOC (Either [String] (TxsDefs.BExpr, TxsDefs.ProcId, TxsDefs.ProcDef))
 lpeOperations operations procInst out invariant = do
-    eitherLPEInstance <- toLPEInstance procInst
-    case eitherLPEInstance of
+    eitherModel <- toLPEModel procInst
+    case eitherModel of
       Left msgs -> return (Left msgs)
-      Right lpeInstance -> do eitherNewLPEInstances <- lpeOperation operations operations [lpeInstance, lpeInstance] out invariant
-                              case eitherNewLPEInstances of
-                                Left msgs -> return (Left msgs)
-                                Right [] -> return (Left ["No output LPE found!"])
-                                Right (newLPE:_) -> do temp <- fromLPEInstance newLPE out
-                                                       if newLPE /= lpeInstance
-                                                       then IOC.putMsgs [ EnvData.TXS_CORE_ANY "LPE instance has been rewritten!" ]
-                                                       else IOC.putMsgs [ EnvData.TXS_CORE_ANY "LPE instance is identical to input!" ]
-                                                       return (Right temp)
+      Right model -> do eitherNewModel <- lpeOperation operations operations [model, model] out invariant
+                        case eitherNewModel of
+                          Left msgs -> return (Left msgs)
+                          Right [] -> return (Left ["No output LPE found!"])
+                          Right (newModel:_) -> do temp <- fromLPEModel newModel out
+                                                   if newModel /= model
+                                                   then IOC.putMsgs [ EnvData.TXS_CORE_ANY "LPE instance has been rewritten!" ]
+                                                   else IOC.putMsgs [ EnvData.TXS_CORE_ANY "LPE instance is identical to input!" ]
+                                                   return (Right temp)
 -- lpeOperations
 
-lpeOperation :: [LPEOp] -> [LPEOp] -> [LPEInstance] -> String -> TxsDefs.VExpr -> IOC.IOC (Either [String] [LPEInstance])
+lpeOperation :: [LPEOp] -> [LPEOp] -> [LPEModel] -> String -> TxsDefs.VExpr -> IOC.IOC (Either [String] [LPEModel])
 lpeOperation _ops _ [] _out _invariant = return (Left ["No input LPE found!"])
 lpeOperation _ops [] lpeInstances _out _invariant = return (Right lpeInstances)
-lpeOperation ops (LPEOpLoop:xs) (lpeInstance:ys) out invariant =
-    if lpeInstance `elem` ys
-    then lpeOperation ops xs (lpeInstance:ys) out invariant
-    else lpeOperation ops ops (lpeInstance:lpeInstance:ys) out invariant
-lpeOperation ops (LPEOp op:xs) (lpeInstance:ys) out invariant = do
-    eitherNewLPEInstance <- op lpeInstance out invariant
-    case eitherNewLPEInstance of
+lpeOperation ops (LPEOpLoop:xs) (model:ys) out invariant =
+    if model `elem` ys
+    then lpeOperation ops xs (model:ys) out invariant
+    else lpeOperation ops ops (model:model:ys) out invariant
+lpeOperation ops (LPEOp op:xs) (model:ys) out invariant = do
+    eitherNewModel <- op model out invariant
+    case eitherNewModel of
       Left msgs -> return (Left msgs)
-      Right newLPE -> let scopeProblems = getScopeProblems newLPE in
-                        if null scopeProblems
-                        then lpeOperation ops xs (newLPE:ys) out invariant
-                        else return (Left scopeProblems)
+      Right newModel -> let scopeProblems = getScopeProblems (snd newModel) in
+                          if null scopeProblems
+                          then lpeOperation ops xs (newModel:ys) out invariant
+                          else return (Left scopeProblems)
 -- lpeOperation
 
 discardLPE :: LPEOperation
-discardLPE _lpeInstance _out _invariant = return (Left ["LPE discarded!"])
+discardLPE _ _ _ = return (Left ["LPE discarded!"])
 
 showLPE :: LPEOperation
-showLPE lpeInstance _out _invariant = do
-    IOC.putMsgs [ EnvData.TXS_CORE_ANY (showAbbrevLPEInstance lpeInstance) ]
-    return (Right lpeInstance)
+showLPE model _out _invariant = do
+    IOC.putMsgs [ EnvData.TXS_CORE_ANY (showAbbrevLPEModel model) ]
+    return (Right model)
 -- showLPE
 
 exportLPE :: LPEOperation
-exportLPE lpeInstance out _invariant = do
+exportLPE model out _invariant = do
     let filename = out ++ ".txs"
-    tdefs <- MonadState.gets (IOC.tdefs . IOC.state)
-    MonadState.liftIO $ writeFile filename (showLPEModel tdefs lpeInstance)
+    MonadState.liftIO $ writeFile filename (showLPEModel model)
     return (Left ["Model exported to " ++ filename ++ "!"])
 -- exportLPE
 

@@ -15,8 +15,8 @@ See LICENSE at root directory of this repository.
 -----------------------------------------------------------------------------
 
 module LPETypes (
-toLPEInstance,
-fromLPEInstance,
+toLPEModel,
+fromLPEModel,
 getScopeProblems,
 normalizeLPESummands,
 module LPETypeDefs
@@ -42,11 +42,11 @@ import           LPEPrettyPrint
 import           LPETypeDefs
 import           BlindSubst
 
--- Constructs an LPEInstance from a process expression (unless there is a problem).
+-- Constructs an LPEModel from a process expression (unless there is a problem).
 -- The process expression should be the instantiation of a process that is already linear.
-toLPEInstance :: TxsDefs.BExpr                          -- Process instantiation.
-              -> IOC.IOC (Either [String] LPEInstance)  -- Instance (unless there are problems).
-toLPEInstance procInst = do
+toLPEModel :: TxsDefs.BExpr                          -- Process instantiation.
+           -> IOC.IOC (Either [String] LPEModel)     -- Instance (unless there are problems).
+toLPEModel procInst = do
     envc <- MonadState.get
     case IOC.state envc of
       IOC.Initing { IOC.tdefs = tdefs } -> let procDefs = TxsDefs.procDefs tdefs in
@@ -61,13 +61,13 @@ toLPEInstance procInst = do
                                                     let result = (chans, eqs, Set.fromList normalizedSummands)
                                                     let scopeProblems = getScopeProblems result
                                                     if null scopeProblems
-                                                    then return (Right result)
+                                                    then return (Right (tdefs, result))
                                                     else return (Left scopeProblems)
             Nothing -> do let definedProcessNames = List.intercalate " or " (map (Text.unpack . ProcId.name) (Map.keys procDefs))
                           return (Left ["Expected " ++ definedProcessNames ++ ", found " ++ show (Text.unpack (ProcId.name procId)) ++ "!"])
           _ -> return (Left ["Expression must be process instantiation, found " ++ TxsShow.fshow (TxsDefs.view procInst) ++ "!"])
       _ -> return (Left ["TorXakis core is not initialized!"])
--- toLPEInstance
+-- toLPEModel
 
 normalizeLPESummands :: [LPESummand] -> IOC.IOC [LPESummand]
 normalizeLPESummands summands = do
@@ -145,10 +145,10 @@ getParamEqs n (x:params) (y:paramValues) =
                    else Right (Map.insert x y eqs)
 -- getParamEqs
 
--- Constructs a process expression and a process definition from an LPEInstance (unless there is a problem).
+-- Constructs a process expression and a process definition from an LPEModel (unless there is a problem).
 -- The process expression creates an instance of the process definition.
-fromLPEInstance :: LPEInstance -> String -> IOC.IOC (TxsDefs.BExpr, TxsDefs.ProcId, TxsDefs.ProcDef)
-fromLPEInstance (chans, paramEqs, summands) procName = do
+fromLPEModel :: LPEModel -> String -> IOC.IOC (TxsDefs.BExpr, TxsDefs.ProcId, TxsDefs.ProcDef)
+fromLPEModel (_, (chans, paramEqs, summands)) procName = do
     let orderedParams = Map.keys paramEqs
     newProcUnid <- IOC.newUnid
     let newProcId = TxsDefs.ProcId { ProcId.name = Text.pack procName
@@ -174,10 +174,10 @@ fromLPEInstance (chans, paramEqs, summands) procName = do
       -- Constructs an offer from an offer:
       offerToOffer :: LPEChannelOffer -> TxsDefs.Offer
       offerToOffer (chanId, chanVars) = TxsDefs.Offer { TxsDefs.chanid = chanId, TxsDefs.chanoffers = [TxsDefs.Quest var | var <- chanVars] }
--- fromLPEInstance
+-- fromLPEModel
 
 -- This method can detect certain problems with an LPE, making finding bugs in LPE operations easier:
-getScopeProblems :: LPEInstance -> [String]
+getScopeProblems :: LPEProcess -> [String]
 getScopeProblems (_chanIds, initParamEqs, summands) = concatMap (getSummandScopeProblems (Map.keysSet initParamEqs)) (Set.toList summands)
 
 getSummandScopeProblems :: Set.Set VarId -> LPESummand -> [String]
