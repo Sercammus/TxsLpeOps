@@ -35,7 +35,6 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified TxsDefs
 import qualified SortId
-import qualified SortOf
 import qualified CstrId
 import qualified CstrDef
 import qualified FuncId
@@ -44,10 +43,20 @@ import qualified VarId
 import qualified ChanId
 import           Constant hiding (sort)
 import           ValExpr hiding (subst)
-import           TxsShow
 import           LPETypeDefs
-import           ValExprVisitor
 import           LPEContexts
+import           ValExprVisitor
+--import           ValFactory
+--import           Debug.Trace
+
+mapGet :: (Show a, Ord a) => Map.Map a b -> a -> b
+mapGet m k =
+    --trace ("mapGet(" ++ (show k) ++ ")") (
+      case m Map.!? k of
+        Just x -> x
+        Nothing -> error ("Could not find " ++ show k ++ " in map!")
+    --)
+-- mapGet
 
 showSubst :: Map.Map VarId.VarId TxsDefs.VExpr -> String
 showSubst subst = "[" ++ List.intercalate ", " (map (\(p, v) -> Text.unpack (VarId.name p) ++ " := " ++ showValExpr v) (Map.toList subst)) ++ "]"
@@ -63,14 +72,32 @@ showLPEModelInContext f (tdefs, process@(chanIds, initParamEqs, _)) =
     let orderedParams = Map.keys initParamEqs in
       showTypeDefs f (Map.toList (TxsDefs.cstrDefs tdefs)) ++
       showFuncDefs f (TxsDefs.funcDefs tdefs) ++
+      showChanDefs f chanIds ++
       showLPEProcessExactly f process orderedParams False ++
-      "MODELDEF Model ::=\n" ++
-      "    CHAN IN" ++ "\n" ++
-      "    CHAN OUT" ++ "\n" ++
-      "    BEHAVIOR LPE[" ++ List.intercalate ", " (map ((f Map.!) . TxsDefs.IdChan) chanIds) ++ "]" ++
+      "MODELDEF Model ::=\n" ++ showChanRef "CHAN IN" chanIds ++ showChanRef "CHAN OUT" [] ++ -- TODO how do we distinguish input channels from output channels?
+      "    BEHAVIOUR LPE[" ++ List.intercalate ", " (map (showChanId f) chanIds) ++ "]" ++
       "(" ++ List.intercalate ", " (map (showValExprInContext f) (paramEqsLookup orderedParams initParamEqs)) ++ ")" ++
       "\nENDDEF\n"
+  where
+    showChanRef :: String -> [ChanId.ChanId] -> String
+    showChanRef caption [] = "    " ++ caption ++ "\n"
+    showChanRef caption cids = "    " ++ caption ++ " " ++ List.intercalate ", " (map (showChanId f) cids) ++ "\n"
 -- showLPEModelInContext
+
+showChanDefs :: LPEContext -> [ChanId.ChanId] -> String
+showChanDefs _ [] = ""
+showChanDefs f cids =
+    "CHANDEF ChanDefs\n" ++ -- From tests, it does not seem to matter what name is used here.
+    "    ::= " ++ List.intercalate "\n      ; " (map (showChanDecl f) cids) ++ "\n" ++
+    "ENDDEF\n"
+-- showChanDefs
+
+showChanDecl :: LPEContext -> ChanId.ChanId -> String
+showChanDecl f chanId =
+    if null (ChanId.chansorts chanId)
+    then showChanId f chanId
+    else showChanId f chanId ++ " :: " ++ List.intercalate " # " (map (showSortId f) (ChanId.chansorts chanId))
+-- showChanDecl
 
 showTypeDefs :: LPEContext -> [(CstrId.CstrId, CstrDef.CstrDef)] -> String
 showTypeDefs f cstrdefs =
@@ -85,41 +112,40 @@ showTypeDefs f cstrdefs =
     showCstrSortId cstrSortId =
         let cstrs = [ (c, d) | (c, d) <- cstrdefs, CstrId.cstrsort c == cstrSortId ] in
           case cstrs of
-            [] -> "TYPEDEF " ++ f Map.! (TxsDefs.IdSort cstrSortId) ++ " ENDDEF" -- Implicit type, not allowed in TorXakis but whatever
-            _ -> "TYPEDEF " ++ f Map.! (TxsDefs.IdSort cstrSortId) ++ " ::= " ++ List.intercalate " | " (map showCstrDef cstrs) ++ " ENDDEF\n"
+            [] -> "TYPEDEF " ++ mapGet f (TxsDefs.IdSort cstrSortId) ++ " ENDDEF" -- Implicit type, not allowed in TorXakis but whatever
+            _ -> "TYPEDEF " ++ mapGet f (TxsDefs.IdSort cstrSortId) ++ " ::= " ++ List.intercalate " | " (map showCstrDef cstrs) ++ " ENDDEF\n"
     -- showCstrSortId
     
     showCstrDef :: (CstrId.CstrId, CstrDef.CstrDef) -> String
     showCstrDef (cid, CstrDef.CstrDef _ accs) =
         case accs of
-          [] -> f Map.! (TxsDefs.IdCstr cid)
-          _ -> f Map.! (TxsDefs.IdCstr cid) ++ " { " ++ List.intercalate "; " (map showAccessor accs) ++ " }"
+          [] -> mapGet f (TxsDefs.IdCstr cid)
+          _ -> mapGet f (TxsDefs.IdCstr cid) ++ " { " ++ List.intercalate "; " (map showAccessor accs) ++ " }"
     -- showCstrDef
     
     showAccessor :: FuncId.FuncId -> String
-    showAccessor fid =
-        let sid = FuncId.funcsort fid in
-          case f Map.!? (TxsDefs.IdSort sid) of
-            Just sortText -> f Map.! (TxsDefs.IdFunc fid) ++ " :: " ++ sortText -- Custom type
-            Nothing -> f Map.! (TxsDefs.IdFunc fid) ++ " :: " ++ Text.unpack (SortId.name sid) -- Primitive type
-    -- showAccessor
+    showAccessor fid = showFuncId f fid ++ " :: " ++ showSortId f (FuncId.funcsort fid)
 -- showTypeDefs
 
 showFuncDefs :: LPEContext -> Map.Map FuncId.FuncId (FuncDef.FuncDef VarId.VarId) -> String
 showFuncDefs f funcdefs =
     let funcIds = Set.fromList (concatMap extractFuncIds (Map.keys f)) in
-      concatMap showFuncId (Set.toList funcIds)
+      concatMap showFuncDef (Set.toList funcIds)
   where
     extractFuncIds :: TxsDefs.Ident -> [FuncId.FuncId]
     extractFuncIds (TxsDefs.IdFunc fid) = [fid]
     extractFuncIds _ = []
     
-    showFuncId :: FuncId.FuncId -> String
-    showFuncId fid = showFuncDef (fid, funcdefs Map.! fid)
+    showFuncDef :: FuncId.FuncId -> String
+    showFuncDef fid =
+        case funcdefs Map.!? fid of
+          Just (FuncDef.FuncDef params body) ->
+            "FUNCDEF " ++ showFuncId f fid ++ "(" ++ List.intercalate "; " (map showParamDecl params) ++ ") :: " ++ showSortId f (FuncId.funcsort fid) ++ " ::= " ++ showValExprInContext f body ++ " ENDDEF\n"
+          Nothing -> ""
+    -- showFuncDef
     
-    showFuncDef :: (FuncId.FuncId, FuncDef.FuncDef VarId.VarId) -> String
-    showFuncDef (fid, FuncDef.FuncDef params body) =
-        "FUNCDEF " ++ f Map.! (TxsDefs.IdFunc fid) ++ "(" ++ (List.intercalate "; " (map ((f Map.!) . TxsDefs.IdVar) params)) ++ ") ::= " ++ showValExprInContext f body ++ " ENDDEF\n"
+    showParamDecl :: VarId.VarId -> String
+    showParamDecl varId = showVarId f varId ++ " :: " ++ showSortId f (VarId.varsort varId)
 -- showFuncDefs
 
 showLPEProcess :: LPEProcess -> String
@@ -133,55 +159,53 @@ showLPEProcessInContext f lpe@(_, initParamEqs, _) = showLPEProcessExactly f lpe
 
 showLPEProcessExactly :: LPEContext -> LPEProcess -> [VarId.VarId] -> Bool -> String
 showLPEProcessExactly f (chanIds, initParamEqs, summands) orderedParams initParamValueFlag =
-    "PROCDEF LPE[" ++ List.intercalate "; " (map showChanDecl chanIds) ++ "]" ++
-    "(" ++ List.intercalate ", " (map showParamDecl orderedParams) ++ ") ::=\n        " ++
-    List.intercalate "\n     ## " (map (showLPESummandInContext f) (Set.toList summands)) ++
+    "PROCDEF LPE[" ++ List.intercalate "; " (map (showChanDecl f) chanIds) ++ "]" ++
+    "(" ++ List.intercalate "; " (map showParamDecl orderedParams) ++ ") ::=\n        " ++
+    List.intercalate "\n     ## " (map (showLPESummandInContext f chanIds) (Set.toList summands)) ++
     "\nENDDEF\n"
   where
-    showChanDecl :: ChanId.ChanId -> String
-    showChanDecl chanId =
-        let chanSortStrings = map pshow (ChanId.chansorts chanId) in
-          Text.unpack (ChanId.name chanId) ++ " :: " ++ List.intercalate " # " chanSortStrings
-    -- showChanDecl
-    
     showParamDecl :: VarId.VarId -> String
     showParamDecl varId =
-        f Map.! TxsDefs.IdVar varId ++ " :: " ++ pshow (SortOf.sortOf varId) ++
+        showVarId f varId ++ " :: " ++ showSortId f (VarId.varsort varId) ++
         if initParamValueFlag then " = " ++ showValExprInContext f (initParamEqs Map.! varId) else ""
     -- showParamDecl
 -- showLPEProcessExactly
 
 showLPESummand :: LPESummand -> String
-showLPESummand summand = showLPESummandInContext (getSummandContext summand) summand
+showLPESummand summand = showLPESummandInContext (getSummandContext summand) [] summand
 
 showAbbrevLPESummand :: LPESummand -> String
-showAbbrevLPESummand summand = showLPESummandInContext (getAbbrevSummandContext summand) summand
+showAbbrevLPESummand summand = showLPESummandInContext (getAbbrevSummandContext summand) [] summand
 
-showLPESummandInContext :: LPEContext -> LPESummand -> String
-showLPESummandInContext f (LPESummand channelVars channelOffers guard paramEqs) =
+showLPESummandInContext :: LPEContext -> [ChanId.ChanId] -> LPESummand -> String
+showLPESummandInContext f chanIds (LPESummand channelVars channelOffers guard paramEqs) =
     let usedChannelVars = concatMap snd channelOffers in
     let hiddenChannelVars = Set.toList (Set.fromList channelVars Set.\\ Set.fromList usedChannelVars) in
       showChannelOffers channelOffers ++
       showHiddenVars hiddenChannelVars ++
-      "[[ " ++ showValExprInContext f guard ++ " ]] >-> LPE(" ++ showLPEParamEqs f paramEqs ++ ")"
+      "[[ " ++ showValExprInContext f guard ++ " ]] >-> LPE" ++ showChanRefs chanIds ++ "(" ++ showLPEParamEqs f paramEqs ++ ")"
   where
     showChannelOffers :: LPEChannelOffers -> String
     showChannelOffers [] = ""
     showChannelOffers offers = List.intercalate " | " (map showChannelOffer offers) ++ " "
     
     showChannelOffer :: LPEChannelOffer -> String
-    showChannelOffer (chanId, vars) = f Map.! (TxsDefs.IdChan chanId) ++ concatMap (\v -> " ? " ++ f Map.! TxsDefs.IdVar v) vars
+    showChannelOffer (chanId, vars) = showChanId f chanId ++ concatMap (\v -> " ? " ++ showVarId f v ++ " :: " ++ showSortId f (VarId.varsort v)) vars
+    
+    showChanRefs :: [ChanId.ChanId] -> String
+    showChanRefs [] = ""
+    showChanRefs cids = "[" ++ List.intercalate ", " (map (showChanId f) cids) ++ "]"
     
     showHiddenVars :: [VarId.VarId] -> String
     showHiddenVars [] = ""
-    showHiddenVars hiddenVars = "(" ++ List.intercalate ", " (map (\v -> f Map.! TxsDefs.IdVar v) hiddenVars) ++ ") "
+    showHiddenVars hiddenVars = "(" ++ List.intercalate ", " (map (showVarId f) hiddenVars) ++ ") "
 -- showLPESummandInContext
 
 showLPEParamEqs :: LPEContext -> LPEParamEqs -> String
 showLPEParamEqs f eqs = List.intercalate ", " (map showParamEq (Map.toList eqs))
   where
     showParamEq :: (VarId.VarId, TxsDefs.VExpr) -> String
-    --showParamEq (varId, expr) = f Map.! TxsDefs.IdVar varId ++ " = " ++ showValExprInContext f expr
+    --showParamEq (varId, expr) = mapGet f TxsDefs.IdVar varId ++ " = " ++ showValExprInContext f expr
     showParamEq (_varId, expr) = showValExprInContext f expr
 -- showParamEq
 
@@ -202,27 +226,28 @@ showValExprInContext f = customData . visitValExpr showVisitor
                     (view -> Vconst (Cint val))       -> show val
                     (view -> Vconst (Cstring val))    -> show val
                     (view -> Vconst (Cregex val))     -> show val
-                    (view -> Vconst (Ccstr cid _))    -> f Map.! TxsDefs.IdCstr cid ++ "(" ++ List.intercalate ", " pars ++ ")"
-                    (view -> Vconst (Cany sort))      -> "ANY " ++ Text.unpack (SortId.name sort)
-                    (view -> Vvar vid)                -> f Map.! TxsDefs.IdVar vid
-                    (view -> Vfunc fid _)             -> f Map.! TxsDefs.IdFunc fid ++ "(" ++ List.intercalate ", " pars ++ ")"
-                    (view -> Vcstr cid _)             -> f Map.! TxsDefs.IdCstr cid ++ "(" ++ List.intercalate ", " pars ++ ")"
-                    (view -> Viscstr cid _)           -> "is" ++ f Map.! TxsDefs.IdCstr cid ++ "(" ++ head pars ++ ")"
-                    (view -> Vaccess cid p _)         -> f Map.! TxsDefs.IdFunc (CstrId.cstrargs cid !! p) ++ "(" ++ head pars ++ ")"
-                    (view -> Vite{})                  -> "IF " ++ head pars ++ " THEN " ++ pars !! 1 ++ " ELSE " ++ pars !! 2 ++ " ENDIF"
+                    (view -> Vconst (Ccstr cid _))    -> mapGet f (TxsDefs.IdCstr cid) ++ "(" ++ List.intercalate ", " pars ++ ")"
+                    --(view -> Vconst (Cany sort))      -> showValExprInContext f (sort2defaultValue sort)
+                    (view -> Vconst (Cany sort))      -> "ANY " ++ showSortId f sort
+                    (view -> Vvar vid)                -> showVarId f vid
+                    (view -> Vfunc fid _)             -> showFuncId f fid ++ "(" ++ List.intercalate ", " pars ++ ")"
+                    (view -> Vcstr cid _)             -> mapGet f (TxsDefs.IdCstr cid) ++ "(" ++ List.intercalate ", " pars ++ " / ## " ++ show (length (CstrId.cstrargs cid)) ++ " ##" ++ ")"
+                    (view -> Viscstr cid _)           -> "is" ++ mapGet f (TxsDefs.IdCstr cid) ++ "(" ++ head pars ++ ")"
+                    (view -> Vaccess cid p _)         -> showFuncId f (CstrId.cstrargs cid !! p) ++ "(" ++ head pars ++ ")"
+                    (view -> Vite{})                  -> "IF " ++ head pars ++ " THEN " ++ pars !! 1 ++ " ELSE " ++ pars !! 2 ++ " FI"
                     (view -> Vdivide _ _)             -> "(" ++ head pars ++ "/" ++ pars !! 1 ++ ")"
                     (view -> Vmodulo _ _)             -> "(" ++ head pars ++ "%" ++ pars !! 1 ++ ")"
                     (view -> Vgez _)                  -> "(" ++ head pars ++ ">=0)"
                     (view -> Vsum _)                  -> "(" ++ List.intercalate "+" (map (showMultElem "*") subExps) ++ ")"
                     (view -> Vproduct _)              -> "(" ++ List.intercalate "*" (map (showMultElem "^") subExps) ++ ")"
                     (view -> Vequal _ _)              -> "(" ++ head pars ++ "==" ++ pars !! 1 ++ ")"
-                    (view -> Vand _)                  -> "(" ++ List.intercalate " && " pars ++ ")"
+                    (view -> Vand _)                  -> "(" ++ List.intercalate " /\\ " pars ++ ")"
                     (view -> Vnot _)                  -> "not(" ++ head pars ++ ")"
                     (view -> Vlength _)               -> "length(" ++ head pars ++ ")"
                     (view -> Vat _ _)                 -> head pars ++ "[" ++ pars !! 1 ++ "]"
                     (view -> Vconcat _)               -> List.intercalate ":" pars
                     (view -> Vstrinre _ _)            -> "regex(" ++ head pars ++ ", " ++ pars !! 1 ++ ")"
-                    (view -> Vpredef _ fid _)         -> Text.unpack (FuncId.name fid) ++ "(" ++ List.intercalate ", " pars ++ ")"
+                    (view -> Vpredef _ fid _)         -> showFuncId f fid ++ "(" ++ List.intercalate ", " pars ++ ")"
                     _                                 -> error ("ShowValExprInContext.showVisitor not defined for " ++ show expr ++ "!")
         in ValExprVisitorOutput expr 1 str
     -- showVisitor
@@ -230,6 +255,28 @@ showValExprInContext f = customData . visitValExpr showVisitor
     showMultElem :: String -> ValExprVisitorOutput String -> String
     showMultElem op subExp =
         let mult = multiplicity subExp in
-          customData subExp ++ if mult /= 1 then op ++ show mult else ""
+          customData subExp ++ if mult /= 1 then op ++ "(" ++ show mult ++ ")" else ""
 -- showValExprInContext
+
+showVarId :: LPEContext -> VarId.VarId -> String
+showVarId f = (mapGet f) . TxsDefs.IdVar
+
+showChanId :: LPEContext -> ChanId.ChanId -> String
+showChanId f = (mapGet f) . TxsDefs.IdChan
+
+showFuncId :: LPEContext -> FuncId.FuncId -> String
+showFuncId f fid =
+    case f Map.!? (TxsDefs.IdFunc fid) of
+      Just funcText -> funcText -- Custom type
+      Nothing -> Text.unpack (FuncId.name fid) -- Predefined (standard) function
+-- showFuncId
+
+showSortId :: LPEContext -> SortId.SortId -> String
+showSortId f sid =
+    case f Map.!? (TxsDefs.IdSort sid) of
+      Just sortText -> sortText -- Custom type
+      Nothing -> Text.unpack (SortId.name sid) -- Predefined (standard) type
+-- showSortId
+
+
 

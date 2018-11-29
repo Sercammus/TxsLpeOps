@@ -6,7 +6,7 @@ See LICENSE at root directory of this repository.
 
 -----------------------------------------------------------------------------
 -- |
--- Module      :  LPETypes
+-- Module      :  LPETypeDefs
 -- Copyright   :  TNO and University of Twente
 -- License     :  BSD3
 -- Maintainer  :  djurrevanderwal@gmail.com
@@ -31,7 +31,7 @@ paramEqsLookup
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified TxsDefs
-import           VarId
+import qualified VarId
 
 type LPEModel = (TxsDefs.TxsDefs, LPEProcess)
 
@@ -48,32 +48,32 @@ type LPEProcess = ([TxsDefs.ChanId], LPEParamEqs, LPESummands)
 --  - Channel offers (action prefices and the *fresh* variables - also found in the earlier list - used per action prefix for synchronization).
 --  - Guard (restriction on when the summand can be 'applied').
 --  - STOP, or a number of parameter equations to be used for the recursive instantiation.
-data LPESummand = LPESummand [VarId] LPEChannelOffers TxsDefs.VExpr LPEParamEqs deriving (Eq, Ord, Show)
+data LPESummand = LPESummand [VarId.VarId] LPEChannelOffers TxsDefs.VExpr LPEParamEqs deriving (Eq, Ord, Show)
 type LPESummands = Set.Set LPESummand
 
 -- Convenience type.
 -- Relates a channel with communication variables over which that channel must be synchronized.
-type LPEChannelOffer = (TxsDefs.ChanId, [VarId])
+type LPEChannelOffer = (TxsDefs.ChanId, [VarId.VarId])
 type LPEChannelOffers = [LPEChannelOffer]
 
 -- Convenience type.
 -- Relates a parameter with the (initial) value of that parameter
 -- (in the case of a particular process instantiation).
-type LPEParamEqs = Map.Map VarId TxsDefs.VExpr
+type LPEParamEqs = Map.Map VarId.VarId TxsDefs.VExpr
 
-paramEqsLookup :: [VarId] -> LPEParamEqs -> [TxsDefs.VExpr]
+paramEqsLookup :: [VarId.VarId] -> LPEParamEqs -> [TxsDefs.VExpr]
 paramEqsLookup orderedParams paramEqs = map (\p -> paramEqs Map.! p) orderedParams
 
-toLPEParamEqs :: [(VarId, TxsDefs.VExpr)] -> LPEParamEqs
+toLPEParamEqs :: [(VarId.VarId, TxsDefs.VExpr)] -> LPEParamEqs
 toLPEParamEqs = Map.fromList
 
-newLPESummand :: [VarId] -> LPEChannelOffers -> TxsDefs.VExpr -> [(VarId, TxsDefs.VExpr)] -> LPESummand
+newLPESummand :: [VarId.VarId] -> LPEChannelOffers -> TxsDefs.VExpr -> [(VarId.VarId, TxsDefs.VExpr)] -> LPESummand
 newLPESummand chanVarIds chanOffers guard procInstParamEqs = LPESummand chanVarIds chanOffers guard (toLPEParamEqs procInstParamEqs)
 
-newLPEProcess :: ([TxsDefs.ChanId], [(VarId, TxsDefs.VExpr)], [LPESummand]) -> LPEProcess
+newLPEProcess :: ([TxsDefs.ChanId], [(VarId.VarId, TxsDefs.VExpr)], [LPESummand]) -> LPEProcess
 newLPEProcess (chanIds, initParamEqs, summands) = (chanIds, toLPEParamEqs initParamEqs, Set.fromList summands)
 
-newLPEModel :: ([TxsDefs.ChanId], [(VarId, TxsDefs.VExpr)], [LPESummand]) -> LPEModel
+newLPEModel :: ([TxsDefs.ChanId], [(VarId.VarId, TxsDefs.VExpr)], [LPESummand]) -> LPEModel
 newLPEModel contents = (TxsDefs.empty, newLPEProcess contents)
 
 

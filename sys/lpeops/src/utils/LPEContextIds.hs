@@ -22,11 +22,14 @@ getSummandIds,
 getValExprIds
 ) where
 
+--import qualified Data.List as List
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+--import qualified Data.Text as Text
 import qualified TxsDefs
-import qualified FuncId
+import qualified StdTDefs (stdTDefs)
 import qualified CstrId
+import qualified FuncId
 import qualified SortOf
 import qualified ChanId
 import qualified FuncDef
@@ -35,6 +38,9 @@ import           Constant hiding (sort)
 import           ValExpr hiding (subst)
 import           LPETypeDefs
 import           ValExprVisitor
+
+stdIds :: Set.Set TxsDefs.Ident
+stdIds = Set.fromList (map fst StdTDefs.stdTDefs)
 
 -- Because Set.unions does not work on sets of sets for some reason?
 setUnions :: (Foldable f, Ord a) => f (Set.Set a) -> Set.Set a
@@ -46,7 +52,7 @@ getModelIds (tdefs, process) =
   where
     untilFixpoint :: Set.Set TxsDefs.Ident -> Set.Set TxsDefs.Ident
     untilFixpoint currentIds =
-      let nextIds = getNextIds currentIds in
+      let nextIds = getNextIds currentIds Set.\\ stdIds in
         if nextIds == currentIds
         then currentIds
         else untilFixpoint nextIds
@@ -54,21 +60,19 @@ getModelIds (tdefs, process) =
     
     getNextIds :: Set.Set TxsDefs.Ident -> Set.Set TxsDefs.Ident
     getNextIds currentIds =
-      let funcIds = setUnions (Set.map getFuncId currentIds) in
-      let funcDefs = Set.map getFuncDef funcIds in
-      let recursiveIds = setUnions (Set.map getFuncIds funcDefs) in
-        Set.union currentIds recursiveIds
+        let recursiveIds = setUnions (Set.map getRecursiveIds currentIds) in
+          Set.union currentIds recursiveIds
     -- getNextIds
     
-    getFuncId :: TxsDefs.Ident -> Set.Set FuncId.FuncId
-    getFuncId (TxsDefs.IdFunc fid) = Set.singleton fid
-    getFuncId _ = Set.empty
-    
-    getFuncDef :: FuncId.FuncId -> FuncDef.FuncDef VarId.VarId
-    getFuncDef fid = TxsDefs.funcDefs tdefs Map.! fid
-    
-    getFuncIds :: FuncDef.FuncDef VarId.VarId -> Set.Set TxsDefs.Ident
-    getFuncIds (FuncDef.FuncDef params body) = Set.union (getVarsIds params) (getValExprIds body)
+    getRecursiveIds :: TxsDefs.Ident -> Set.Set TxsDefs.Ident
+    getRecursiveIds (TxsDefs.IdCstr cid) =
+        let otherCids = Set.filter ((== CstrId.cstrsort cid) . CstrId.cstrsort) (Map.keysSet (TxsDefs.cstrDefs tdefs)) in
+          setUnions (Set.map getCstrIds otherCids)
+    getRecursiveIds (TxsDefs.IdFunc fid) =
+        case TxsDefs.funcDefs tdefs Map.!? fid of
+          Just (FuncDef.FuncDef params body) -> Set.union (getVarsIds params) (getValExprIds body)
+          Nothing -> Set.empty
+    getRecursiveIds _ = Set.empty
 -- getModelIds
 
 -- Gathers all ids that are used in the given LPE process:
@@ -78,7 +82,7 @@ getProcessIds (channels, initParamEqs, summands) =
       getChansIds channels,
       getParamEqsIds initParamEqs,
       setUnions (Set.map getSummandIds summands)
-    ]
+    ] Set.\\ stdIds
 -- getProcessIds
 
 -- Gathers all ids that are used in the given summand:
@@ -90,7 +94,7 @@ getSummandIds (LPESummand channelVars channelOffers guard paramEqs) =
       Set.unions (map (getVarsIds . snd) channelOffers),
       getValExprIds guard,
       getParamEqsIds paramEqs
-    ]
+    ] Set.\\ stdIds
 -- getSummandIds
 
 getParamEqsIds :: LPEParamEqs -> Set.Set TxsDefs.Ident
@@ -133,14 +137,19 @@ getValExprIds = customData . visitValExpr searchVisitor
                     (view -> Vat _ _)                 -> idsInSubExps
                     (view -> Vconcat _)               -> idsInSubExps
                     (view -> Vstrinre _ _)            -> idsInSubExps
-                    (view -> Vpredef {})              -> idsInSubExps -- We are not interested in predefined functions!
+                    (view -> Vpredef _ fid _)         -> Set.insert (TxsDefs.IdFunc fid) idsInSubExps
                     _                                 -> error ("GetValExprIds.searchVisitor not defined for " ++ show expr ++ "!")
-        in ValExprVisitorOutput expr 1 ids
+        in ValExprVisitorOutput expr 1 (ids Set.\\ stdIds)
     -- searchVisitor
-    
-    getCstrIds :: CstrId.CstrId -> Set.Set TxsDefs.Ident
-    getCstrIds cid = Set.fromList (TxsDefs.IdCstr cid : TxsDefs.IdSort (CstrId.cstrsort cid) : map TxsDefs.IdFunc (CstrId.cstrargs cid)) -- TODO add recognizer function?
 -- getValExprIds
+
+getCstrIds :: CstrId.CstrId -> Set.Set TxsDefs.Ident
+getCstrIds cid =
+    Set.fromList (TxsDefs.IdCstr cid : TxsDefs.IdSort (CstrId.cstrsort cid) : concatMap getAccIds (CstrId.cstrargs cid)) -- TODO add recognizer function?
+  where
+    getAccIds :: FuncId.FuncId -> [TxsDefs.Ident]
+    getAccIds fid = [TxsDefs.IdFunc fid, TxsDefs.IdSort (FuncId.funcsort fid)]
+-- getCstrIds
 
 getChansIds :: [ChanId.ChanId] -> Set.Set TxsDefs.Ident
 getChansIds = Set.unions . map getChanIds

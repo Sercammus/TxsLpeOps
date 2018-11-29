@@ -38,25 +38,25 @@ import           LPEContextIds
 type LPEContext = Map.Map TxsDefs.Ident String
 
 getContextFromIds :: Set.Set TxsDefs.Ident -> LPEContext
-getContextFromIds = Map.fromSet (Text.unpack . TxsDefs.name)
+getContextFromIds ids = Map.fromSet (Text.unpack . TxsDefs.name) ids
 
 getAbbrevContextFromIds :: Set.Set TxsDefs.Ident -> LPEContext
 getAbbrevContextFromIds ids =
     Map.mapWithKey abbrevName (Map.fromList (zip (Set.toList ids) [1..]))
   where
     abbrevName :: TxsDefs.Ident -> Int -> String
-    abbrevName (TxsDefs.IdSort _) i   = "sort" ++ show i
-    abbrevName (TxsDefs.IdCstr _) i   = "cstr" ++ show i
+    abbrevName (TxsDefs.IdSort _) i   = "Sort" ++ show i -- Must be capitalized!
+    abbrevName (TxsDefs.IdCstr _) i   = "Cstr" ++ show i -- Must be capitalized!
     abbrevName (TxsDefs.IdFunc _) i   = "func" ++ show i
     abbrevName (TxsDefs.IdProc _) i   = "proc" ++ show i
-    abbrevName (TxsDefs.IdChan _) i   = "chan" ++ show i
+    abbrevName (TxsDefs.IdChan _) i   = "Chan" ++ show i -- Must be capitalized!
     abbrevName (TxsDefs.IdVar _) i    = "var" ++ show i
-    abbrevName (TxsDefs.IdStat _) i   = "stat" ++ show i
-    abbrevName (TxsDefs.IdModel _) i  = "model" ++ show i
-    abbrevName (TxsDefs.IdPurp _) i   = "purp" ++ show i
-    abbrevName (TxsDefs.IdGoal _) i   = "goal" ++ show i
-    abbrevName (TxsDefs.IdMapper _) i = "mapper" ++ show i
-    abbrevName (TxsDefs.IdCnect _) i  = "cnect" ++ show i
+    abbrevName (TxsDefs.IdStat _) i   = "Stat" ++ show i
+    abbrevName (TxsDefs.IdModel _) i  = "Model" ++ show i
+    abbrevName (TxsDefs.IdPurp _) i   = "Purp" ++ show i
+    abbrevName (TxsDefs.IdGoal _) i   = "Goal" ++ show i
+    abbrevName (TxsDefs.IdMapper _) i = "Mapper" ++ show i
+    abbrevName (TxsDefs.IdCnect _) i  = "Cnect" ++ show i
 -- getAbbrevContextFromIds
 
 getModelContext :: LPEModel -> LPEContext
