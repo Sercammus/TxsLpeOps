@@ -31,6 +31,7 @@ showAbbrevValExpr
 
 import qualified Data.List as List
 import qualified Data.Map as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified TxsDefs
@@ -52,9 +53,7 @@ import           ValExprVisitor
 mapGet :: (Show a, Ord a) => Map.Map a b -> a -> b
 mapGet m k =
     --trace ("mapGet(" ++ (show k) ++ ")") (
-      case m Map.!? k of
-        Just x -> x
-        Nothing -> error ("Could not find " ++ show k ++ " in map!")
+      Maybe.fromMaybe (error ("Could not find " ++ show k ++ " in map!")) (m Map.!? k)
     --)
 -- mapGet
 
@@ -227,11 +226,10 @@ showValExprInContext f = customData . visitValExpr showVisitor
                     (view -> Vconst (Cstring val))    -> show val
                     (view -> Vconst (Cregex val))     -> show val
                     (view -> Vconst (Ccstr cid _))    -> mapGet f (TxsDefs.IdCstr cid) ++ "(" ++ List.intercalate ", " pars ++ ")"
-                    --(view -> Vconst (Cany sort))      -> showValExprInContext f (sort2defaultValue sort)
                     (view -> Vconst (Cany sort))      -> "ANY " ++ showSortId f sort
                     (view -> Vvar vid)                -> showVarId f vid
                     (view -> Vfunc fid _)             -> showFuncId f fid ++ "(" ++ List.intercalate ", " pars ++ ")"
-                    (view -> Vcstr cid _)             -> mapGet f (TxsDefs.IdCstr cid) ++ "(" ++ List.intercalate ", " pars ++ " / ## " ++ show (length (CstrId.cstrargs cid)) ++ " ##" ++ ")"
+                    (view -> Vcstr cid _)             -> mapGet f (TxsDefs.IdCstr cid) ++ "(" ++ List.intercalate ", " pars ++ ")"
                     (view -> Viscstr cid _)           -> "is" ++ mapGet f (TxsDefs.IdCstr cid) ++ "(" ++ head pars ++ ")"
                     (view -> Vaccess cid p _)         -> showFuncId f (CstrId.cstrargs cid !! p) ++ "(" ++ head pars ++ ")"
                     (view -> Vite{})                  -> "IF " ++ head pars ++ " THEN " ++ pars !! 1 ++ " ELSE " ++ pars !! 2 ++ " FI"
@@ -259,24 +257,16 @@ showValExprInContext f = customData . visitValExpr showVisitor
 -- showValExprInContext
 
 showVarId :: LPEContext -> VarId.VarId -> String
-showVarId f = (mapGet f) . TxsDefs.IdVar
+showVarId f = mapGet f . TxsDefs.IdVar
 
 showChanId :: LPEContext -> ChanId.ChanId -> String
-showChanId f = (mapGet f) . TxsDefs.IdChan
+showChanId f = mapGet f . TxsDefs.IdChan
 
 showFuncId :: LPEContext -> FuncId.FuncId -> String
-showFuncId f fid =
-    case f Map.!? (TxsDefs.IdFunc fid) of
-      Just funcText -> funcText -- Custom type
-      Nothing -> Text.unpack (FuncId.name fid) -- Predefined (standard) function
--- showFuncId
+showFuncId f fid = Maybe.fromMaybe (Text.unpack (FuncId.name fid)) (f Map.!? TxsDefs.IdFunc fid)
 
 showSortId :: LPEContext -> SortId.SortId -> String
-showSortId f sid =
-    case f Map.!? (TxsDefs.IdSort sid) of
-      Just sortText -> sortText -- Custom type
-      Nothing -> Text.unpack (SortId.name sid) -- Predefined (standard) type
--- showSortId
+showSortId f sid = Maybe.fromMaybe (Text.unpack (SortId.name sid)) (f Map.!? TxsDefs.IdSort sid)
 
 
 

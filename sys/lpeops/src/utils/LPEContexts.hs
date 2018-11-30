@@ -38,16 +38,16 @@ import           LPEContextIds
 type LPEContext = Map.Map TxsDefs.Ident String
 
 getContextFromIds :: Set.Set TxsDefs.Ident -> LPEContext
-getContextFromIds ids = Map.fromSet (Text.unpack . TxsDefs.name) ids
+getContextFromIds = Map.fromSet (Text.unpack . TxsDefs.name)
 
 getAbbrevContextFromIds :: Set.Set TxsDefs.Ident -> LPEContext
 getAbbrevContextFromIds ids =
     Map.mapWithKey abbrevName (Map.fromList (zip (Set.toList ids) [1..]))
   where
     abbrevName :: TxsDefs.Ident -> Int -> String
-    abbrevName (TxsDefs.IdSort _) i   = "Sort" ++ show i -- Must be capitalized!
-    abbrevName (TxsDefs.IdCstr _) i   = "Cstr" ++ show i -- Must be capitalized!
-    abbrevName (TxsDefs.IdFunc _) i   = "func" ++ show i
+    abbrevName j@(TxsDefs.IdSort _) i   = "Sort" ++ show i ++ "_" ++ Text.unpack (TxsDefs.name j) -- Must be capitalized!
+    abbrevName j@(TxsDefs.IdCstr _) i   = "Cstr" ++ show i ++ "_" ++ Text.unpack (TxsDefs.name j) -- Must be capitalized!
+    abbrevName j@(TxsDefs.IdFunc _) i   = "func" ++ show i ++ "_" ++ Text.unpack (TxsDefs.name j)
     abbrevName (TxsDefs.IdProc _) i   = "proc" ++ show i
     abbrevName (TxsDefs.IdChan _) i   = "Chan" ++ show i -- Must be capitalized!
     abbrevName (TxsDefs.IdVar _) i    = "var" ++ show i

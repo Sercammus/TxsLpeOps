@@ -78,10 +78,10 @@ lpeOperation ops (LPEOp op:xs) (model:ys) out invariant = do
     eitherNewModel <- op model out invariant
     case eitherNewModel of
       Left msgs -> return (Left msgs)
-      Right newModel -> let scopeProblems = getScopeProblems (snd newModel) in
-                          if null scopeProblems
+      Right newModel -> let problems = getProcessProblems (snd newModel) in
+                          if null problems
                           then lpeOperation ops xs (newModel:ys) out invariant
-                          else return (Left scopeProblems)
+                          else return (Left problems)
 -- lpeOperation
 
 discardLPE :: LPEOperation
