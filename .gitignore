@@ -1,93 +1,48 @@
-.stack-work/
-examps/DispatchProcess/spec/Out2.mcrl2
-examps/DispatchProcess/spec/Out2.lps
-examps/DispatchProcess/spec/Out1.mcrl2
-examps/DispatchProcess/spec/Out1.lps
-examps/CustomersOrders/logSMT.2018-08-15-11-43-53.5512542.smt2
-examps/CustomersOrders/logSMT.2018-08-15-11-42-20.3609093.smt2
-examps/CustomersOrders/Out2.mcrl2
-examps/CustomersOrders/Out2.lps
-examps/CustomersOrders/Out1.mcrl2
-examps/ControlLoop/test.txt
-examps/Adder/adder1.txt
-examps/Adder/adder1.mcrl2
-examps/Adder/adder1.lps
-examps/Adder/Out2.mcrl2
-_tex/lpeopsDoc/lpeopsDoc.synctex
-_tex/lpeopsDoc/lpeopsDoc.run.xml
-_tex/lpeopsDoc/lpeopsDoc.pdf
-_tex/lpeopsDoc/lpeopsDoc.out
-_tex/lpeopsDoc/lpeopsDoc.blg
-_tex/lpeopsDoc/lpeopsDoc.bcf
-_tex/lpeopsDoc/lpeopsDoc.bbl
-_tex/lpeopsDoc/lpeopsDoc.aux
-_tex/lpeopsDoc/lpeDefinition.aux
-_tex/lpeopsDoc/constElm.aux
-examps/ReadWriteConflict/Out2.mcrl2
-examps/ReadWriteConflict/Out2.lts
-examps/ReadWriteConflict/Out2.lps
-examps/ReadWriteConflict/Out1.mcrl2
-examps/ReadWriteConflict/Out1.lts
-examps/ReadWriteConflict/Out1.lps
-examps/Bakery/Out2.mcrl2
-examps/Bakery/Out2.lps
-examps/Bakery/Out1.mcrl2
-examps/Bakery/Out1.lps
-examps/Ark/logSMT.2018-08-15-11-39-14.4536428.smt2
-examps/Adder/adder2.mcrl2
-examps/Adder/adder2.lps
-examps/Adder/adder1_1.txt
-examps/Adder/Out2.lps
-examps/Adder/Out1.mcrl2
-examps/Adder/Out1.lps
-_tex/lpeopsDoc/parElm.aux
-_tex/lpeopsDoc/lpeopsDoc.tps
-_tex/lpeopsDoc/lpeopsDoc.toc
-_tex/lpeopsDoc/lpeopsDoc.tcp
-examps/Queue/Out2.lts
-examps/Queue/Out2.lps
-examps/Queue/Out1.mcrl2
-examps/Queue/Out1.lts
-examps/Queue/Out1.lps
-examps/Point/Out2.mcrl2
-examps/Point/Out2.lps
-examps/Point/Out1.mcrl2
-examps/Fibonacci/logSMT.2018-08-15-11-55-03.7027696.smt2
-examps/Echo/Out2.mcrl2
-examps/Echo/Out2.lps
-examps/Echo/Out1.mcrl2
-examps/Echo/Out1.lps
-examps/DispatchProcess/spec/logSMT.2018-08-15-11-53-34.2615375.smt2
-examps/DispatchProcess/spec/logSMT.2018-08-15-11-46-33.696151.smt2
-sys/bexpr/bexpr-test.prof
-sys/behave/behave-test.prof
-examps/ReadWriteConflict/test.txt
-examps/ReadWriteConflict/logB.txt
-examps/ReadWriteConflict/log4.txt
-examps/ReadWriteConflict/log3.txt
-examps/ReadWriteConflict/log2.txt
-examps/ReadWriteConflict/log.txt
-examps/LuckyPeople/spec/Out2.mcrl2
-examps/LuckyPeople/spec/Out2.lps
-examps/LuckyPeople/spec/Out1.mcrl2
-examps/LuckyPeople/spec/Out1.lps
-examps/ControlLoop/PartialControlLoopLPEWithInvalidVar.txt
-examps/ControlLoop/MultipleControlLoopsDjurre.txs
-examps/Adder/adder1_1.lps
-test/sqatt/bench.prof
-sys/valexpr/valexpr-BlackBox.prof
-sys/txs-compiler/txs-compiler-test.prof
-sys/solve/SmtSolver-WhiteBox.prof
-sys/solve/SmtSolver-BlackBox.prof
-sys/server/server-test.prof
-examps/ReadWriteConflict/Out.mcrl2
-examps/ReadWriteConflict/NoActionOffers.txt
-examps/ReadWriteConflict/Counterexample0.trc
-examps/Queue/output.mcrl2
-examps/Point/Out1.lps
-examps/LuckyPeople/spec/logSMT.2018-08-15-11-57-48.7323432.smt2
-examps/LuckyPeople/spec/logSMT.2018-08-15-11-57-24.6183678.smt2
-sys/lpeops/lpeops-test.prof
-sys/lpe/lpe-test.prof
-examps/Queue/Out2.mcrl2
-examps/ControlLoop/output.txt
+#stack working directory
+.stack-work
+
+# Compiled class file - test
+*.class
+
+# Log files
+*.log
+
+# SMT Solver output
+*.smt2
+
+# IDE files and folders
+.settings
+.idea
+*.iml
+out/
+TAGS
+*.swp
+.vscode
+
+# SemaphoreCI cache folders
+.semaphore-cache
+
+# Sphinx build folders
+docs/wiki/_build
+
+# TorXakis traces generated while running `sqatt`
+
+/*Proc.txs
+/*Purpose.txs
+
+# Cabal files that are generated using hpack
+sys/txs-compiler/txs-compiler.cabal
+sys/txs-sort/txs-sort.cabal
+
+# Png or dot generated files.
+/*.png
+/*.dot
+
+# special mac files
+.DS_Store
+
+# Debian package
+*.deb
+
+# RPM package.
+*.rpm

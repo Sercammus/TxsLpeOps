@@ -41,6 +41,7 @@ library
                      , Examples.ControlLoop
                      , Examples.DispatchProcess
                      , Examples.Echo
+                     , Examples.Fibonacci                     
                      , Examples.LuckyPeople
                      , Examples.MovingArms
                      , Examples.Paths
