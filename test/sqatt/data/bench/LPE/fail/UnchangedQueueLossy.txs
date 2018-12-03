@@ -1,0 +1,22 @@
+TYPEDEF Sort1_IntList ::= Cstr3_Cons { func9_hd :: Int; func11_tl :: Sort1_IntList } | Cstr7_Nil ENDDEF
+TYPEDEF Sort2_QueueOp ::= Cstr4_Deq | Cstr5_Enq { func12_val :: Int } | Cstr6_Error ENDDEF
+FUNCDEF func8_add(var22 :: Int; var17 :: Sort1_IntList) :: Sort1_IntList ::= IF isCstr7_Nil(var17) THEN Cstr3_Cons(var22, Cstr7_Nil()) ELSE Cstr3_Cons(func9_hd(var17), func8_add(var22, func11_tl(var17))) FI ENDDEF
+FUNCDEF func10_overflow(var23 :: Int) :: Bool ::= True ENDDEF
+CHANDEF ChanDefs
+    ::= Chan13 :: Sort2_QueueOp
+      ; Chan14 :: Int
+ENDDEF
+PROCDEF LPE[Chan13 :: Sort2_QueueOp; Chan14 :: Int](var18 :: Int; var19 :: Sort1_IntList; var20 :: Sort1_IntList; var21 :: Sort2_QueueOp) ::=
+        Chan13 ? var15 :: Sort2_QueueOp [[ IF (0==var18) THEN IF isCstr5_Enq(var15) THEN not(func10_overflow(func12_val(var15))) ELSE False FI ELSE False FI ]] >-> LPE[Chan13, Chan14](1, func8_add(func12_val(var15), Cstr7_Nil()), var20, var21)
+     ## Chan13 ? var15 :: Sort2_QueueOp [[ IF (0==var18) THEN isCstr4_Deq(var15) ELSE False FI ]] >-> LPE[Chan13, Chan14](2, var19, Cstr7_Nil(), var15)
+     ## Chan13 ? var15 :: Sort2_QueueOp [[ IF (1==var18) THEN IF isCstr5_Enq(var15) THEN not(func10_overflow(func12_val(var15))) ELSE False FI ELSE False FI ]] >-> LPE[Chan13, Chan14](1, func8_add(func12_val(var15), var19), var20, var21)
+     ## Chan13 ? var15 :: Sort2_QueueOp [[ IF (1==var18) THEN isCstr4_Deq(var15) ELSE False FI ]] >-> LPE[Chan13, Chan14](2, var19, var19, var15)
+     ## Chan13 ? var15 :: Sort2_QueueOp [[ IF (2==var18) THEN IF isCstr7_Nil(var20) THEN IF isCstr5_Enq(var15) THEN not(func10_overflow(func12_val(var15))) ELSE False FI ELSE False FI ELSE False FI ]] >-> LPE[Chan13, Chan14](1, func8_add(func12_val(var15), Cstr7_Nil()), var20, var21)
+     ## Chan13 ? var15 :: Sort2_QueueOp [[ IF (2==var18) THEN IF isCstr7_Nil(var20) THEN isCstr4_Deq(var15) ELSE False FI ELSE False FI ]] >-> LPE[Chan13, Chan14](2, var19, Cstr7_Nil(), var15)
+     ## Chan14 ? var16 :: Int [[ IF (2==var18) THEN ((var16==func9_hd(var20)) /\ not(isCstr7_Nil(var20))) ELSE False FI ]] >-> LPE[Chan13, Chan14](1, func11_tl(var20), var20, var21)
+ENDDEF
+MODELDEF Model ::=
+    CHAN IN Chan13, Chan14
+    CHAN OUT
+    BEHAVIOUR LPE[Chan13, Chan14](0, Cstr7_Nil, Cstr7_Nil, Cstr6_Error)
+ENDDEF
