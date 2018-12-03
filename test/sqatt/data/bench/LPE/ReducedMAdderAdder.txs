@@ -1,0 +1,18 @@
+CHANDEF ChanDefs
+    ::= Chan1 :: Int # Int
+      ; Chan2 :: Int # Int
+      ; Chan3 :: Int
+ENDDEF
+PROCDEF LPE[Chan1 :: Int # Int; Chan2 :: Int # Int; Chan3 :: Int](var9 :: Int; var10 :: Int; var11 :: Int; var12 :: Int; var13 :: Int) ::=
+        Chan1 ? var4 :: Int ? var5 :: Int [[ (0==var13) ]] >-> LPE[Chan1, Chan2, Chan3](var4, var5, 0, 0, 1)
+     ## Chan1 ? var4 :: Int ? var5 :: Int [[ (2==var13) ]] >-> LPE[Chan1, Chan2, Chan3](var4, var5, 0, 0, 1)
+     ## Chan2 ? var6 :: Int ? var7 :: Int [[ (0==var13) ]] >-> LPE[Chan1, Chan2, Chan3](0, 0, var6, var7, 3)
+     ## Chan2 ? var6 :: Int ? var7 :: Int [[ (2==var13) ]] >-> LPE[Chan1, Chan2, Chan3](0, 0, var6, var7, 3)
+     ## Chan3 ? var8 :: Int [[ IF (1==var13) THEN (var8==(var9+var10*(-1))) ELSE False FI ]] >-> LPE[Chan1, Chan2, Chan3](0, 0, 0, 0, 2)
+     ## Chan3 ? var8 :: Int [[ IF (3==var13) THEN (var8==(var11+var12)) ELSE False FI ]] >-> LPE[Chan1, Chan2, Chan3](0, 0, 0, 0, 2)
+ENDDEF
+MODELDEF Model ::=
+    CHAN IN Chan1, Chan2, Chan3
+    CHAN OUT
+    BEHAVIOUR LPE[Chan1, Chan2, Chan3](0, 0, 0, 0, 0)
+ENDDEF

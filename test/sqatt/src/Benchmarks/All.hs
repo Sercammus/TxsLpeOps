@@ -13,7 +13,9 @@ module Benchmarks.All (allExamples, allBenchmarks) where
 --import qualified Benchmarks.Parallel        as Parallel
 --import qualified Benchmarks.LPEAdder3         as LPEAdder3
 import qualified Benchmarks.LPEBakery         as LPEBakery
+import qualified Benchmarks.LPEMAdder         as LPEMAdder
 import qualified Benchmarks.LPEReadWrite      as LPEReadWrite
+--import qualified Benchmarks.LPELuckyPeople    as LPELuckyPeople
 --import qualified Benchmarks.Queue           as Queue
 --import qualified Benchmarks.RealWorld       as RealWorld
 --import qualified Benchmarks.Sequence        as Sequence
@@ -26,8 +28,10 @@ allExamples = [ --Choice.benchmarksSet
               --, Dynamic.benchmarksSet
               --, Enable.benchmarksSet
               --, Hiding.benchmarksSet
-              LPEBakery.benchmarksSet
+                LPEBakery.benchmarksSet
+              , LPEMAdder.benchmarksSet
               , LPEReadWrite.benchmarksSet
+              --, LPELuckyPeople.benchmarksSet
               --, RealWorld.benchmarksSet
               --, Sequence.benchmarksSet
               --, Synchronization.benchmarksSet
