@@ -224,7 +224,7 @@ showValExprInContext f = customData . visitValExpr showVisitor
                     (view -> Vconst (Cbool val))      -> show val
                     (view -> Vconst (Cint val))       -> show val
                     (view -> Vconst (Cstring val))    -> show val
-                    (view -> Vconst (Cregex val))     -> show val
+                    (view -> Vconst (Cregex val))     -> "REGEX('" ++ Text.unpack val ++ "')"
                     (view -> Vconst (Ccstr cid _))    -> mapGet f (TxsDefs.IdCstr cid) ++ "(" ++ List.intercalate ", " pars ++ ")"
                     (view -> Vconst (Cany sort))      -> "ANY " ++ showSortId f sort
                     (view -> Vvar vid)                -> showVarId f vid
@@ -242,9 +242,9 @@ showValExprInContext f = customData . visitValExpr showVisitor
                     (view -> Vand _)                  -> "(" ++ List.intercalate " /\\ " pars ++ ")"
                     (view -> Vnot _)                  -> "not(" ++ head pars ++ ")"
                     (view -> Vlength _)               -> "length(" ++ head pars ++ ")"
-                    (view -> Vat _ _)                 -> head pars ++ "[" ++ pars !! 1 ++ "]"
+                    (view -> Vat _ _)                 -> "at(" ++ head pars ++ ", " ++ pars !! 1 ++ ")"
                     (view -> Vconcat _)               -> List.intercalate ":" pars
-                    (view -> Vstrinre _ _)            -> "regex(" ++ head pars ++ ", " ++ pars !! 1 ++ ")"
+                    (view -> Vstrinre _ _)            -> "strinre(" ++ head pars ++ ", " ++ pars !! 1 ++ ")"
                     (view -> Vpredef _ fid _)         -> showFuncId f fid ++ "(" ++ List.intercalate ", " pars ++ ")"
                     _                                 -> error ("ShowValExprInContext.showVisitor not defined for " ++ show expr ++ "!")
         in ValExprVisitorOutput expr 1 str
