@@ -8,7 +8,6 @@ See LICENSE at root directory of this repository.
 -- ----------------------------------------------------------------------------------------- --
 -- Model of a Queue of Integers, with input "In x", and "Out y".
 
-
 TYPEDEF  IntList  ::=   Nil
                       | Cons  { hd ::  Int
                               ; tl ::  IntList

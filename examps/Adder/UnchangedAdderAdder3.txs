@@ -1,0 +1,22 @@
+TYPEDEF Sort1_Operation ::= Cstr2_Minus { func4_m1 :: Int; func5_m2 :: Int } | Cstr3_Plus { func7_p1 :: Int; func8_p2 :: Int } | Cstr4_ANY ENDDEF
+FUNCDEF func6_overflow(var33 :: Int) :: Bool ::= not((((2147483647+var33*(-1))>=0) /\ ((2147483648+var33)>=0))) ENDDEF
+CHANDEF ChanDefs
+    ::= Chan9 :: Sort1_Operation
+      ; Chan10 :: Sort1_Operation
+      ; Chan11 :: Sort1_Operation
+      ; Chan12 :: Sort1_Operation
+      ; Chan13 :: Int
+      ; Chan14 :: Int
+      ; Chan15 :: Int
+      ; Chan16 :: Int
+ENDDEF
+PROCDEF LPE[Chan9 :: Sort1_Operation; Chan10 :: Sort1_Operation; Chan11 :: Sort1_Operation; Chan12 :: Sort1_Operation; Chan13 :: Int; Chan14 :: Int; Chan15 :: Int; Chan16 :: Int](var23 :: Sort1_Operation; var24 :: Sort1_Operation; var25 :: Int; var26 :: Sort1_Operation; var27 :: Sort1_Operation; var28 :: Int; var29 :: Sort1_Operation; var30 :: Sort1_Operation; var31 :: Int; var32 :: Int) ::=
+        Chan10 ? var17 :: Sort1_Operation [[ True ]] >-> LPE[Chan9, Chan10, Chan11, Chan12, Chan13, Chan14, Chan15, Chan16](Cstr4_ANY, var17, 2, Cstr4_ANY, Cstr4_ANY, 0, Cstr4_ANY, Cstr4_ANY, 0, 1)
+     ## Chan10 ? var17 :: Sort1_Operation [[ IF (0==var32) THEN IF isCstr3_Plus(var17) THEN (not(func6_overflow((func7_p1(var17)+func8_p2(var17)))) /\ not(func6_overflow(func7_p1(var17))) /\ not(func6_overflow(func8_p2(var17)))) ELSE False FI ELSE False FI ]] >-> LPE[Chan9, Chan10, Chan11, Chan12, Chan13, Chan14, Chan15, Chan16](var17, Cstr4_ANY, 1, Cstr4_ANY, Cstr4_ANY, 0, Cstr4_ANY, Cstr4_ANY, 0, 1)
+     ## Chan10 ? var17 :: Sort1_Operation [[ IF (1==var32) THEN IF (0==var25) THEN IF isCstr2_Minus(var17) THEN (not(func6_overflow((func4_m1(var17)+func5_m2(var17)*(-1)))) /\ not(func6_overflow(func4_m1(var17))) /\ not(func6_overflow(func5_m2(var17)))) ELSE False FI ELSE False FI ELSE False FI ]] >-> LPE[Chan9, Chan10, Chan11, Chan12, Chan13, Chan14, Chan15, Chan16](var23, var17, 2, var26, var27, var28, var29, var30, var31, 1)
+ENDDEF
+MODELDEF Model ::=
+    CHAN IN Chan9, Chan10, Chan11, Chan12, Chan13, Chan14, Chan15, Chan16
+    CHAN OUT
+    BEHAVIOUR LPE[Chan9, Chan10, Chan11, Chan12, Chan13, Chan14, Chan15, Chan16](Cstr4_ANY, Cstr4_ANY, 0, Cstr4_ANY, Cstr4_ANY, 0, Cstr4_ANY, Cstr4_ANY, 0, 0)
+ENDDEF

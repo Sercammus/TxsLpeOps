@@ -1,0 +1,22 @@
+TYPEDEF Sort1 ::= Cstr3 { func9 :: Int; func11 :: Sort1 } | Cstr7 ENDDEF
+TYPEDEF Sort2 ::= Cstr4 | Cstr5 { func12 :: Int } | Cstr6 ENDDEF
+FUNCDEF func8(var22 :: Int; var17 :: Sort1) :: Sort1 ::= IF isCstr7(var17) THEN Cstr3(var22, Cstr7()) ELSE Cstr3(func9(var17), func8(var22, func11(var17))) FI ENDDEF
+FUNCDEF func10(var23 :: Int) :: Bool ::= True ENDDEF
+CHANDEF ChanDefs
+    ::= Chan13 :: Sort2
+      ; Chan14 :: Int
+ENDDEF
+PROCDEF LPE[Chan13 :: Sort2; Chan14 :: Int](var18 :: Int; var19 :: Sort1; var20 :: Sort1; var21 :: Sort2) ::=
+        Chan13 ? var15 :: Sort2 [[ IF (0==var18) THEN IF isCstr5(var15) THEN not(func10(func12(var15))) ELSE False FI ELSE False FI ]] >-> LPE[Chan13, Chan14](1, func8(func12(var15), Cstr7()), var20, var21)
+     ## Chan13 ? var15 :: Sort2 [[ IF (0==var18) THEN isCstr4(var15) ELSE False FI ]] >-> LPE[Chan13, Chan14](2, var19, Cstr7(), var15)
+     ## Chan13 ? var15 :: Sort2 [[ IF (1==var18) THEN IF isCstr5(var15) THEN not(func10(func12(var15))) ELSE False FI ELSE False FI ]] >-> LPE[Chan13, Chan14](1, func8(func12(var15), var19), var20, var21)
+     ## Chan13 ? var15 :: Sort2 [[ IF (1==var18) THEN isCstr4(var15) ELSE False FI ]] >-> LPE[Chan13, Chan14](2, var19, var19, var15)
+     ## Chan13 ? var15 :: Sort2 [[ IF (2==var18) THEN IF isCstr7(var20) THEN IF isCstr5(var15) THEN not(func10(func12(var15))) ELSE False FI ELSE False FI ELSE False FI ]] >-> LPE[Chan13, Chan14](1, func8(func12(var15), Cstr7()), var20, var21)
+     ## Chan13 ? var15 :: Sort2 [[ IF (2==var18) THEN IF isCstr7(var20) THEN isCstr4(var15) ELSE False FI ELSE False FI ]] >-> LPE[Chan13, Chan14](2, var19, Cstr7(), var15)
+     ## Chan14 ? var16 :: Int [[ IF (2==var18) THEN ((var16==func9(var20)) /\ not(isCstr7(var20))) ELSE False FI ]] >-> LPE[Chan13, Chan14](1, func11(var20), var20, var21)
+ENDDEF
+MODELDEF Model ::=
+    CHAN IN Chan13, Chan14
+    CHAN OUT
+    BEHAVIOUR LPE[Chan13, Chan14](0, ANY Sort1, ANY Sort1, ANY Sort2)
+ENDDEF

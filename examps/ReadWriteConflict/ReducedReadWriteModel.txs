@@ -1,0 +1,25 @@
+CHANDEF ChanDefs
+    ::= Chan1 :: Int
+      ; Chan2 :: Int
+ENDDEF
+PROCDEF LPE[Chan1 :: Int; Chan2 :: Int](var5 :: Int; var6 :: Int; var7 :: Int; var8 :: Int; var9 :: Int; var10 :: Int; var11 :: Int; var12 :: Int; var13 :: Int; var14 :: Int; var15 :: Int; var16 :: Int; var17 :: Int; var18 :: Int; var19 :: Int; var20 :: Int; var21 :: Int) ::=
+        Chan1 ? var3 :: Int [[ IF (0==var5) THEN (0==var3) ELSE False FI ]] >-> LPE[Chan1, Chan2](1, 0, 0, 1, 1, 0, 1, ANY Int, ANY Int, 0, 2, ANY Int, ANY Int, 1, 4, 4, var3)
+     ## Chan1 ? var3 :: Int [[ IF (0==var5) THEN (0==var3) ELSE False FI ]] >-> LPE[Chan1, Chan2](1, 0, 0, 1, 1, 0, 1, ANY Int, ANY Int, 1, 2, 2, var3, 0, 4, ANY Int, ANY Int)
+     ## Chan1 ? var3 :: Int [[ IF (0==var5) THEN (0==var3) ELSE False FI ]] >-> LPE[Chan1, Chan2](1, 0, 0, 1, 1, 1, 1, 1, var3, 0, 2, ANY Int, ANY Int, 0, 4, ANY Int, ANY Int)
+     ## Chan1 ? var3 :: Int [[ IF (1==var5) THEN ((0==var8) /\ IF (0==var7) THEN (var3==var6) ELSE False FI) ELSE False FI ]] >-> LPE[Chan1, Chan2](1, var6, 0, 1, 1, 0, 1, ANY Int, ANY Int, 0, 2, ANY Int, ANY Int, 1, 4, 4, var3)
+     ## Chan1 ? var3 :: Int [[ IF (1==var5) THEN ((0==var8) /\ IF (0==var7) THEN (var3==var6) ELSE False FI) ELSE False FI ]] >-> LPE[Chan1, Chan2](1, var6, 0, 1, 1, 0, 1, ANY Int, ANY Int, 1, 2, 2, var3, 0, 4, ANY Int, ANY Int)
+     ## Chan1 ? var3 :: Int [[ IF (1==var5) THEN ((0==var8) /\ IF (0==var7) THEN (var3==var6) ELSE False FI) ELSE False FI ]] >-> LPE[Chan1, Chan2](1, var6, 0, 1, 1, 1, 1, 1, var3, 0, 2, ANY Int, ANY Int, 0, 4, ANY Int, ANY Int)
+     ## Chan1 ? var3 :: Int [[ IF (1==var5) THEN (IF (0==var7) THEN (var3==var6) ELSE False FI /\ IF (1==var8) THEN IF (1==var9) THEN (0==var10) ELSE False FI ELSE False FI) ELSE False FI ]] >-> LPE[Chan1, Chan2](1, var6, 0, 1, 1, 1, var11, var11, var3, var14, var15, var16, var17, var18, var19, var20, var21)
+     ## Chan1 ? var3 :: Int [[ IF (1==var5) THEN (IF (0==var7) THEN (var3==var6) ELSE False FI /\ IF (1==var8) THEN IF (1==var9) THEN (0==var14) ELSE False FI ELSE False FI) ELSE False FI ]] >-> LPE[Chan1, Chan2](1, var6, 0, 1, 1, var10, var11, var12, var13, 1, var15, var15, var3, var18, var19, var20, var21)
+     ## Chan1 ? var3 :: Int [[ IF (1==var5) THEN (IF (0==var7) THEN (var3==var6) ELSE False FI /\ IF (1==var8) THEN IF (1==var9) THEN (0==var18) ELSE False FI ELSE False FI) ELSE False FI ]] >-> LPE[Chan1, Chan2](1, var6, 0, 1, 1, var10, var11, var12, var13, var14, var15, var16, var17, 1, var19, var19, var3)
+     ## Chan1 ? var3 :: Int [[ (IF (0==var7) THEN (var3==var6) ELSE False FI /\ IF (1==var5) THEN IF (1==var8) THEN IF (1==var9) THEN ((2==var10) /\ (2==var14) /\ (2==var18)) ELSE False FI ELSE False FI ELSE False FI) ]] >-> LPE[Chan1, Chan2](1, ANY Int, 0, 3, ANY Int, ANY Int, ANY Int, ANY Int, ANY Int, ANY Int, ANY Int, ANY Int, ANY Int, ANY Int, ANY Int, ANY Int, ANY Int)
+     ## Chan2 ? var4 :: Int [[ IF (1==var5) THEN ((0==var7) /\ IF (1==var8) THEN IF (1==var9) THEN IF (1==var10) THEN (var4==(var12+var13)) ELSE False FI ELSE False FI ELSE False FI) ELSE False FI ]] >-> LPE[Chan1, Chan2](1, var4, 0, 1, 1, 2, var11, var12, var13, var14, var15, var16, var17, var18, var19, var20, var21)
+     ## Chan2 ? var4 :: Int [[ IF (1==var5) THEN ((0==var7) /\ IF (1==var8) THEN IF (1==var9) THEN IF (1==var14) THEN (var4==(var16+var17)) ELSE False FI ELSE False FI ELSE False FI) ELSE False FI ]] >-> LPE[Chan1, Chan2](1, var4, 0, 1, 1, var10, var11, var12, var13, 2, var15, var16, var17, var18, var19, var20, var21)
+     ## Chan2 ? var4 :: Int [[ IF (1==var5) THEN ((0==var7) /\ IF (1==var8) THEN IF (1==var9) THEN IF (1==var18) THEN (var4==(var20+var21)) ELSE False FI ELSE False FI ELSE False FI) ELSE False FI ]] >-> LPE[Chan1, Chan2](1, var4, 0, 1, 1, var10, var11, var12, var13, var14, var15, var16, var17, 2, var19, var20, var21)
+     ## Chan2 ? var4 :: Int [[ IF (1==var5) THEN ((0==var7) /\ IF (3==var8) THEN (0==var4) ELSE False FI) ELSE False FI ]] >-> LPE[Chan1, Chan2](1, var4, 0, 0, ANY Int, ANY Int, ANY Int, ANY Int, ANY Int, ANY Int, ANY Int, ANY Int, ANY Int, ANY Int, ANY Int, ANY Int, ANY Int)
+ENDDEF
+MODELDEF Model ::=
+    CHAN IN Chan1, Chan2
+    CHAN OUT
+    BEHAVIOUR LPE[Chan1, Chan2](0, ANY Int, ANY Int, ANY Int, ANY Int, ANY Int, ANY Int, ANY Int, ANY Int, ANY Int, ANY Int, ANY Int, ANY Int, ANY Int, ANY Int, ANY Int, ANY Int)
+ENDDEF

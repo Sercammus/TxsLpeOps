@@ -1,0 +1,183 @@
+sort
+	Bool1 = Bool;
+	Int1 = Int;
+	Regex = List(Int);
+	Sort1_Person = struct Cstr5_Person(func15_sex: Sort2_Sex, func7_firstName: String, func13_lastName: String, func6_dayOfBirth: Int1, func14_monthOfBirth: Int1) ? isCstr5_Person | Cstr6_ANY ? isCstr6_ANY;
+	Sort2_Sex = struct Cstr3_Female ? isCstr3_Female | Cstr4_Male ? isCstr4_Male;
+	String = List(Int);
+map
+	dropWhile: ((String # String) -> String);
+	dropWhileNot: ((String # String) -> String);
+	fromString: (String -> Bool1);
+	fromString1: (String -> Int1);
+	fromString2: (String -> String);
+	fromXml: (String -> Bool1);
+	fromXml1: (String -> Int1);
+	fromXml2: (String -> String);
+	func10_isLuckyByName: (Sort1_Person -> Bool1);
+	func11_isLuckyPerson: ((Sort1_Person # Sort2_Sex # Int1) -> Bool1);
+	func12_isValid_Person: (Sort1_Person -> Bool1);
+	func8_isLuckyByBirthday: (Sort1_Person -> Bool1);
+	func9_isLuckyByGender: ((Sort1_Person # Sort2_Sex # Int1) -> Bool1);
+	takeWhile: ((String # String) -> String);
+	takeWhileNot: ((String # String) -> String);
+	toString: (Bool1 -> String);
+	toString1: (Int1 -> String);
+	toString2: (String -> String);
+	toXml: (Bool1 -> String);
+	toXml1: (Int1 -> String);
+	toXml2: (String -> String);
+var
+	x12: String;
+	y4: String;
+eqn
+	dropWhile(x12, y4) = [];
+var
+	x13: String;
+	y5: String;
+eqn
+	dropWhileNot(x13, y5) = [];
+var
+	x14: String;
+eqn
+	fromString(x14) = false;
+var
+	x15: String;
+eqn
+	fromString1(x15) = 0;
+var
+	r2: String;
+eqn
+	fromString2(r2) = [];
+var
+	x16: String;
+eqn
+	fromXml(x16) = false;
+var
+	x17: String;
+eqn
+	fromXml1(x17) = 0;
+var
+	r3: String;
+eqn
+	fromXml2(r3) = [];
+var
+	var331: Sort1_Person;
+eqn
+	func10_isLuckyByName(var331) = ((func7_firstName(var331) . 0) == (func13_lastName(var331) . 0));
+var
+	var311: Sort1_Person;
+	var201: Sort2_Sex;
+	var281: Int1;
+eqn
+	func11_isLuckyPerson(var311, var201, var281) = !((!(func8_isLuckyByBirthday(var311)) && (!(func9_isLuckyByGender(var311, var201, var281)) && !(func10_isLuckyByName(var311)))));
+var
+	var301: Sort1_Person;
+eqn
+	func12_isValid_Person(var301) = ((((func14_monthOfBirth(var301) * -1) + (-12 * 1)) >= 0) && ((((func6_dayOfBirth(var301) * 1) + (-1 * 1)) >= 0) && ((((func14_monthOfBirth(var301) * 1) + (-1 * 1)) >= 0) && (true && (true && (((func6_dayOfBirth(var301) * -1) + (-31 * 1)) >= 0))))));
+var
+	var341: Sort1_Person;
+eqn
+	func8_isLuckyByBirthday(var341) = (func6_dayOfBirth(var341) == func14_monthOfBirth(var341));
+var
+	var321: Sort1_Person;
+	var211: Sort2_Sex;
+	var291: Int1;
+eqn
+	func9_isLuckyByGender(var321, var211, var291) = ((((var291 * 1) + (-5 * 1)) >= 0) && !((var211 == func15_sex(var321))));
+var
+	x18: String;
+	y6: String;
+eqn
+	takeWhile(x18, y6) = [];
+var
+	x19: String;
+	y7: String;
+eqn
+	takeWhileNot(x19, y7) = [];
+var
+	x20: Bool1;
+eqn
+	toString(x20) = [];
+var
+	x21: Int1;
+eqn
+	toString1(x21) = [];
+var
+	s2: String;
+eqn
+	toString2(s2) = [];
+var
+	x22: Bool1;
+eqn
+	toXml(x22) = [];
+var
+	x23: Int1;
+eqn
+	toXml1(x23) = [];
+var
+	s3: String;
+eqn
+	toXml2(s3) = [];
+act
+	Chan16: Sort1_Person;
+	Chan17: Bool1;
+glob
+	gInt: Int1;
+	gInt1: Int1;
+	gInt2: Int1;
+	gSort1_Person: Sort1_Person;
+	gSort1_Person1: Sort1_Person;
+	gSort2_Sex: Sort2_Sex;
+	gSort2_Sex1: Sort2_Sex;
+proc
+	LPE(LPE_Chan16_Chan17_var22: Sort2_Sex, LPE_Chan16_Chan17_var23: Int1, LPE_Chan16_Chan17_var24: Sort1_Person, LPE_Chan16_Chan17_var25: Sort2_Sex, LPE_Chan16_Chan17_var26: Int1, LPE_Chan16_Chan17_var27: Sort1_Person, LPE_Chan16_Chan17_var35: Int1, pc_proxyProcess: Int1)
+	= (
+		(sum Chan16_1: Sort1_Person .
+			((if((0 == pc_proxyProcess), func12_isValid_Person(Chan16_1), false))
+				-> (
+					Chan16(Chan16_1)
+					. LPE(Cstr4_Male, 0, Chan16_1, Cstr4_Male, 0, Cstr6_ANY, 1, 1)
+				)
+				<> delta
+			)
+		)
+		+ (sum Chan16_11: Sort1_Person .
+			((if((1 == pc_proxyProcess), if((0 == LPE_Chan16_Chan17_var35), func12_isValid_Person(Chan16_11), false), false))
+				-> (
+					Chan16(Chan16_11)
+					. LPE(Cstr4_Male, 0, Chan16_11, LPE_Chan16_Chan17_var25, LPE_Chan16_Chan17_var26, LPE_Chan16_Chan17_var27, 1, 1)
+				)
+				<> delta
+			)
+		)
+		+ (sum Chan16_12: Sort1_Person .
+			((if((1 == pc_proxyProcess), if((2 == LPE_Chan16_Chan17_var35), if((LPE_Chan16_Chan17_var25 == func15_sex(LPE_Chan16_Chan17_var27)), false, func12_isValid_Person(Chan16_12)), false), false))
+				-> (
+					Chan16(Chan16_12)
+					. LPE(func15_sex(LPE_Chan16_Chan17_var27), 1, Chan16_12, LPE_Chan16_Chan17_var25, LPE_Chan16_Chan17_var26, LPE_Chan16_Chan17_var27, 1, 1)
+				)
+				<> delta
+			)
+		)
+		+ (sum Chan16_13: Sort1_Person .
+			((if((1 == pc_proxyProcess), if((2 == LPE_Chan16_Chan17_var35), if((LPE_Chan16_Chan17_var25 == func15_sex(LPE_Chan16_Chan17_var27)), func12_isValid_Person(Chan16_13), false), false), false))
+				-> (
+					Chan16(Chan16_13)
+					. LPE(func15_sex(LPE_Chan16_Chan17_var27), ((LPE_Chan16_Chan17_var26 * 1) + (1 * 1)), Chan16_13, LPE_Chan16_Chan17_var25, LPE_Chan16_Chan17_var26, LPE_Chan16_Chan17_var27, 1, 1)
+				)
+				<> delta
+			)
+		)
+		+ (sum Chan17_1: Bool1 .
+			((if((1 == pc_proxyProcess), if((1 == LPE_Chan16_Chan17_var35), (Chan17_1 == func11_isLuckyPerson(LPE_Chan16_Chan17_var24, LPE_Chan16_Chan17_var22, LPE_Chan16_Chan17_var23)), false), false))
+				-> (
+					Chan17(Chan17_1)
+					. LPE(LPE_Chan16_Chan17_var22, LPE_Chan16_Chan17_var23, LPE_Chan16_Chan17_var24, LPE_Chan16_Chan17_var22, LPE_Chan16_Chan17_var23, LPE_Chan16_Chan17_var24, 2, 1)
+				)
+				<> delta
+			)
+		)
+	);
+init
+	LPE(gSort2_Sex, gInt, gSort1_Person, gSort2_Sex1, gInt1, gSort1_Person1, gInt2, 0);

@@ -185,7 +185,6 @@ compileParsedDefs parsedDefs = do
     -- Generate a map from constructor declarations to 'CstrId''s.
     -- Also create and gather the required accessor functions;
     -- this should be fine, since they only depend on sorts.
-    
     (cstrIds, accFuncIdsL) <- compileToCstrId sIds (parsedDefs ^. adts)
 
     -- Generate a map from locations of function declarations to 'FuncId''s.
