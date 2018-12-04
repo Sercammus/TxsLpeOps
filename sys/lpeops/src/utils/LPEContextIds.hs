@@ -25,7 +25,7 @@ getValExprIds
 --import qualified Data.List as List
 import qualified Data.Map as Map
 import qualified Data.Set as Set
---import qualified Data.Text as Text
+import qualified Data.Text as Text
 import qualified TxsDefs
 import qualified StdTDefs (stdTDefs)
 import qualified CstrId
@@ -34,6 +34,7 @@ import qualified SortOf
 import qualified ChanId
 import qualified FuncDef
 import qualified VarId
+import qualified Id
 import           Constant hiding (sort)
 import           ValExpr hiding (subst)
 import           LPETypeDefs
@@ -123,7 +124,7 @@ getValExprIds = customData . visitValExpr searchVisitor
                     (view -> Vfunc fid _)             -> Set.insert (TxsDefs.IdFunc fid) idsInSubExps
                     (view -> Vcstr cid _)             -> Set.union (getCstrIds cid) idsInSubExps
                     (view -> Viscstr cid _)           -> Set.union (getCstrIds cid) idsInSubExps
-                    (view -> Vaccess cid _ _)         -> Set.union (getCstrIds cid) idsInSubExps
+                    (view -> Vaccess cid n p _)       -> Set.unions [getCstrIds cid, Set.singleton (createAccessorId cid n p), idsInSubExps]
                     (view -> Vite {})                 -> idsInSubExps
                     (view -> Vdivide _ _)             -> idsInSubExps
                     (view -> Vmodulo _ _)             -> idsInSubExps
@@ -145,11 +146,11 @@ getValExprIds = customData . visitValExpr searchVisitor
 
 getCstrIds :: CstrId.CstrId -> Set.Set TxsDefs.Ident
 getCstrIds cid =
-    Set.fromList (TxsDefs.IdCstr cid : TxsDefs.IdSort (CstrId.cstrsort cid) : concatMap getAccIds (CstrId.cstrargs cid)) -- TODO add recognizer function?
-  where
-    getAccIds :: FuncId.FuncId -> [TxsDefs.Ident]
-    getAccIds fid = [TxsDefs.IdFunc fid, TxsDefs.IdSort (FuncId.funcsort fid)]
+    Set.fromList (TxsDefs.IdCstr cid : TxsDefs.IdSort (CstrId.cstrsort cid) : map TxsDefs.IdSort (CstrId.cstrargs cid))
 -- getCstrIds
+
+createAccessorId :: CstrId.CstrId -> Text.Text -> Int -> TxsDefs.Ident
+createAccessorId cid n p = TxsDefs.IdFunc (FuncId.FuncId n (Id.Id 0) [CstrId.cstrsort cid] (CstrId.cstrargs cid !! p))
 
 getChansIds :: [ChanId.ChanId] -> Set.Set TxsDefs.Ident
 getChansIds = Set.unions . map getChanIds

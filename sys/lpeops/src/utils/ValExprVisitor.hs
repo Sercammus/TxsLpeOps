@@ -80,7 +80,7 @@ visitValExprM f expr = do
       (view -> Viscstr _cid vexp) ->
           do newVExp <- visitValExprM1 vexp
              f [newVExp] expr
-      (view -> Vaccess _cid _p vexp) ->
+      (view -> Vaccess _cid _n _p vexp) ->
           do newVExp <- visitValExprM1 vexp
              f [newVExp] expr
       (view -> Vite cond vexp1 vexp2) ->
@@ -160,7 +160,7 @@ defaultValExprVisitorM defaultDat subExps expr = do
                   (view -> Vfunc fid _)                   -> cstrFunc emptyFis fid (map expression subExps)
                   (view -> Vcstr cid _)                   -> cstrCstr cid (map expression subExps)
                   (view -> Viscstr cid _)                 -> cstrIsCstr cid (expression (head subExps))
-                  (view -> Vaccess cid p _)               -> cstrAccess cid p (expression (head subExps))
+                  (view -> Vaccess cid n p _)             -> cstrAccess cid n p (expression (head subExps))
                   (view -> Vite{})                        -> cstrITE (expression (head subExps)) (expression (subExps !! 1)) (expression (subExps !! 2))
                   (view -> Vdivide _ _)                   -> cstrDivide (expression (head subExps)) (expression (subExps !! 1))
                   (view -> Vmodulo _ _)                   -> cstrModulo (expression (head subExps)) (expression (subExps !! 1))

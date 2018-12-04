@@ -206,18 +206,18 @@ getValExprProblems location scope = customData . visitValExpr getProblemsVisitor
                         (view -> Vconst (Cstring _))      -> []
                         (view -> Vconst (Cregex _))       -> []
                         (view -> Vconst (Ccstr cid args)) ->
-                            getSortsProblems ("constant \"" ++ Text.unpack (CstrId.name cid) ++ "\" constructor in " ++ location) (map FuncId.funcsort (CstrId.cstrargs cid)) (map SortOf.sortOf args)
+                            getSortsProblems ("constant \"" ++ Text.unpack (CstrId.name cid) ++ "\" constructor in " ++ location) (CstrId.cstrargs cid) (map SortOf.sortOf args)
                         (view -> Vconst (Cany _))         -> []
                         (view -> Vvar vid)                ->
                             ["Variable \"" ++ Text.unpack (VarId.name vid) ++ "\" is not in scope for " ++ location ++ "!" | Set.notMember vid scope]
                         (view -> Vfunc fid args)          ->
                             getSortsProblems ("function \"" ++ Text.unpack (FuncId.name fid) ++ "\" call in " ++ location) (FuncId.funcargs fid) (map SortOf.sortOf args)
                         (view -> Vcstr cid args)          ->
-                            getSortsProblems ("\"" ++ Text.unpack (CstrId.name cid) ++ "\" constructor in " ++ location) (map FuncId.funcsort (CstrId.cstrargs cid)) (map SortOf.sortOf args)
+                            getSortsProblems ("\"" ++ Text.unpack (CstrId.name cid) ++ "\" constructor in " ++ location) (CstrId.cstrargs cid) (map SortOf.sortOf args)
                         (view -> Viscstr cid arg)         ->
                             getSortProblems ("recognizer \"is" ++ Text.unpack (CstrId.name cid) ++ "\" call in " ++ location) (CstrId.cstrsort cid) (SortOf.sortOf arg)
-                        (view -> Vaccess cid p arg)       ->
-                            getSortsProblems ("accessor \"" ++ Text.unpack (FuncId.name (CstrId.cstrargs cid !! p)) ++ "\" call in " ++ location) (FuncId.funcargs (CstrId.cstrargs cid !! p)) [SortOf.sortOf arg]
+                        (view -> Vaccess cid n _ arg)     ->
+                            getSortProblems ("accessor \"" ++ Text.unpack n ++ "\" call in " ++ location) (CstrId.cstrsort cid) (SortOf.sortOf arg)
                         (view -> Vite{})                  -> [] -- TODO
                         (view -> Vdivide _ _)             -> [] -- TODO
                         (view -> Vmodulo _ _)             -> [] -- TODO

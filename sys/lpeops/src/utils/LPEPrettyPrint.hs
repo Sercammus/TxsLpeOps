@@ -231,7 +231,7 @@ showValExprInContext f = customData . visitValExpr showVisitor
                     (view -> Vfunc fid _)             -> showFuncId f fid ++ "(" ++ List.intercalate ", " pars ++ ")"
                     (view -> Vcstr cid _)             -> mapGet f (TxsDefs.IdCstr cid) ++ "(" ++ List.intercalate ", " pars ++ ")"
                     (view -> Viscstr cid _)           -> "is" ++ mapGet f (TxsDefs.IdCstr cid) ++ "(" ++ head pars ++ ")"
-                    (view -> Vaccess cid p _)         -> showFuncId f (CstrId.cstrargs cid !! p) ++ "(" ++ head pars ++ ")"
+                    (view -> Vaccess cid n _ _)       -> showAccId cid n ++ "(" ++ head pars ++ ")"
                     (view -> Vite{})                  -> "IF " ++ head pars ++ " THEN " ++ pars !! 1 ++ " ELSE " ++ pars !! 2 ++ " FI"
                     (view -> Vdivide _ _)             -> "(" ++ head pars ++ "/" ++ pars !! 1 ++ ")"
                     (view -> Vmodulo _ _)             -> "(" ++ head pars ++ "%" ++ pars !! 1 ++ ")"
@@ -249,6 +249,13 @@ showValExprInContext f = customData . visitValExpr showVisitor
                     _                                 -> error ("ShowValExprInContext.showVisitor not defined for " ++ show expr ++ "!")
         in ValExprVisitorOutput expr 1 str
     -- showVisitor
+    
+    showAccId :: CstrId.CstrId -> Text.Text -> String
+    showAccId cid n =
+        case [ s | (TxsDefs.IdFunc fid, s) <- Map.toList f, FuncId.funcargs fid == [CstrId.cstrsort cid], FuncId.name fid == n ] of
+          x:_ -> x
+          [] -> error ("ShowValExprInContext.showVisitor has not been given a name for accessor \"" ++ Text.unpack n ++ "\"!")
+    -- showAccId
     
     showMultElem :: String -> ValExprVisitorOutput String -> String
     showMultElem op subExp =

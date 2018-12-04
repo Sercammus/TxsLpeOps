@@ -28,7 +28,6 @@ import qualified ValExpr
 import qualified SortId
 import qualified Constant
 import qualified CstrId
-import qualified FuncId
 
 sort2defaultConst :: TxsDefs.TxsDefs -> SortId.SortId -> Constant.Constant
 sort2defaultConst tdefs sortId
@@ -43,7 +42,7 @@ sort2defaultConst tdefs sortId
     | otherwise =
         -- Use any non-recursive constructor of this sort to express a value of this sort:
         case [ cstrId | cstrId <- Map.keys (TxsDefs.cstrDefs tdefs), CstrId.cstrsort cstrId == sortId, not(isRecursiveCstr tdefs cstrId) ] of
-          (cstrId:_) -> Constant.Ccstr cstrId (map (sort2defaultConst tdefs . FuncId.funcsort) (CstrId.cstrargs cstrId))
+          (cstrId:_) -> Constant.Ccstr cstrId (map (sort2defaultConst tdefs) (CstrId.cstrargs cstrId))
           [] -> error ("Failed to generate a default value for " ++ show sortId ++ " (available={" ++ List.intercalate ", " (map show (Map.keys (TxsDefs.cstrDefs tdefs))) ++ "})!")
 -- sort2defaultConst
 
@@ -51,7 +50,7 @@ sort2defaultValue :: TxsDefs.TxsDefs -> SortId.SortId -> TxsDefs.VExpr
 sort2defaultValue tdefs sortId = ValExpr.cstrConst (sort2defaultConst tdefs sortId)
 
 isRecursiveCstr :: TxsDefs.TxsDefs -> CstrId.CstrId -> Bool
-isRecursiveCstr tdefs cstrId = List.any (isRecursiveSort tdefs Set.empty . FuncId.funcsort) (CstrId.cstrargs cstrId)
+isRecursiveCstr tdefs cstrId = List.any (isRecursiveSort tdefs Set.empty) (CstrId.cstrargs cstrId)
 
 isRecursiveSort :: TxsDefs.TxsDefs -> Set.Set SortId.SortId -> SortId.SortId -> Bool
 isRecursiveSort tdefs beenHere sortId
@@ -62,7 +61,7 @@ isRecursiveSort tdefs beenHere sortId
     | otherwise =
         let sortCstrs = [ cstrId | cstrId <- Map.keys (TxsDefs.cstrDefs tdefs), CstrId.cstrsort cstrId == sortId ] in
         let sortCstrParamSorts = concatMap CstrId.cstrargs sortCstrs in
-          Set.member sortId beenHere || List.any (isRecursiveSort tdefs (Set.insert sortId beenHere)) (map FuncId.funcsort sortCstrParamSorts)
+          Set.member sortId beenHere || List.any (isRecursiveSort tdefs (Set.insert sortId beenHere)) sortCstrParamSorts
 -- isRecursiveSort
 
 
