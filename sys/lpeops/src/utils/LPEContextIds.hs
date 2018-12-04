@@ -29,6 +29,7 @@ import qualified Data.Text as Text
 import qualified TxsDefs
 import qualified StdTDefs (stdTDefs)
 import qualified CstrId
+import qualified CstrDef
 import qualified FuncId
 import qualified SortOf
 import qualified ChanId
@@ -67,8 +68,10 @@ getModelIds (tdefs, process) =
     
     getRecursiveIds :: TxsDefs.Ident -> Set.Set TxsDefs.Ident
     getRecursiveIds (TxsDefs.IdCstr cid) =
-        let otherCids = Set.filter ((== CstrId.cstrsort cid) . CstrId.cstrsort) (Map.keysSet (TxsDefs.cstrDefs tdefs)) in
-          setUnions (Set.map getCstrIds otherCids)
+        let allCidCstrs = Map.filterWithKey (\k _ -> CstrId.cstrsort k == CstrId.cstrsort cid) (TxsDefs.cstrDefs tdefs) in
+        let allCstrIds = Set.unions (map getCstrIds (Map.keys allCidCstrs)) in
+        let allAccessorIds = Set.unions (Map.elems (Map.mapWithKey getAccessorIdsFromCstrDef allCidCstrs)) in
+          Set.union allCstrIds allAccessorIds
     getRecursiveIds (TxsDefs.IdFunc fid) =
         case TxsDefs.funcDefs tdefs Map.!? fid of
           Just (FuncDef.FuncDef params body) -> Set.union (getVarsIds params) (getValExprIds body)
@@ -124,7 +127,7 @@ getValExprIds = customData . visitValExpr searchVisitor
                     (view -> Vfunc fid _)             -> Set.insert (TxsDefs.IdFunc fid) idsInSubExps
                     (view -> Vcstr cid _)             -> Set.union (getCstrIds cid) idsInSubExps
                     (view -> Viscstr cid _)           -> Set.union (getCstrIds cid) idsInSubExps
-                    (view -> Vaccess cid n p _)       -> Set.unions [getCstrIds cid, Set.singleton (createAccessorId cid n p), idsInSubExps]
+                    (view -> Vaccess cid n p _)       -> Set.unions [getCstrIds cid, getAccessorIds cid n p, idsInSubExps]
                     (view -> Vite {})                 -> idsInSubExps
                     (view -> Vdivide _ _)             -> idsInSubExps
                     (view -> Vmodulo _ _)             -> idsInSubExps
@@ -149,8 +152,16 @@ getCstrIds cid =
     Set.fromList (TxsDefs.IdCstr cid : TxsDefs.IdSort (CstrId.cstrsort cid) : map TxsDefs.IdSort (CstrId.cstrargs cid))
 -- getCstrIds
 
-createAccessorId :: CstrId.CstrId -> Text.Text -> Int -> TxsDefs.Ident
-createAccessorId cid n p = TxsDefs.IdFunc (FuncId.FuncId n (Id.Id 0) [CstrId.cstrsort cid] (CstrId.cstrargs cid !! p))
+getAccessorIdsFromCstrDef :: CstrId.CstrId -> CstrDef.CstrDef -> Set.Set TxsDefs.Ident
+getAccessorIdsFromCstrDef cid (CstrDef.CstrDef _recognizer accessors) =
+    Set.unions (map (\(acc, p) -> getAccessorIds cid (FuncId.name acc) p) (zip accessors [0..]))
+-- getAccessorIdsFromCstrDef
+
+getAccessorIds :: CstrId.CstrId -> Text.Text -> Int -> Set.Set TxsDefs.Ident
+getAccessorIds cid n p =
+    let accSort = CstrId.cstrargs cid !! p in
+      Set.fromList [TxsDefs.IdFunc (FuncId.FuncId n (Id.Id 0) [CstrId.cstrsort cid] accSort), TxsDefs.IdSort accSort]
+-- createAccessorIds
 
 getChansIds :: [ChanId.ChanId] -> Set.Set TxsDefs.Ident
 getChansIds = Set.unions . map getChanIds

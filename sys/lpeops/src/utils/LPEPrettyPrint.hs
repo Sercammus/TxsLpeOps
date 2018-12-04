@@ -119,11 +119,11 @@ showTypeDefs f cstrdefs =
     showCstrDef (cid, CstrDef.CstrDef _ accs) =
         case accs of
           [] -> mapGet f (TxsDefs.IdCstr cid)
-          _ -> mapGet f (TxsDefs.IdCstr cid) ++ " { " ++ List.intercalate "; " (map showAccessor accs) ++ " }"
-    -- showCstrDef
+          _ -> mapGet f (TxsDefs.IdCstr cid) ++ " { " ++ List.intercalate "; " (map (showAccessor cid) accs) ++ " }"
+    --showCstrDef
     
-    showAccessor :: FuncId.FuncId -> String
-    showAccessor fid = showFuncId f fid ++ " :: " ++ showSortId f (FuncId.funcsort fid)
+    showAccessor :: CstrId.CstrId -> FuncId.FuncId -> String
+    showAccessor cid acc = showAccessorId f cid (FuncId.name acc) ++ " :: " ++ showSortId f (FuncId.funcsort acc)
 -- showTypeDefs
 
 showFuncDefs :: LPEContext -> Map.Map FuncId.FuncId (FuncDef.FuncDef VarId.VarId) -> String
@@ -231,7 +231,7 @@ showValExprInContext f = customData . visitValExpr showVisitor
                     (view -> Vfunc fid _)             -> showFuncId f fid ++ "(" ++ List.intercalate ", " pars ++ ")"
                     (view -> Vcstr cid _)             -> mapGet f (TxsDefs.IdCstr cid) ++ "(" ++ List.intercalate ", " pars ++ ")"
                     (view -> Viscstr cid _)           -> "is" ++ mapGet f (TxsDefs.IdCstr cid) ++ "(" ++ head pars ++ ")"
-                    (view -> Vaccess cid n _ _)       -> showAccId cid n ++ "(" ++ head pars ++ ")"
+                    (view -> Vaccess cid n _ _)       -> showAccessorId f cid n ++ "(" ++ head pars ++ ")"
                     (view -> Vite{})                  -> "IF " ++ head pars ++ " THEN " ++ pars !! 1 ++ " ELSE " ++ pars !! 2 ++ " FI"
                     (view -> Vdivide _ _)             -> "(" ++ head pars ++ "/" ++ pars !! 1 ++ ")"
                     (view -> Vmodulo _ _)             -> "(" ++ head pars ++ "%" ++ pars !! 1 ++ ")"
@@ -250,13 +250,6 @@ showValExprInContext f = customData . visitValExpr showVisitor
         in ValExprVisitorOutput expr 1 str
     -- showVisitor
     
-    showAccId :: CstrId.CstrId -> Text.Text -> String
-    showAccId cid n =
-        case [ s | (TxsDefs.IdFunc fid, s) <- Map.toList f, FuncId.funcargs fid == [CstrId.cstrsort cid], FuncId.name fid == n ] of
-          x:_ -> x
-          [] -> error ("ShowValExprInContext.showVisitor has not been given a name for accessor \"" ++ Text.unpack n ++ "\"!")
-    -- showAccId
-    
     showMultElem :: String -> ValExprVisitorOutput String -> String
     showMultElem op subExp =
         let mult = multiplicity subExp in
@@ -271,6 +264,13 @@ showChanId f = mapGet f . TxsDefs.IdChan
 
 showFuncId :: LPEContext -> FuncId.FuncId -> String
 showFuncId f fid = Maybe.fromMaybe (Text.unpack (FuncId.name fid)) (f Map.!? TxsDefs.IdFunc fid)
+
+showAccessorId :: LPEContext -> CstrId.CstrId -> Text.Text -> String
+showAccessorId f cid n =
+    case [ s | (TxsDefs.IdFunc fid, s) <- Map.toList f, FuncId.funcargs fid == [CstrId.cstrsort cid], FuncId.name fid == n ] of
+      x:_ -> x
+      [] -> error ("ShowValExprInContext.showVisitor has not been given a name for accessor \"" ++ Text.unpack n ++ "\"!")
+-- showAccId
 
 showSortId :: LPEContext -> SortId.SortId -> String
 showSortId f sid = Maybe.fromMaybe (Text.unpack (SortId.name sid)) (f Map.!? TxsDefs.IdSort sid)
