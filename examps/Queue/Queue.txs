@@ -8,6 +8,7 @@ See LICENSE at root directory of this repository.
 -- ----------------------------------------------------------------------------------------- --
 -- Model of a Queue of Integers, with input "In x", and "Out y".
 
+
 TYPEDEF  IntList  ::=   Nil
                       | Cons  { hd ::  Int
                               ; tl ::  IntList
@@ -25,17 +26,8 @@ ENDDEF
 FUNCDEF overflow (x :: Int) :: Bool ::=
     True -- (x < -2147483648) \/ ( x > +2147483647)
 ENDDEF
-
 -- ----------------------------------------------------------------------------------------- --
 
-CHANDEF  Chans   ::=    In   :: QueueOp
-                      ; Out  :: Int
-                      ; Ch1 :: Int
-                      ; Ch2 :: Int
-                      ; Ch3 :: Int
-ENDDEF
-
--- ----------------------------------------------------------------------------------------- --
 
 TYPEDEF  QueueOp
     ::=
@@ -59,6 +51,14 @@ PROCDEF  queue  [ In :: QueueOp; Out :: Int ]  ( buf :: IntList )
                   ##
                      [[ isNil(buf) ]]       =>>  queue [In,Out] (Nil)
                  )
+ENDDEF
+
+
+-- ----------------------------------------------------------------------------------------- --
+
+
+CHANDEF  Chans   ::=    In   :: QueueOp
+                      ; Out  :: Int
 ENDDEF
 
 

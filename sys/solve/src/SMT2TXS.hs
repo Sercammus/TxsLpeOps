@@ -36,7 +36,6 @@ import           CstrDef
 import           CstrId
 import           SMTHappy
 import           SortId
-import           FuncId
 
 
 -- ---------------------------------------------------------
@@ -90,7 +89,7 @@ smtValueToValExpr (SMTConstructor cname argValues) cstrMap srt =
                 let cstrid = lookupConstructor cstrMap srt (T.drop (1 + T.length nameSort) cname) in
                     if length (cstrargs cstrid) == length argValues
                         then  -- recursively translate the arguments:
-                            let mexprArgs = map (\(argValue, sort') -> smtValueToValExpr argValue cstrMap (funcsort sort'))
+                            let mexprArgs = map (\(argValue, sort') -> smtValueToValExpr argValue cstrMap sort')
                                                 (zip argValues (cstrargs cstrid))
                                 (es, vexprArgs) = partitionEithers mexprArgs 
                               in

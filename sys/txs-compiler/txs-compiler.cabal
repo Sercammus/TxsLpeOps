@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: e7a7ff5046aec1ef673695fb388fe462dba89187f5484559e4f5111c9145601d
+-- hash: dd318f18fd103272d6c7ffa154a60d38f25ca1dd8908a8d1d8e7925a630be185
 
 name:           txs-compiler
 version:        0.1.0.0
@@ -41,6 +41,7 @@ extra-source-files:
     test/data/examps/ReadWriteTestPurposes.txs
     test/data/examps/RestrictedAxisPurpose.txs
     test/data/examps/SingleAxisPurpose.txs
+    test/data/examps/stdi_example.txs
     test/data/examps/StimulusResponse.txs
     test/data/examps/StimulusResponseLoop.txs
     test/data/parser/success/Adder.txs

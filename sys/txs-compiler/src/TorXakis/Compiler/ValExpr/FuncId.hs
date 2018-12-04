@@ -160,6 +160,7 @@ cstrToFuncIds :: (MapsTo Text SortId mm)
 cstrToFuncIds mm sId c =
     concat <$> sequence [ mkCstrFdiFid
                         , isCstrFdiFid
+                        , cstrAccessFdiFid
                         ]
     where
       cn = cstrName c
@@ -175,6 +176,13 @@ cstrToFuncIds mm sId c =
           -- Create a function id for the constructor function.
           -- NOTE: sharing the ID should be fine.
           return [(PredefLoc isN isCstrId, FuncId isN (Id isCstrId) [sId] sortIdBool)]
+      cstrAccessFdiFid = traverse accessFdiFid (cstrFields c)
+          where
+            accessFdiFid f = do
+                let accN = fieldName f
+                accSid <- getNextId
+                fSid   <- findSortIdM mm (fieldSort f)
+                return (PredefLoc accN accSid, FuncId accN (Id accSid) [sId] fSid)
 
 -- | Return the function id as a signature.
 funcIdAsSignature :: FuncId -> Signature

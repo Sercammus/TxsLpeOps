@@ -22,36 +22,43 @@ where
 
 import           Data.Map                         (Map)
 import qualified Data.Map                         as Map
+import           Data.Text                        (Text)
 
 import           CstrDef                          (CstrDef (CstrDef))
-import           CstrId                           (CstrId (CstrId))
+import           CstrId                           (CstrId)
+import           SortId                           (SortId)
 
 import           TorXakis.Compiler.Data           (CompilerM)
 import           TorXakis.Compiler.MapsTo         (MapsTo, lookupM)
-import           TorXakis.Compiler.ValExpr.FuncId (cstrToIsCstrFuncId)
+import           TorXakis.Compiler.ValExpr.FuncId (cstrToAccFuncId,
+                                                   cstrToIsCstrFuncId)
 import           TorXakis.Parser.Data             (ADTDecl, CstrDecl, CstrE,
                                                    Loc, constructors,
-                                                   getLoc)
+                                                   cstrFields, getLoc)
 
 -- | Compile a list of ADT declarations into a map from constructor id's to
 -- their definitions.
-compileToCstrDefs :: ( MapsTo (Loc CstrE) CstrId mm )
+compileToCstrDefs :: ( MapsTo Text        SortId mm
+                     , MapsTo (Loc CstrE) CstrId mm )
                   => mm -> [ADTDecl] -> CompilerM (Map CstrId CstrDef)
 compileToCstrDefs mm ds =
     Map.fromList . concat <$> traverse (adtToCstrDefs mm) ds
 
 -- | Compile an ADT declaration into a list constructor id's and
 -- constructor definition pairs.
-adtToCstrDefs :: ( MapsTo (Loc CstrE) CstrId mm )
+adtToCstrDefs :: ( MapsTo Text        SortId mm
+                 , MapsTo (Loc CstrE) CstrId mm )
                => mm -> ADTDecl -> CompilerM [(CstrId, CstrDef)]
 adtToCstrDefs mm a =
     traverse (cstrToCstrDefs mm) (constructors a)
 
 -- | Compile a constructor declaration into a list constructor id's and
 -- constructor definition pairs.
-cstrToCstrDefs :: ( MapsTo (Loc CstrE) CstrId mm )
+cstrToCstrDefs :: ( MapsTo Text        SortId mm
+                  , MapsTo (Loc CstrE) CstrId mm )
                => mm -> CstrDecl -> CompilerM (CstrId, CstrDef)
 cstrToCstrDefs mm c = do
-    cId@(CstrId _ _ accessFids _) <- lookupM (getLoc c) mm
+    cId <- lookupM (getLoc c) mm
     isCstrFid <- cstrToIsCstrFuncId cId
-    return (cId, CstrDef isCstrFid accessFids)
+    cstrAccFids <- traverse (cstrToAccFuncId mm cId) (cstrFields c)
+    return (cId, CstrDef isCstrFid cstrAccFids)

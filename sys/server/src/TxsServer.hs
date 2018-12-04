@@ -195,7 +195,7 @@ cmdsIntpr = do
        "LPE"       | not $ IOS.isInited   modus ->  cmdNoop      cmd
        "LPEOP"     |       IOS.isInited   modus ->  cmdLPEOp     args
        "LPEOP"     | not $ IOS.isInited   modus ->  cmdNoop      cmd
-       _           ->  cmdUnknown   cmd
+       _                                        ->  cmdUnknown   cmd
 
 -- ----------------------------------------------------------------------------------------- --
 -- torxakis server individual command processing

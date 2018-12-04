@@ -62,10 +62,10 @@ testRecursiveFunction s = TestLabel "recursive function" $ TestCase $ do
     let nilId = CstrId "Nil" 2345 [] sortId_ListInt
     let isNil = FuncId "isNil" 9875 [sortId_ListInt] sortIdBool
 
+    let constrId = CstrId "Constr" 2346 [sortIdInt, sortId_ListInt] sortId_ListInt
+    let isConstr = FuncId "isConstr" 9876 [sortId_ListInt] sortIdBool
     let tl = FuncId "tail" 6565 [sortId_ListInt] sortId_ListInt
     let hd = FuncId "head" 6566 [sortId_ListInt] sortIdInt
-    let constrId = CstrId "Constr" 2346 [hd, tl] sortId_ListInt
-    let isConstr = FuncId "isConstr" 9876 [sortId_ListInt] sortIdBool
 
     -- ----------------------------------
     -- function

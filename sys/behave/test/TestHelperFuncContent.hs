@@ -94,7 +94,7 @@ identicalFuncId (FuncId name1 _ funcargs1 funcsort1) (FuncId name2 _ funcargs2 f
 
 identicalCstrId :: CstrId -> CstrId -> Bool
 identicalCstrId (CstrId name1 _ cstrargs1 cstrsort1) (CstrId name2 _ cstrargs2 cstrsort2) =       name1 == name2
-                                                                                               && identicalLists identicalFuncId cstrargs1 cstrargs2
+                                                                                               && identicalLists identicalSortId cstrargs1 cstrargs2
                                                                                                && identicalSortId cstrsort1 cstrsort2
 
 identicalVarId :: VarId -> VarId -> Bool
@@ -202,9 +202,6 @@ parseTorXakis txt = -- Trace.trace ("txt = " ++ txt)
 fromTypedElementsToSortIds :: TypedElements -> [SortId]
 fromTypedElementsToSortIds = concatMap (\(is,t) -> map (\_ -> expectSortId t) is)
 
-fromTypedElementsToFuncIds :: String -> TypedElements -> [FuncId]
-fromTypedElementsToFuncIds sid = concatMap (\(is,t) -> map (\i -> expectFuncId i [([], sid)] t) is)
-
 fromMaybeTypeToMaybeSortIds :: Maybe [String] -> ExitSort
 fromMaybeTypeToMaybeSortIds Nothing       = NoExit
 fromMaybeTypeToMaybeSortIds (Just params) = Exit (map expectSortId params)
@@ -233,7 +230,7 @@ createCstrId cstrName fields _sortDefName = cstrName ++ " { "
                                             ++ " }"
 
 expectCstrId :: String -> TypedElements -> String -> CstrId
-expectCstrId cstrName types sortDefName = CstrId (T.pack cstrName) dontCareUnid (fromTypedElementsToFuncIds sortDefName types) (expectSortId sortDefName)
+expectCstrId cstrName types sortDefName = CstrId (T.pack cstrName) dontCareUnid (fromTypedElementsToSortIds types) (expectSortId sortDefName)
 
 createSortDef :: String -> Constructors -> String
 createSortDef sortDefName constrs = "TYPEDEF " ++ sortDefName ++ " ::=\n\t  " ++

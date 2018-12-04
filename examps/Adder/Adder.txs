@@ -71,18 +71,17 @@ ENDDEF
 
 -- ----------------------------------------------------------------------------------------- --
 
-PROCDEF  adder3init  [ Action1, Action2, Action3 :: Operation;  Result1, Result2, Result3 :: Int ] ( ) ::=
-        adder [ Action1, Result1 ] ( )
-   |||
-        adder [ Action2, Result2 ] ( )
-   |||
-        adder [ Action3, Result3 ] ( )
-ENDDEF
 
 MODELDEF  Adder3 ::=
         CHAN IN    Action1, Action2, Action3
         CHAN OUT   Result1, Result2, Result3
-        BEHAVIOUR       adder3init[Action1, Action2, Action3, Result1, Result2, Result3]()
+
+        BEHAVIOUR       adder [ Action1, Result1 ] ( )
+                   |||
+                        adder [ Action2, Result2 ] ( )
+                   |||
+                        adder [ Action3, Result3 ] ( )
+
 ENDDEF
 
 CNECTDEF  Sut3 ::=

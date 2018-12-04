@@ -40,7 +40,6 @@ import           SMTData
 import           SolveDefs
 import           SortId
 import           SortOf
-import           FuncId
 import           ValExpr
 import           Variable
 
@@ -315,7 +314,7 @@ addIsConstructor v cid = addAssertions [cstrIsCstr cid (cstrVar v)]
 
 addFields :: (Variable v) => v -> Int -> CstrId -> SMT [v]
 addFields v i cid@CstrId{ cstrargs = args' } = do
-    let fieldVars = map (\(iNew,sNew) -> cstrVariable ("$$$t$" ++ show iNew) (10000000+iNew) sNew) (zip [i .. ] (map funcsort args'))
+    let fieldVars = map (\(iNew,sNew) -> cstrVariable ("$$$t$" ++ show iNew) (10000000+iNew) sNew) (zip [i .. ] args')
     addDeclarations fieldVars
     edefs <- gets envDefs
     let mcdef = Map.lookup cid (cstrDefs edefs)

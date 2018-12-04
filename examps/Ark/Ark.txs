@@ -32,8 +32,7 @@ FUNCDEF isValid_short ( x :: Int ) :: Bool ::= (-32768 <= x) /\ (x <= 32767 ) EN
 FUNCDEF isValid_unsignedShort ( x :: Int ) :: Bool ::= (0 <= x) /\ (x <= 65535) ENDDEF
 FUNCDEF isValid_byte ( x :: Int ) :: Bool ::= (-128 <= x) /\ (x <= 127 ) ENDDEF
 FUNCDEF isValid_unsignedByte ( x :: Int ) :: Bool ::= (0 <= x) /\ (x <= 255) ENDDEF
---FUNCDEF isValid_string ( x :: String ) :: Bool ::= strinre(x, REGEX('[\t\r\n -]*')) ENDDEF
-FUNCDEF isValid_string ( x :: String ) :: Bool ::= True ENDDEF
+FUNCDEF isValid_string ( x :: String ) :: Bool ::= strinre(x, REGEX('[\t\r\n -]*')) ENDDEF
 FUNCDEF isValid_date ( x :: Int ) :: Bool ::= True ENDDEF
 FUNCDEF isValid_dateTime ( x :: Int ) :: Bool ::= True ENDDEF
 FUNCDEF isValid_decimal  ( x :: Int ) :: Bool ::= True ENDDEF

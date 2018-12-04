@@ -244,7 +244,7 @@ absentCstrId :: CstrId
 absentCstrId = CstrId "_absent" 2345 [] conditionalIntSortId
 
 presentCstrId :: CstrId
-presentCstrId = CstrId "_present" 2346 [valuePresentCstrFunc] conditionalIntSortId
+presentCstrId = CstrId "_present" 2346 [sortIdInt] conditionalIntSortId
 
 isAbsentCstrFunc :: FuncId
 isAbsentCstrFunc = FuncId "is_absent" 9876 [conditionalIntSortId] sortIdBool
@@ -342,9 +342,9 @@ testConditionalIntInstances = testTemplateValue conditionalIntDef
 testNestedConstructor :: SMT()
 testNestedConstructor = do
         let pairSortId = SortId "Pair" 12345
-        let pairCstrId = CstrId "Pair" 2344 [FuncId "x" 6565 [] sortIdInt, FuncId "y" 6666 [] sortIdInt] pairSortId
+        let pairCstrId = CstrId "Pair" 2344 [sortIdInt,sortIdInt] pairSortId
         let absentPairCstrId = CstrId "Absent" 2345 [] conditionalPairSortId
-        let presentPairCstrId = CstrId "Present" 2346 [FuncId "value" 6767 [] pairSortId] conditionalPairSortId
+        let presentPairCstrId = CstrId "Present" 2346 [pairSortId] conditionalPairSortId
         let conditionalPairDefs = EnvDefs (Map.fromList [ (conditionalPairSortId, SortDef), (pairSortId, SortDef) ])
                                           (Map.fromList [ (pairCstrId, CstrDef (FuncId "ignore" 9875 [] pairSortId) [FuncId "x" 6565 [] sortIdInt, FuncId "y" 6666 [] sortIdInt])
                                                         , (absentPairCstrId, CstrDef (FuncId "ignore" 9876 [] conditionalPairSortId) [])

@@ -181,19 +181,15 @@ compileParsedDefs parsedDefs = do
     -- in 'parsedDefs', as well as the predefined Sorts ("Bool", "Int", "Regex",
     -- "String").
     sIds <- compileToSortIds parsedDefs
-    
+
     -- Generate a map from constructor declarations to 'CstrId''s.
-    -- Also create and gather the required accessor functions;
-    -- this should be fine, since they only depend on sorts.
-    (cstrIds, accFuncIdsL) <- compileToCstrId sIds (parsedDefs ^. adts)
+    cstrIds <- compileToCstrId sIds (parsedDefs ^. adts)
 
     -- Generate a map from locations of function declarations to 'FuncId''s.
     -- This map includes the predefined functions (standard functions) such as
     -- '*', '++', 'toString', 'fromString'.
     stdFuncIdsL  <- getStdFuncIds
-    isCstrFuncIdsL <- adtsToFuncIds sIds (parsedDefs ^. adts)
-    -- Reuse the original variable, so that we do not have to change the rest of the code:
-    let cstrFuncIdsL = accFuncIdsL <> isCstrFuncIdsL
+    cstrFuncIdsL <- adtsToFuncIds sIds (parsedDefs ^. adts)
     fIdsL        <- funcDeclsToFuncIds sIds (allFuncs parsedDefs)
     checkUnique (NoErrorLoc, Function, "Functions ")
                 (fmap snd $ stdFuncIdsL <> cstrFuncIdsL <> fIdsL)

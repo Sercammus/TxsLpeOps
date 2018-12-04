@@ -14,10 +14,10 @@ ENDDEF
 -- ----------------------------------------------------------------------------------------- --
 -- inputs and outputs
 
-PROCDEF  proc  [ In, Out :: Int ]  ( a :: Int ) ::=
-       In ? x >-> proc [ In, Out ] ( a+1 )
-    ## Out ? x >-> proc [ In, Out ] ( a-1 )
-    ## In ? x | Out ? y [[x==y]] >-> proc [ In, Out ] ( a )
+PROCDEF  proc  [ In, Out :: Int ]  ( ) ::=
+        In ? x
+    >-> Out ! x
+    >-> proc [ In, Out ] ()
 ENDDEF
 
 -- ----------------------------------------------------------------------------------------- --
@@ -28,7 +28,7 @@ MODELDEF  Model ::=
         CHAN IN     In
         CHAN OUT    Out
 
-        BEHAVIOUR   proc [ In, Out ] ( 123 )
+        BEHAVIOUR   proc [ In, Out ] ( )
 ENDDEF
 
 
