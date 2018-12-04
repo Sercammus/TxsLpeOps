@@ -195,6 +195,8 @@ cmdsIntpr = do
        "LPE"       | not $ IOS.isInited   modus ->  cmdNoop      cmd
        "LPEOP"     |       IOS.isInited   modus ->  cmdLPEOp     args
        "LPEOP"     | not $ IOS.isInited   modus ->  cmdNoop      cmd
+       "MERGE"     |       IOS.isInited   modus ->  cmdMerge     args
+       "MERGE"     | not $ IOS.isInited   modus ->  cmdNoop      cmd
        _                                        ->  cmdUnknown   cmd
 
 -- ----------------------------------------------------------------------------------------- --
@@ -1051,6 +1053,22 @@ cmdLPEOp args = do
     cutAfterSpace (' ':xs) = ("", xs)
     cutAfterSpace (x:xs) = let (s1, s2) = cutAfterSpace xs in (x:s1, s2)
 --cmdLPEOp
+
+-- ----------------------------------------------------------------------------------------- --
+
+cmdMerge :: String -> IOS.IOS ()
+cmdMerge args = do
+    let (firstName, secondNameAndOutputName) = cutAfterSpace args
+    let (secondName, outputName) = cutAfterSpace secondNameAndOutputName
+    msgs <- lift $ TxsCore.txsMerge firstName secondName outputName
+    IFS.pack "MERGE" msgs
+    cmdsIntpr
+  where
+    cutAfterSpace :: String -> (String, String)
+    cutAfterSpace "" = ("", "")
+    cutAfterSpace (' ':xs) = ("", xs)
+    cutAfterSpace (x:xs) = let (s1, s2) = cutAfterSpace xs in (x:s1, s2)
+--cmdMerge
 
 -- Helper Functions
 --

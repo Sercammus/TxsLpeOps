@@ -118,6 +118,9 @@ module TxsCore
 
   -- * LPE manipulation
 , txsLPEOp
+
+  -- * LPE manipulation
+, txsMerge
 )
 
 -- ----------------------------------------------------------------------------------------- --
@@ -156,6 +159,7 @@ import           Relabel             (relabel)
 -- import from behave(defs)
 import qualified Behave
 import qualified BTree
+import qualified BehExprDefs
 
 -- import from coreenv
 import qualified EnvCore             as IOC
@@ -1225,6 +1229,29 @@ txsLPEOp opChain inName outName invariant = do
                                "mcrl2" -> Right [LPEOps.LPEOp LPE2MCRL2.lpe2mcrl2]
                                _ -> Left ["Unknown LPE operation (" ++ opName ++ ")!"]
 --txsLPEOp
+
+-- ----------------------------------------------------------------------------------------- --
+txsMerge :: String -> String -> String -> IOC.IOC [String]
+txsMerge firstName secondName outputName = do
+    eitherFirstModel <- getEitherModelFromName firstName
+    case eitherFirstModel of
+      Left msg -> return [msg]
+      Right (_, TxsDefs.ModelDef insyncs1 outsyncs1 splsyncs1 bexpr1) ->
+        do eitherSecondModel <- getEitherModelFromName secondName
+           case eitherSecondModel of
+             Left msg -> return [msg]
+             Right (_, TxsDefs.ModelDef insyncs2 outsyncs2 splsyncs2 bexpr2) ->
+               do outputModelId <- getModelIdFromName outputName
+                  let newInsyncs = Set.toList (Set.fromList (insyncs1 ++ insyncs2))
+                  let newOutsyncs = Set.toList (Set.fromList (outsyncs1 ++ outsyncs2))
+                  let newSplsyncs = Set.toList (Set.fromList (splsyncs1 ++ splsyncs2))
+                  let newProcInst = BehExprDefs.parallel (Set.unions (newInsyncs ++ newOutsyncs ++ newSplsyncs)) [bexpr1, bexpr2]
+                  let newModelDef = TxsDefs.ModelDef newInsyncs newOutsyncs newSplsyncs newProcInst
+                  tdefs' <- gets (IOC.tdefs . IOC.state)
+                  let tdefs'' = tdefs' { TxsDefs.modelDefs = Map.insert outputModelId newModelDef (TxsDefs.modelDefs tdefs') }
+                  IOC.modifyCS $ \st -> st { IOC.tdefs = tdefs'' }
+                  return ["Models merged; result saved to model " ++ TxsShow.fshow outputModelId ++ "!"]
+-- txsMerge
 
 -- ----------------------------------------------------------------------------------------- --
 --                                                                                           --
