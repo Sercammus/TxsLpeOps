@@ -1183,11 +1183,11 @@ txsLPEOp opChain inName outName invariant = do
     case IOC.state envc of
       IOC.Initing { IOC.tdefs = tdefs } ->
         case getModels (TxsDefs.modelDefs tdefs) inName of
-          [TxsDefs.ModelDef insyncs outsyncs splsyncs bexpr] ->
+          [modelDef@(TxsDefs.ModelDef insyncs outsyncs splsyncs _)] ->
             case concatEither (map getLPEOperation (filter (\opName -> opName /= []) (splitByArrow opChain))) of
               Left msgs -> return msgs
               Right ops -> do
-                manipulatedLPE <- LPEOps.lpeOperations ops bexpr outName invariant
+                manipulatedLPE <- LPEOps.lpeOperations ops modelDef outName invariant
                 case manipulatedLPE of
                   Left msgs -> return msgs
                   Right (newProcInst, newProcId, newProcDef) -> do

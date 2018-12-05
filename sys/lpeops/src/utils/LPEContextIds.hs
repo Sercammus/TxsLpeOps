@@ -49,7 +49,7 @@ setUnions :: (Foldable f, Ord a) => f (Set.Set a) -> Set.Set a
 setUnions = foldl Set.union Set.empty
 
 getModelIds :: LPEModel -> Set.Set TxsDefs.Ident
-getModelIds (tdefs, process) =
+getModelIds (tdefs, _, process) =
     untilFixpoint (getProcessIds process)
   where
     untilFixpoint :: Set.Set TxsDefs.Ident -> Set.Set TxsDefs.Ident
@@ -81,7 +81,7 @@ getModelIds (tdefs, process) =
 
 -- Gathers all ids that are used in the given LPE process:
 getProcessIds :: LPEProcess -> Set.Set TxsDefs.Ident
-getProcessIds (channels, initParamEqs, summands) =
+getProcessIds (_, channels, initParamEqs, summands) =
     Set.unions [
       getChansIds channels,
       getParamEqsIds initParamEqs,

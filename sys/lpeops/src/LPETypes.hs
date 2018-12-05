@@ -49,9 +49,9 @@ import           ConcatEither
 
 -- Constructs an LPEModel from a process expression (unless there is a problem).
 -- The process expression should be the instantiation of a process that is already linear.
-toLPEModel :: TxsDefs.BExpr                          -- Process instantiation.
+toLPEModel :: TxsDefs.ModelDef                       -- Process instantiation.
            -> IOC.IOC (Either [String] LPEModel)     -- Instance (unless there are problems).
-toLPEModel procInst = do
+toLPEModel modelDef@(TxsDefs.ModelDef _ _ _ procInst) = do
     envc <- MonadState.get
     case IOC.state envc of
       IOC.Initing { IOC.tdefs = tdefs } -> let procDefs = TxsDefs.procDefs tdefs in
@@ -62,10 +62,10 @@ toLPEModel procInst = do
                 case getLPESummands procId procDef body of
                   Left msgs -> return (Left msgs)
                   Right summands -> do normalizedSummands <- normalizeLPESummands summands
-                                       let result = (chans, paramEqs, Set.fromList normalizedSummands)
+                                       let result = (ProcId.name procId, chans, paramEqs, Set.fromList normalizedSummands)
                                        let problems = paramEqsProblems ++ getProcessProblems result
                                        if null problems
-                                       then return (Right (tdefs, result))
+                                       then return (Right (tdefs, modelDef, result))
                                        else return (Left problems)
             Nothing -> do let definedProcessNames = List.intercalate " or " (map (Text.unpack . ProcId.name) (Map.keys procDefs))
                           return (Left ["Expected " ++ definedProcessNames ++ ", found " ++ show (Text.unpack (ProcId.name procId)) ++ "!"])
@@ -145,7 +145,7 @@ getChannelOffer params TxsDefs.Offer { TxsDefs.chanid = chanid, TxsDefs.chanoffe
 -- Constructs a process expression and a process definition from an LPEModel (unless there is a problem).
 -- The process expression creates an instance of the process definition.
 fromLPEModel :: LPEModel -> String -> IOC.IOC (TxsDefs.BExpr, TxsDefs.ProcId, TxsDefs.ProcDef)
-fromLPEModel (_, (chans, paramEqs, summands)) procName = do
+fromLPEModel (_, _, (_, chans, paramEqs, summands)) procName = do
     let orderedParams = Map.keys paramEqs
     newProcUnid <- IOC.newUnid
     let newProcId = TxsDefs.ProcId { ProcId.name = Text.pack procName
@@ -175,7 +175,7 @@ fromLPEModel (_, (chans, paramEqs, summands)) procName = do
 
 -- This method can detect certain problems with an LPE, making finding bugs in LPE operations easier:
 getProcessProblems :: LPEProcess -> [String]
-getProcessProblems (_chanIds, initParamEqs, summands) =
+getProcessProblems (_, _chanIds, initParamEqs, summands) =
     concatMap getSmdProblems (zip [1..] (Set.toList summands))
   where
     getSmdProblems :: (Int, LPESummand) -> [String]

@@ -1,4 +1,4 @@
-TYPEDEF Sort1_Person ::= Cstr5_Person { func15_sex :: Sort2_Sex; func7_firstName :: String; func13_lastName :: String; func6_dayOfBirth :: Int; func14_monthOfBirth :: Int } | Cstr6_ANY ENDDEF
+TYPEDEF Sort1_Person ::= Cstr5_Person { sex :: Sort2_Sex; firstName :: String; lastName :: String; dayOfBirth :: Int; monthOfBirth :: Int } ENDDEF
 TYPEDEF Sort2_Sex ::= Cstr3_Female | Cstr4_Male ENDDEF
 FUNCDEF func8_isLuckyByBirthday(var34 :: Sort1_Person) :: Bool ::= (func6_dayOfBirth(var34)==func14_monthOfBirth(var34)) ENDDEF
 FUNCDEF func9_isLuckyByGender(var32 :: Sort1_Person; var21 :: Sort2_Sex; var29 :: Int) :: Bool ::= (not((var21==func15_sex(var32))) /\ ((-5+var29)>=0)) ENDDEF
@@ -18,5 +18,5 @@ ENDDEF
 MODELDEF Model ::=
     CHAN IN Chan16, Chan17
     CHAN OUT
-    BEHAVIOUR LPE[Chan16, Chan17](Cstr4_Male, 0, Cstr6_ANY, Cstr4_Male, 0, Cstr6_ANY, 0)
+    BEHAVIOUR LPE[Chan16, Chan17](ANY Sort2_Sex, ANY Int, ANY Sort1_Person, ANY Sort2_Sex, ANY Int, ANY Sort1_Person, 0)
 ENDDEF

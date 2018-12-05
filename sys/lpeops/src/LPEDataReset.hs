@@ -42,7 +42,7 @@ mapGet m k =
 -- mapGet
 
 dataReset :: LPEOperation
-dataReset (tdefs, (channels, initParamEqs, summands)) _out invariant = do
+dataReset (tdefs, mdef, (n, channels, initParamEqs, summands)) _out invariant = do
     IOC.putMsgs [ EnvData.TXS_CORE_ANY "<<dataReset>>" ]
     let params = Map.keysSet initParamEqs
     IOC.putMsgs [ EnvData.TXS_CORE_ANY "Collecting information on parameter usage..." ]
@@ -64,7 +64,7 @@ dataReset (tdefs, (channels, initParamEqs, summands)) _out invariant = do
     IOC.putMsgs [ EnvData.TXS_CORE_ANY "Constructing new LPE..." ]
     let newSummands = map (resetParamsInSummand initParamEqs paramUsagePerSummand belongsToRelation relevanceRelation) (Set.toList summands)
     Monad.mapM_ (\m -> IOC.putMsgs [ EnvData.TXS_CORE_ANY m ]) (concatMap snd newSummands)
-    return (Right (tdefs, (channels, initParamEqs, Set.fromList (map fst newSummands))))
+    return (Right (tdefs, mdef, (n, channels, initParamEqs, Set.fromList (map fst newSummands))))
   where
     untilFixpoint :: Eq t => (t -> t) -> t -> t
     untilFixpoint f i = let i' = f i in if i == i' then i else untilFixpoint f i'

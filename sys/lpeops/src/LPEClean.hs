@@ -35,14 +35,14 @@ import Satisfiability
 -- Removes duplicate summands and summands that are unreachable by all other (!) summands
 -- (so basically we do a partial, symbolic reachability analysis).
 cleanLPE :: LPEOperation
-cleanLPE (tdefs, (channels, initParamEqs, summands)) _out invariant = do
+cleanLPE (tdefs, mdef, (n, channels, initParamEqs, summands)) _out invariant = do
     IOC.putMsgs [ EnvData.TXS_CORE_ANY "<<clean>>" ]
     uniqueSummands <- Monad.foldM addSummandIfUnique Set.empty (Set.toList summands)
     Monad.when (length uniqueSummands < Set.size summands) (IOC.putMsgs [ EnvData.TXS_CORE_ANY ("Removed " ++ show (Set.size summands - length uniqueSummands) ++ " duplicate summands") ])
     initReachableSummands <- Monad.foldM addSummandIfReachableFromInit Set.empty uniqueSummands
     reachableSummands <- reachableSummandsLoop initReachableSummands invariant (uniqueSummands Set.\\ initReachableSummands)
     Monad.when (length reachableSummands < length uniqueSummands) (IOC.putMsgs [ EnvData.TXS_CORE_ANY ("Removed " ++ show (length uniqueSummands - length reachableSummands) ++ " unreachable summands") ])
-    return (Right (tdefs, (channels, initParamEqs, reachableSummands)))
+    return (Right (tdefs, mdef, (n, channels, initParamEqs, reachableSummands)))
   where
     addSummandIfUnique :: Set.Set LPESummand -> LPESummand -> IOC.IOC (Set.Set LPESummand)
     addSummandIfUnique soFar candidate = do

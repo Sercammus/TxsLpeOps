@@ -47,10 +47,10 @@ getAbbrevContextFromIds ids =
     abbrevName :: TxsDefs.Ident -> Int -> String
     abbrevName j@(TxsDefs.IdSort _) i   = "Sort" ++ show i ++ "_" ++ Text.unpack (TxsDefs.name j) -- Must be capitalized!
     abbrevName j@(TxsDefs.IdCstr _) i   = "Cstr" ++ show i ++ "_" ++ Text.unpack (TxsDefs.name j) -- Must be capitalized!
-    abbrevName j@(TxsDefs.IdFunc _) i   = "func" ++ show i ++ "_" ++ Text.unpack (TxsDefs.name j)
+    abbrevName j@(TxsDefs.IdFunc _) i   = "f" ++ show i ++ "_" ++ Text.unpack (TxsDefs.name j)
     abbrevName (TxsDefs.IdProc _) i   = "proc" ++ show i
     abbrevName (TxsDefs.IdChan _) i   = "Chan" ++ show i -- Must be capitalized!
-    abbrevName (TxsDefs.IdVar _) i    = "var" ++ show i
+    abbrevName (TxsDefs.IdVar _) i    = "v" ++ show i
     abbrevName (TxsDefs.IdStat _) i   = "Stat" ++ show i
     abbrevName (TxsDefs.IdModel _) i  = "Model" ++ show i
     abbrevName (TxsDefs.IdPurp _) i   = "Purp" ++ show i

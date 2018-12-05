@@ -32,14 +32,14 @@ import           VarId
 -- Removes the specified parameters an LPE.
 -- Occurrences of the parameters in expressions are substituted by their initial values.
 removeParsFromLPE :: Set.Set VarId -> LPEProcess -> IOC.IOC LPEProcess
-removeParsFromLPE targetParams process@(channels, initParamEqs, summands)
+removeParsFromLPE targetParams process@(n, channels, initParamEqs, summands)
     | targetParams == Set.empty =
         return process
     | otherwise = do
         Monad.mapM_ (\p -> IOC.putMsgs [ EnvData.TXS_CORE_ANY ("Removed parameter " ++ Text.unpack (VarId.name p)) ]) (Set.toList targetParams)
         let rho = Map.restrictKeys initParamEqs targetParams
         newSummands <- Monad.mapM (removeParsFromSummand rho) (Set.toList summands)
-        return (channels, Map.withoutKeys initParamEqs targetParams, Set.fromList newSummands)
+        return (n, channels, Map.withoutKeys initParamEqs targetParams, Set.fromList newSummands)
   where
     -- Eliminates parameters from a summand.
     -- Note that channel variables are always fresh, and therefore do not have to be substituted:

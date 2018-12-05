@@ -58,30 +58,30 @@ mapGetS i s m k =
 -- Eliminates parameters that do not contribute to the behavior of a process from an LPE.
 -- State spaces before and after are strongly bisimilar.
 parReset :: LPEOperation
-parReset (tdefs, process@(_channels, paramEqs, summands)) _out invariant = do
+parReset (tdefs, mdef, process@(_, _channels, paramEqs, summands)) _out invariant = do
     IOC.putMsgs [ EnvData.TXS_CORE_ANY "<<parReset>>" ]
     IOC.putMsgs [ EnvData.TXS_CORE_ANY "Identifying successors..." ]
     possibleSuccessors <- Monad.mapM (getPossibleSuccessors summands invariant) (Set.toList summands)
     let successorsPerSummand = zipWith (\s i -> (s, i, Map.keys paramEqs)) (Set.toList summands) possibleSuccessors
     IOC.putMsgs [ EnvData.TXS_CORE_ANY "Analyzing control flow..." ]
     newProcess <- parResetLoop process invariant successorsPerSummand
-    return (Right (tdefs, newProcess))
+    return (Right (tdefs, mdef, newProcess))
 -- parReset
 
 -- Updates the information collected about summands, in particular their lists of used variables,
 -- until the information no longer changes.
 -- With the final information, assign ANY values to variables that are unused:
 parResetLoop :: LPEProcess -> TxsDefs.VExpr -> [(LPESummand, [LPESummand], [VarId])] -> IOC.IOC LPEProcess
-parResetLoop process@(channels, initParamEqs, summands) invariant successorsPerSummand = do
+parResetLoop process@(n, channels, initParamEqs, summands) invariant successorsPerSummand = do
     let newSuccessorsPerSummand = parResetUpdate process successorsPerSummand
     if newSuccessorsPerSummand == successorsPerSummand
     then do newSummands <- Monad.mapM (resetParamsInSummand process invariant successorsPerSummand) (Set.toList summands)
-            return (channels, initParamEqs, Set.fromList newSummands)
+            return (n, channels, initParamEqs, Set.fromList newSummands)
     else parResetLoop process invariant newSuccessorsPerSummand
 -- parResetLoop
 
 resetParamsInSummand :: LPEProcess -> TxsDefs.VExpr -> [(LPESummand, [LPESummand], [VarId])] -> LPESummand -> IOC.IOC LPESummand
-resetParamsInSummand (_, initParamEqs, summands) invariant successorsPerSummand summand@(LPESummand channelVars channelOffers guard paramEqs) =
+resetParamsInSummand (_, _, initParamEqs, summands) invariant successorsPerSummand summand@(LPESummand channelVars channelOffers guard paramEqs) =
     case [ (sucs, uvars) | (smd, sucs, uvars) <- successorsPerSummand, smd == summand ] of
       [(sucs, uvars)] -> if length uvars == length initParamEqs
                          then return summand -- (All variables are used, apparently, so do not touch the summand.)

@@ -33,7 +33,7 @@ import           LPETypes
 import           LPEPrettyPrint
 
 lpeOpsVersion :: String
-lpeOpsVersion = "0.9.0"
+lpeOpsVersion = "0.11.3"
 
 data LPEOp = LPEOpLoop | LPEOp LPEOperation
 
@@ -51,19 +51,19 @@ type LPEOperation = LPEModel -> String -> TxsDefs.VExpr -> IOC.IOC (Either [Stri
 --  2. Applies the given operation to the LPE instance, which results in a new LPE instance;
 --  3. Transforms the new LPE instance to a process definition with the specified name and
 --     a process expression that creates an instance of this process definition.
-lpeOperations :: [LPEOp] -> TxsDefs.BExpr -> String -> TxsDefs.VExpr -> IOC.IOC (Either [String] (TxsDefs.BExpr, TxsDefs.ProcId, TxsDefs.ProcDef))
-lpeOperations operations procInst out invariant = do
-    eitherModel <- toLPEModel procInst
+lpeOperations :: [LPEOp] -> TxsDefs.ModelDef -> String -> TxsDefs.VExpr -> IOC.IOC (Either [String] (TxsDefs.BExpr, TxsDefs.ProcId, TxsDefs.ProcDef))
+lpeOperations operations modelDef out invariant = do
+    eitherModel <- toLPEModel modelDef
     case eitherModel of
       Left msgs -> return (Left msgs)
       Right model -> do eitherNewModel <- lpeOperation operations operations [model, model] out invariant
                         case eitherNewModel of
                           Left msgs -> return (Left msgs)
                           Right [] -> return (Left ["No output LPE found!"])
-                          Right (newModel:_) -> do temp <- fromLPEModel newModel out
-                                                   if newModel /= model
+                          Right (newModel:_) -> do if newModel /= model
                                                    then IOC.putMsgs [ EnvData.TXS_CORE_ANY "LPE instance has been rewritten!" ]
                                                    else IOC.putMsgs [ EnvData.TXS_CORE_ANY "LPE instance is identical to input!" ]
+                                                   temp <- fromLPEModel newModel out
                                                    return (Right temp)
 -- lpeOperations
 
@@ -78,10 +78,10 @@ lpeOperation ops (LPEOp op:xs) (model:ys) out invariant = do
     eitherNewModel <- op model out invariant
     case eitherNewModel of
       Left msgs -> return (Left msgs)
-      Right newModel -> let problems = getProcessProblems (snd newModel) in
-                          if null problems
-                          then lpeOperation ops xs (newModel:ys) out invariant
-                          else return (Left problems)
+      Right newModel@(_, _, x) -> let problems = getProcessProblems x in
+                                    if null problems
+                                    then lpeOperation ops xs (newModel:ys) out invariant
+                                    else return (Left problems)
 -- lpeOperation
 
 discardLPE :: LPEOperation

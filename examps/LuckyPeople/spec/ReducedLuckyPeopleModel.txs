@@ -1,22 +1,24 @@
-TYPEDEF Sort1_Person ::= Cstr5_Person { func15_sex :: Sort2_Sex; func7_firstName :: String; func13_lastName :: String; func6_dayOfBirth :: Int; func14_monthOfBirth :: Int } | Cstr6_ANY ENDDEF
+TYPEDEF Sort1_Person ::= Cstr5_Person { sex :: Sort2_Sex; firstName :: String; lastName :: String; dayOfBirth :: Int; monthOfBirth :: Int } ENDDEF
 TYPEDEF Sort2_Sex ::= Cstr3_Female | Cstr4_Male ENDDEF
-FUNCDEF func8_isLuckyByBirthday(var34 :: Sort1_Person) :: Bool ::= (func6_dayOfBirth(var34)==func14_monthOfBirth(var34)) ENDDEF
-FUNCDEF func9_isLuckyByGender(var32 :: Sort1_Person; var21 :: Sort2_Sex; var29 :: Int) :: Bool ::= (not((var21==func15_sex(var32))) /\ ((-5+var29)>=0)) ENDDEF
-FUNCDEF func10_isLuckyByName(var33 :: Sort1_Person) :: Bool ::= (at(func7_firstName(var33), 0)==at(func13_lastName(var33), 0)) ENDDEF
-FUNCDEF func11_isLuckyPerson(var31 :: Sort1_Person; var20 :: Sort2_Sex; var28 :: Int) :: Bool ::= not((not(func8_isLuckyByBirthday(var31)) /\ not(func9_isLuckyByGender(var31, var20, var28)) /\ not(func10_isLuckyByName(var31)))) ENDDEF
-FUNCDEF func12_isValid_Person(var30 :: Sort1_Person) :: Bool ::= (((-1+func6_dayOfBirth(var30))>=0) /\ ((-1+func14_monthOfBirth(var30))>=0) /\ ((12+func14_monthOfBirth(var30)*(-1))>=0) /\ ((31+func6_dayOfBirth(var30)*(-1))>=0) /\ strinre(func7_firstName(var30), REGEX('[A-Z][a-z]*')) /\ strinre(func13_lastName(var30), REGEX('[A-Z][a-z]*'))) ENDDEF
+FUNCDEF func8_isLuckyByBirthday(var28 :: Sort1_Person) :: Bool ::= (func6_dayOfBirth(var28)==func14_monthOfBirth(var28)) ENDDEF
+FUNCDEF func9_isLuckyByGender(var26 :: Sort1_Person; var21 :: Sort2_Sex; var23 :: Int) :: Bool ::= (not((var21==func15_sex(var26))) /\ ((-5+var23)>=0)) ENDDEF
+FUNCDEF func10_isLuckyByName(var27 :: Sort1_Person) :: Bool ::= (at(func7_firstName(var27), 0)==at(func13_lastName(var27), 0)) ENDDEF
+FUNCDEF func11_isLuckyPerson(var25 :: Sort1_Person; var20 :: Sort2_Sex; var22 :: Int) :: Bool ::= not((not(func8_isLuckyByBirthday(var25)) /\ not(func9_isLuckyByGender(var25, var20, var22)) /\ not(func10_isLuckyByName(var25)))) ENDDEF
+FUNCDEF func12_isValid_Person(var24 :: Sort1_Person) :: Bool ::= (((-1+func6_dayOfBirth(var24))>=0) /\ ((-1+func14_monthOfBirth(var24))>=0) /\ ((12+func14_monthOfBirth(var24)*(-1))>=0) /\ ((31+func6_dayOfBirth(var24)*(-1))>=0) /\ strinre(func7_firstName(var24), REGEX('[A-Z][a-z]*')) /\ strinre(func13_lastName(var24), REGEX('[A-Z][a-z]*'))) ENDDEF
 CHANDEF ChanDefs
     ::= Chan16 :: Sort1_Person
       ; Chan17 :: Bool
 ENDDEF
-PROCDEF LPE[Chan16 :: Sort1_Person; Chan17 :: Bool](var22 :: Sort2_Sex; var23 :: Int; var24 :: Sort1_Person; var25 :: Sort2_Sex; var26 :: Int; var27 :: Sort1_Person; var35 :: Int) ::=
-        Chan16 ? var18 :: Sort1_Person [[ IF (0==var35) THEN func12_isValid_Person(var18) ELSE False FI ]] >-> LPE[Chan16, Chan17](Cstr4_Male(), 0, var18, Cstr4_Male, 0, Cstr6_ANY, 1)
-     ## Chan16 ? var18 :: Sort1_Person [[ IF (2==var35) THEN IF (var25==func15_sex(var27)) THEN False ELSE func12_isValid_Person(var18) FI ELSE False FI ]] >-> LPE[Chan16, Chan17](func15_sex(var27), 1, var18, Cstr4_Male, 0, Cstr6_ANY, 1)
-     ## Chan16 ? var18 :: Sort1_Person [[ IF (2==var35) THEN IF (var25==func15_sex(var27)) THEN func12_isValid_Person(var18) ELSE False FI ELSE False FI ]] >-> LPE[Chan16, Chan17](func15_sex(var27), (1+var26), var18, Cstr4_Male, 0, Cstr6_ANY, 1)
-     ## Chan17 ? var19 :: Bool [[ IF (1==var35) THEN (var19==func11_isLuckyPerson(var24, var22, var23)) ELSE False FI ]] >-> LPE[Chan16, Chan17](Cstr4_Male, 0, Cstr6_ANY, var22, var23, var24, 2)
+PROCDEF LPE[Chan16 :: Sort1_Person; Chan17 :: Bool](var29 :: Int; var30 :: Sort2_Sex; var31 :: Int; var32 :: Sort1_Person; var33 :: Sort2_Sex; var34 :: Int; var35 :: Sort1_Person; var36 :: Int; var37 :: Sort2_Sex; var38 :: Int; var39 :: Sort1_Person; var40 :: Sort2_Sex; var41 :: Int; var42 :: Sort1_Person; var43 :: Int; var44 :: Int) ::=
+        Chan16 ? var18 :: Sort1_Person [[ IF (0==var29) THEN func12_isValid_Person(var18) ELSE False FI ]] >-> LPE[Chan16, Chan17](1, Cstr4_Male(), 0, var18, ANY Sort2_Sex, ANY Int, ANY Sort1_Person, 1, Cstr4_Male(), 0, var18, ANY Sort2_Sex, ANY Int, ANY Sort1_Person, 1, 0)
+     ## Chan16 ? var18 :: Sort1_Person [[ IF (1==var29) THEN (IF (0==var44) THEN IF (2==var43) THEN IF (var40==func15_sex(var42)) THEN False ELSE func12_isValid_Person(var18) FI ELSE False FI ELSE False FI /\ IF (2==var36) THEN IF (var33==func15_sex(var35)) THEN False ELSE func12_isValid_Person(var18) FI ELSE False FI) ELSE False FI ]] >-> LPE[Chan16, Chan17](1, func15_sex(var35), 1, var18, ANY Sort2_Sex, ANY Int, ANY Sort1_Person, 1, func15_sex(var42), 1, var18, ANY Sort2_Sex, ANY Int, ANY Sort1_Person, 1, 0)
+     ## Chan16 ? var18 :: Sort1_Person [[ IF (1==var29) THEN (IF (0==var44) THEN IF (2==var43) THEN IF (var40==func15_sex(var42)) THEN False ELSE func12_isValid_Person(var18) FI ELSE False FI ELSE False FI /\ IF (2==var36) THEN IF (var33==func15_sex(var35)) THEN func12_isValid_Person(var18) ELSE False FI ELSE False FI) ELSE False FI ]] >-> LPE[Chan16, Chan17](1, func15_sex(var35), (1+var34), var18, ANY Sort2_Sex, ANY Int, ANY Sort1_Person, 1, func15_sex(var42), 1, var18, ANY Sort2_Sex, ANY Int, ANY Sort1_Person, 1, 0)
+     ## Chan16 ? var18 :: Sort1_Person [[ IF (1==var29) THEN (IF (0==var44) THEN IF (2==var43) THEN IF (var40==func15_sex(var42)) THEN func12_isValid_Person(var18) ELSE False FI ELSE False FI ELSE False FI /\ IF (2==var36) THEN IF (var33==func15_sex(var35)) THEN False ELSE func12_isValid_Person(var18) FI ELSE False FI) ELSE False FI ]] >-> LPE[Chan16, Chan17](1, func15_sex(var35), 1, var18, ANY Sort2_Sex, ANY Int, ANY Sort1_Person, 1, func15_sex(var42), (1+var41), var18, ANY Sort2_Sex, ANY Int, ANY Sort1_Person, 1, 0)
+     ## Chan16 ? var18 :: Sort1_Person [[ IF (1==var29) THEN (IF (0==var44) THEN IF (2==var43) THEN IF (var40==func15_sex(var42)) THEN func12_isValid_Person(var18) ELSE False FI ELSE False FI ELSE False FI /\ IF (2==var36) THEN IF (var33==func15_sex(var35)) THEN func12_isValid_Person(var18) ELSE False FI ELSE False FI) ELSE False FI ]] >-> LPE[Chan16, Chan17](1, func15_sex(var35), (1+var34), var18, ANY Sort2_Sex, ANY Int, ANY Sort1_Person, 1, func15_sex(var42), (1+var41), var18, ANY Sort2_Sex, ANY Int, ANY Sort1_Person, 1, 0)
+     ## Chan17 ? var19 :: Bool [[ IF (1==var29) THEN (IF (0==var44) THEN IF (1==var43) THEN (var19==func11_isLuckyPerson(var39, var37, var38)) ELSE False FI ELSE False FI /\ IF (1==var36) THEN (var19==func11_isLuckyPerson(var32, var30, var31)) ELSE False FI) ELSE False FI ]] >-> LPE[Chan16, Chan17](1, ANY Sort2_Sex, ANY Int, ANY Sort1_Person, var30, var31, var32, 2, ANY Sort2_Sex, ANY Int, ANY Sort1_Person, var37, var38, var39, 2, 0)
 ENDDEF
 MODELDEF Model ::=
     CHAN IN Chan16, Chan17
     CHAN OUT
-    BEHAVIOUR LPE[Chan16, Chan17](Cstr4_Male, 0, Cstr6_ANY, Cstr4_Male, 0, Cstr6_ANY, 0)
+    BEHAVIOUR LPE[Chan16, Chan17](0, ANY Sort2_Sex, ANY Int, ANY Sort1_Person, ANY Sort2_Sex, ANY Int, ANY Sort1_Person, ANY Int, ANY Sort2_Sex, ANY Int, ANY Sort1_Person, ANY Sort2_Sex, ANY Int, ANY Sort1_Person, ANY Int, ANY Int)
 ENDDEF

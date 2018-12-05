@@ -30,17 +30,20 @@ paramEqsLookup
 
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import qualified Data.Text as Text
+import qualified BehExprDefs
 import qualified TxsDefs
 import qualified VarId
 
-type LPEModel = (TxsDefs.TxsDefs, LPEProcess)
+type LPEModel = (TxsDefs.TxsDefs, TxsDefs.ModelDef, LPEProcess)
 
 -- Type around which this module revolves.
 -- It consists of the following parts:
+--  - Name of the process.
 --  - Channels used by the LPE (included mostly so that conversion to TXS is possible without additional channel information).
 --  - Parameters used by the LPE and their initial values (each pair forms a 'parameter equation').
 --  - List of summands of the LPE.
-type LPEProcess = ([TxsDefs.ChanId], LPEParamEqs, LPESummands)
+type LPEProcess = (Text.Text, [TxsDefs.ChanId], LPEParamEqs, LPESummands)
 
 -- Main building block of an LPE.
 -- Each summand provides the following pieces of critical information:
@@ -71,9 +74,9 @@ newLPESummand :: [VarId.VarId] -> LPEChannelOffers -> TxsDefs.VExpr -> [(VarId.V
 newLPESummand chanVarIds chanOffers guard procInstParamEqs = LPESummand chanVarIds chanOffers guard (toLPEParamEqs procInstParamEqs)
 
 newLPEProcess :: ([TxsDefs.ChanId], [(VarId.VarId, TxsDefs.VExpr)], [LPESummand]) -> LPEProcess
-newLPEProcess (chanIds, initParamEqs, summands) = (chanIds, toLPEParamEqs initParamEqs, Set.fromList summands)
+newLPEProcess (chanIds, initParamEqs, summands) = (Text.pack "LPE", chanIds, toLPEParamEqs initParamEqs, Set.fromList summands)
 
 newLPEModel :: ([TxsDefs.ChanId], [(VarId.VarId, TxsDefs.VExpr)], [LPESummand]) -> LPEModel
-newLPEModel contents = (TxsDefs.empty, newLPEProcess contents)
+newLPEModel contents = (TxsDefs.empty, TxsDefs.ModelDef [] [] [] BehExprDefs.stop, newLPEProcess contents)
 
 
