@@ -28,6 +28,7 @@ newLPEModel,
 paramEqsLookup
 ) where
 
+import qualified Data.List as List
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -65,7 +66,13 @@ type LPEChannelOffers = [LPEChannelOffer]
 type LPEParamEqs = Map.Map VarId.VarId TxsDefs.VExpr
 
 paramEqsLookup :: [VarId.VarId] -> LPEParamEqs -> [TxsDefs.VExpr]
-paramEqsLookup orderedParams paramEqs = map (\p -> paramEqs Map.! p) orderedParams
+paramEqsLookup orderedParams paramEqs = map fromEqs orderedParams
+  where
+    fromEqs :: VarId.VarId -> TxsDefs.VExpr
+    fromEqs p = case paramEqs Map.!? p of
+                  Just e -> e
+                  Nothing -> error ("Could not find parameter \"" ++ Text.unpack (VarId.name p) ++ "\" in \"{" ++ List.intercalate ", " (map (Text.unpack . VarId.name) (Map.keys paramEqs)) ++ "}\"!")
+-- paramEqsLookup
 
 toLPEParamEqs :: [(VarId.VarId, TxsDefs.VExpr)] -> LPEParamEqs
 toLPEParamEqs = Map.fromList

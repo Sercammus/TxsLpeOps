@@ -20,14 +20,22 @@ coreName = "LuckyPeopleModel"
 
 example1 :: TxsExample
 example1 = emptyExample
-    { exampleName = "Unchanged" ++ coreName
-    , txsModelFiles = [ txsFilePath BenchTest benchDir (Text.pack ("Unchanged" ++ coreName)) ]
+    { exampleName = "Original" ++ coreName
+    , txsModelFiles = [ txsFilePath BenchTest benchDir (Text.pack ("Original" ++ coreName)) ]
     , txsCmdsFiles = [ seedSetupCmdFile, txsCmdPath BenchTest benchDir "Test" ]
     , expectedResult = Pass
     }
 
 example2 :: TxsExample
 example2 = emptyExample
+    { exampleName = "Unchanged" ++ coreName
+    , txsModelFiles = [ txsFilePath BenchTest benchDir (Text.pack ("Unchanged" ++ coreName)) ]
+    , txsCmdsFiles = [ seedSetupCmdFile, txsCmdPath BenchTest benchDir "Test" ]
+    , expectedResult = Pass
+    }
+
+example3 :: TxsExample
+example3 = emptyExample
     { exampleName = "Reduced" ++ coreName
     , txsModelFiles = [ txsFilePath BenchTest benchDir (Text.pack ("Reduced" ++ coreName)) ]
     , txsCmdsFiles = [ seedSetupCmdFile, txsCmdPath BenchTest benchDir "Test" ]
@@ -35,6 +43,6 @@ example2 = emptyExample
     }
 
 benchmarksSet :: TxsExampleSet
-benchmarksSet = TxsExampleSet (fromString ("LPE" ++ coreName)) [ example1, example2 ]
+benchmarksSet = TxsExampleSet (fromString ("LPE" ++ coreName)) [ example1, example2, example3 ]
 
 

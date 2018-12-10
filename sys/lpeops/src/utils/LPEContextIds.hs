@@ -38,8 +38,8 @@ import qualified VarId
 import qualified Id
 import           Constant hiding (sort)
 import           ValExpr hiding (subst)
-import           LPETypeDefs
 import           ValExprVisitor
+import           LPETypeDefs
 
 stdIds :: Set.Set TxsDefs.Ident
 stdIds = Set.fromList (map fst StdTDefs.stdTDefs)
