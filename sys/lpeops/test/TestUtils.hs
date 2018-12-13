@@ -76,7 +76,7 @@ validateLPEModel' model = do
     tdefs <- gets (IOC.tdefs . IOC.state)
     let tdefs' = tdefs { TxsDefs.procDefs = Map.insert newProcId newProcDef (TxsDefs.procDefs tdefs) }
     IOC.modifyCS $ \st -> st { IOC.tdefs = tdefs' }
-    eitherModel <- toLPEModel procInit
+    eitherModel <- toLPEModel (TxsDefs.ModelDef [] [] [] procInit)
     case eitherModel of
       Left msgs -> return (Just msgs)
       Right _ -> return Nothing
