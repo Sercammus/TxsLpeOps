@@ -91,17 +91,22 @@ helptxt  =
   "--------------------------------\n"++
   "ncomp                                 : test purpose generation via `N-Complete'-algorithm\n"++
   "lpe                                   : lpe transformation (Linear Process Equation)\n"++
-  "lpeop <op> <lpe> <out> [<inv>]        : apply lpe operation <op> to model <lpe> and produce output\n"++
-  "                                        named <out> assuming invariant <inv> (default: true):\n"++
+  "lpeop <op> <lpe> <out>                : apply lpe operation <op> to model <lpe> and produce output named <out>\n"++
   "                                           stop       -> do nothing\n"++
   "                                           show       -> print the lpe to console\n"++
-  "                                           clean      -> remove duplicate/inert summands\n"++
+  "                                           export     -> generate (compilable) torxakis file\n"++
+  "                                           mcrl2      -> translate to mCRL2 specification file\n"++
+  "                                           clean      -> remove duplicate/unreachable summands\n"++
   "                                           cstelm     -> remove parameters that never change value\n"++
   "                                           parelm     -> remove behavior-independent parameters\n"++
-  "                                           datareset,\n"++
-  "                                            parreset  -> reset parameters when temporarily not used\n"++
-  "                                           confelm    -> statically prioritize invisible steps\n"++
-  "                                           mcrl2      -> translate mCRL2 specification file\n"++
+  "                                           datareset  -> reset parameters based on control flow graphs\n"++
+  "                                           parreset   -> reset parameters based on summand reachability\n"++
+  "                                           utraces    -> remove underspecified traces based on summand reachability\n"++
+  "                                           rtraces    -> remove redundant traces based on summand reachability\n"++
+  --"                                           confelm    -> statically prioritize invisible steps\n"++
+  "                                           A->B       -> do two lpe operations in succession\n"++
+  "                                           loop       -> repeat lpe operations so far until fixpoint\n"++
+  " merge <mod1> <mod2> <out>            : put two models in parallel and save it as a new model\n"++
   "--------------------------------\n"++
   "systart <name> <command>              : start external system <command> with internal <name>\n"++
   "systop  <name>                        : stop external command with internal <name>\n"++

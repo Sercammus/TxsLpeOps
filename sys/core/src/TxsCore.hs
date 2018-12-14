@@ -193,6 +193,8 @@ import qualified LPEParElm
 import qualified LPEDataReset
 import qualified LPEParReset
 import qualified LPEConfCheck
+import qualified LPEUTraces
+import qualified LPERTraces
 import qualified LPE2MCRL2
 import ConcatEither
 import ModelIdFactory
@@ -1226,6 +1228,8 @@ txsLPEOp opChain inName outName invariant = do
                                "dataReset" -> Right [LPEOps.LPEOp LPEDataReset.dataReset]
                                "parReset" -> Right [LPEOps.LPEOp LPEParReset.parReset]
                                "confElm" -> Right [LPEOps.LPEOp LPEConfCheck.confElm]
+                               "utraces" -> Right [LPEOps.LPEOp LPEUTraces.utracesElm]
+                               "rtraces" -> Right [LPEOps.LPEOp LPERTraces.rtracesElm]
                                "mcrl2" -> Right [LPEOps.LPEOp LPE2MCRL2.lpe2mcrl2]
                                _ -> Left ["Unknown LPE operation (" ++ opName ++ ")!"]
 --txsLPEOp
