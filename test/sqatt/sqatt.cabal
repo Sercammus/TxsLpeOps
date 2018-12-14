@@ -30,12 +30,7 @@ library
                      , Benchmarks.RealWorld
                      , Benchmarks.Sequence
                      , Benchmarks.Synchronization
-                     , Benchmarks.LPEAdder3
-                     , Benchmarks.LPEBakery
-                     , Benchmarks.LPELuckyPeople
-                     , Benchmarks.LPEMAdder
-                     , Benchmarks.LPEQueueLossy
-                     , Benchmarks.LPEReadWrite
+                     , Benchmarks.LPEBenchmarkSets
                      , Examples.Adder
                      , Examples.CustomersOrders
                      , Examples.ControlLoop

@@ -1,0 +1,15 @@
+CHANDEF ChanDefs
+    ::= Chan1 :: Int
+      ; Chan2 :: Int
+ENDDEF
+PROCDEF LPE[Chan1 :: Int; Chan2 :: Int](v5 :: Int) ::=
+        Chan1 ? v3 :: Int [[ (0==v5) ]] >-> LPE[Chan1, Chan2](1)
+     ## Chan1 ? v3 :: Int [[ (1==v5) ]] >-> LPE[Chan1, Chan2](1)
+     ## Chan2 ? v4 :: Int [[ (0==v5) ]] >-> LPE[Chan1, Chan2](1)
+     ## Chan2 ? v4 :: Int [[ (1==v5) ]] >-> LPE[Chan1, Chan2](1)
+ENDDEF
+MODELDEF Model ::=
+    CHAN IN Chan1
+    CHAN OUT Chan2
+    BEHAVIOUR LPE[Chan1, Chan2](0)
+ENDDEF
