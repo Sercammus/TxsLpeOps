@@ -23,7 +23,8 @@ lpeBenchmarkSet coreName =
     example1 = emptyExample
         { exampleName = "Original" ++ coreName
         , txsModelFiles = [ txsFilePath BenchTest benchDir (Text.pack ("Original" ++ coreName)) ]
-        , txsCmdsFiles = [ seedSetupCmdFile, txsCmdPath BenchTest benchDir "Test" ]
+        --, txsCmdsFiles = [ seedSetupCmdFile, txsCmdPath BenchTest benchDir "Test" ]
+        , txsCmdsFiles = [ txsCmdPath BenchTest benchDir "Test" ]
         , expectedResult = Pass
         }
 
@@ -31,7 +32,8 @@ lpeBenchmarkSet coreName =
     example2 = emptyExample
         { exampleName = "Unchanged" ++ coreName
         , txsModelFiles = [ txsFilePath BenchTest benchDir (Text.pack ("Unchanged" ++ coreName)) ]
-        , txsCmdsFiles = [ seedSetupCmdFile, txsCmdPath BenchTest benchDir "Test" ]
+        --, txsCmdsFiles = [ seedSetupCmdFile, txsCmdPath BenchTest benchDir "Test" ]
+        , txsCmdsFiles = [ txsCmdPath BenchTest benchDir "Test" ]
         , expectedResult = Pass
         }
 
@@ -39,7 +41,8 @@ lpeBenchmarkSet coreName =
     example3 = emptyExample
         { exampleName = "Reduced" ++ coreName
         , txsModelFiles = [ txsFilePath BenchTest benchDir (Text.pack ("Reduced" ++ coreName)) ]
-        , txsCmdsFiles = [ seedSetupCmdFile, txsCmdPath BenchTest benchDir "Test" ]
+        --, txsCmdsFiles = [ seedSetupCmdFile, txsCmdPath BenchTest benchDir "Test" ]
+        , txsCmdsFiles = [ txsCmdPath BenchTest benchDir "Test" ]
         , expectedResult = Pass
         }
 -- lpeBenchmarkSet

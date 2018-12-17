@@ -74,7 +74,7 @@ reachableSummandsLoop reachableSummands invariant summands = do
 
 updateReachableSummands :: Set.Set LPESummand -> TxsDefs.VExpr -> Set.Set LPESummand -> LPESummand -> IOC.IOC (Set.Set LPESummand)
 updateReachableSummands reachableSummands invariant soFar summand = do
-    -- Check which summands could possible enable this summand:
+    -- Check which summands could possibly enable this summand:
     predecessors <- getPossiblePredecessors reachableSummands invariant summand
     -- If the summand is enabled by other summands than itself, it must be reachable:
     let predecessorsSet = Set.delete summand (Set.fromList predecessors)
