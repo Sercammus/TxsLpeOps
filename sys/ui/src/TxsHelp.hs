@@ -99,10 +99,9 @@ helptxt  =
   "                                           clean      -> remove duplicate/unreachable summands\n"++
   "                                           cstelm     -> remove parameters that never change value\n"++
   "                                           parelm     -> remove behavior-independent parameters\n"++
+  "                                           istepelm   -> remove ISTEP actions (preserve weak bisimulation)\n"++
   "                                           datareset  -> reset parameters based on control flow graphs\n"++
   "                                           parreset   -> reset parameters based on summand reachability\n"++
-  "                                           utraces    -> remove underspecified traces based on summand reachability\n"++
-  "                                           rtraces    -> remove redundant traces based on summand reachability\n"++
   --"                                           confelm    -> statically prioritize invisible steps\n"++
   "                                           A->B       -> do two lpe operations in succession\n"++
   "                                           loop       -> repeat lpe operations so far until fixpoint\n"++

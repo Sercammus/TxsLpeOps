@@ -23,14 +23,13 @@ library
                     , LPEClean
                     , LPEConstElm
                     , LPEParElm
+                    , LPEIStepElm
                     , LPEDataReset
                     , LPEParReset
                     , LPETypes
                     , LPETypeDefs
                     , LPEConfCheck
                     , LPE2MCRL2
-                    , LPEUTraces
-                    , LPERTraces
                     , LPEParRemoval
                     , LPEParUsage
                     , LPEPrettyPrint
@@ -80,13 +79,12 @@ test-suite lpeops-test
                       , LPEClean
                       , LPEConstElm
                       , LPEParElm
+                      , LPEIStepElm
                       , LPEDataReset
                       , LPEParReset
                       , LPETypes
                       , LPETypeDefs
                       , LPEConfCheck
-                      , LPEUTraces
-                      , LPERTraces
                       , LPE2MCRL2
                       , LPEParRemoval
                       , LPEParUsage

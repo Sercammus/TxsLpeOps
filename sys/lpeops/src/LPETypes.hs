@@ -19,11 +19,10 @@ module LPETypes (
 toLPEModel,
 fromLPEModel,
 getProcessProblems,
-normalizeLPESummands,
 module LPETypeDefs
 ) where
 
-import qualified Control.Monad as Monad
+--import qualified Control.Monad as Monad
 import qualified Control.Monad.State as MonadState
 import qualified Data.List as List
 import qualified Data.Map as Map
@@ -43,7 +42,6 @@ import           Constant hiding (args, sort)
 import           ValExpr
 import           LPEPrettyPrint
 import           LPETypeDefs
-import           BlindSubst
 import           ValExprVisitor
 import           ConcatEither
 
@@ -61,8 +59,7 @@ toLPEModel modelDef@(TxsDefs.ModelDef _ _ _ procInst) = do
               let (paramEqs, paramEqsProblems) = getParamEqs "model initiation" params paramValues in
                 case getLPESummands procId procDef body of
                   Left msgs -> return (Left msgs)
-                  Right summands -> do normalizedSummands <- normalizeLPESummands summands
-                                       let result = (ProcId.name procId, chans, paramEqs, Set.fromList normalizedSummands)
+                  Right summands -> do let result = (ProcId.name procId, chans, paramEqs, Set.fromList summands)
                                        let problems = paramEqsProblems ++ getProcessProblems result
                                        if null problems
                                        then return (Right (tdefs, modelDef, result))
@@ -72,25 +69,6 @@ toLPEModel modelDef@(TxsDefs.ModelDef _ _ _ procInst) = do
           _ -> return (Left ["Expression must be process instantiation, found " ++ TxsShow.fshow (TxsDefs.view procInst) ++ "!"])
       _ -> return (Left ["TorXakis core is not initialized!"])
 -- toLPEModel
-
-normalizeLPESummands :: [LPESummand] -> IOC.IOC [LPESummand]
-normalizeLPESummands summands = do
-    let (summandsWithoutAction, summandsWithAction) = List.partition (\(LPESummand _ offers _ _) -> null offers) summands
-    combinedSummands <- Monad.mapM (combineSummand summandsWithAction) summandsWithoutAction
-    return (summandsWithAction ++ concat combinedSummands)
-  where
-    combineSummand :: [LPESummand] -> LPESummand -> IOC.IOC [LPESummand]
-    combineSummand summandsWithAction summandWithoutAction =
-        Monad.mapM (combineTwoSummands summandWithoutAction) summandsWithAction
-    -- combineSummand
-    
-    combineTwoSummands :: LPESummand -> LPESummand -> IOC.IOC LPESummand
-    combineTwoSummands (LPESummand chanVars1 _ guard1 paramEqs1) summand@(LPESummand chanVars2 chanOffers2 guard2 paramEqs2) = do
-        newGuard2 <- doConfidentSubst summand paramEqs1 guard2
-        let newGuard = cstrAnd (Set.fromList [guard1, newGuard2])
-        newParamEqs <- doConfidentParamEqsSubst summand paramEqs1 paramEqs2
-        return (LPESummand (chanVars1 `List.union` chanVars2) chanOffers2 newGuard newParamEqs)
--- normalizeLPESummands
 
 -- Helper function.
 -- Constructs one or more summands from a TXS process expression (unless there are problems):

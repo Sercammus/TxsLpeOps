@@ -6,7 +6,7 @@ See LICENSE at root directory of this repository.
 {-# LANGUAGE OverloadedStrings #-}
 module Benchmarks.LPEBenchmarkSets (lpeBenchmarkSet) where
 
-import           Benchmarks.Common
+--import           Benchmarks.Common
 import           Paths
 import           Prelude           hiding (FilePath)
 import           Sqatt

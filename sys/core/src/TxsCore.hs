@@ -190,11 +190,10 @@ import qualified LPEOps
 import qualified LPEClean
 import qualified LPEConstElm
 import qualified LPEParElm
+import qualified LPEIStepElm
 import qualified LPEDataReset
 import qualified LPEParReset
 import qualified LPEConfCheck
-import qualified LPEUTraces
-import qualified LPERTraces
 import qualified LPE2MCRL2
 import ConcatEither
 import ModelIdFactory
@@ -1223,13 +1222,12 @@ txsLPEOp opChain inName outName invariant = do
                                "export" -> Right [LPEOps.LPEOp LPEOps.exportLPE]
                                "loop" -> Right [LPEOps.LPEOpLoop]
                                "clean" -> Right [LPEOps.LPEOp LPEClean.cleanLPE]
-                               "cstElm" -> Right [LPEOps.LPEOp LPEConstElm.constElm]
-                               "parElm" -> Right [LPEOps.LPEOp LPEParElm.parElm]
-                               "dataReset" -> Right [LPEOps.LPEOp LPEDataReset.dataReset]
-                               "parReset" -> Right [LPEOps.LPEOp LPEParReset.parReset]
-                               "confElm" -> Right [LPEOps.LPEOp LPEConfCheck.confElm]
-                               "utraces" -> Right [LPEOps.LPEOp LPEUTraces.utracesElm]
-                               "rtraces" -> Right [LPEOps.LPEOp LPERTraces.rtracesElm]
+                               "cstelm" -> Right [LPEOps.LPEOp LPEConstElm.constElm]
+                               "parelm" -> Right [LPEOps.LPEOp LPEParElm.parElm]
+                               "istepelm" -> Right [LPEOps.LPEOp LPEIStepElm.iStepElm]
+                               "datareset" -> Right [LPEOps.LPEOp LPEDataReset.dataReset]
+                               "parreset" -> Right [LPEOps.LPEOp LPEParReset.parReset]
+                               "confelm" -> Right [LPEOps.LPEOp LPEConfCheck.confElm]
                                "mcrl2" -> Right [LPEOps.LPEOp LPE2MCRL2.lpe2mcrl2]
                                _ -> Left ["Unknown LPE operation (" ++ opName ++ ")!"]
 --txsLPEOp
