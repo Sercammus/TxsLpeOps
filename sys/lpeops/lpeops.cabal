@@ -29,6 +29,7 @@ library
                     , LPETypes
                     , LPETypeDefs
                     , LPEConfCheck
+                    , LPEDeterminize
                     , LPE2MCRL2
                     , LPEParRemoval
                     , LPEParUsage
@@ -85,6 +86,7 @@ test-suite lpeops-test
                       , LPETypes
                       , LPETypeDefs
                       , LPEConfCheck
+                      , LPEDeterminize
                       , LPE2MCRL2
                       , LPEParRemoval
                       , LPEParUsage

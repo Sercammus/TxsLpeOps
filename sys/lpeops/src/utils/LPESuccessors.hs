@@ -18,16 +18,20 @@ module LPESuccessors (
 getPossiblePredecessors,
 couldHavePredecessor,
 getPossibleSuccessors,
-getDefiniteSuccessors
+getDefiniteSuccessors,
+getPossibleCoActors
 ) where
 
+import qualified Data.List           as List
+import qualified Data.Map            as Map
 import qualified Control.Monad       as Monad
 import qualified Data.Set            as Set
 import qualified EnvCore             as IOC
+import qualified ChanId
 import qualified TxsDefs
 import           LPEOps
 import           Satisfiability
-import           ValExpr
+import           ValExpr hiding (subst)
 
 getPossiblePredecessors :: LPESummands -> TxsDefs.VExpr -> LPESummand -> IOC.IOC [LPESummand]
 getPossiblePredecessors allSummands invariant (LPESummand _ _ guard _) =
@@ -71,12 +75,50 @@ getPossibleSuccessors allSummands invariant (LPESummand _ _ guard paramEqs) =
 -- The result is an underapproximation!
 getDefiniteSuccessors :: LPESummands -> TxsDefs.VExpr -> LPESummand -> IOC.IOC [LPESummand]
 getDefiniteSuccessors allSummands invariant (LPESummand _ _ guard paramEqs) =
-    Monad.foldM addSummandIfDefiniteSuccessor [] (Set.toList allSummands)
+    Monad.filterM isDefiniteSuccessor (Set.toList allSummands)
   where
-    addSummandIfDefiniteSuccessor :: [LPESummand] -> LPESummand -> IOC.IOC [LPESummand]
-    addSummandIfDefiniteSuccessor soFar summand@(LPESummand _ _ g _) = do
+    isDefiniteSuccessor :: LPESummand -> IOC.IOC Bool
+    isDefiniteSuccessor (LPESummand _ _ g _) = do
         g' <- doBlindSubst paramEqs g
-        taut <- isTautology (cstrAnd (Set.fromList [guard, g'])) invariant
-        return $ if taut then soFar ++ [summand] else soFar
+        isTautology (cstrAnd (Set.fromList [guard, g'])) invariant
 -- getDefiniteSuccessors
+
+-- Selects all summands from a given list that could generate the same action (both label and arguments) at the same time.
+-- The result is an overapproximation!
+getPossibleCoActors :: LPESummands -> TxsDefs.VExpr -> LPESummand -> IOC.IOC [LPESummand]
+getPossibleCoActors allSummands invariant (LPESummand _ chans1 guard1 _) =
+    Monad.filterM isPossibleCoActor (Set.toList allSummands)
+  where
+    isPossibleCoActor :: LPESummand -> IOC.IOC Bool
+    isPossibleCoActor (LPESummand _ chans2 guard2 _) = do
+        let sortedChans1 = List.sortOn (ChanId.unid . fst) chans1
+        let sortedChans2 = List.sortOn (ChanId.unid . fst) chans2
+        -- All action labels must be the same (order does not matter, because we sorted):
+        if map fst sortedChans1 /= map fst sortedChans2
+        then return False
+        else do -- Both guards must be able to be true at the same time:
+                let guards = cstrAnd (Set.fromList [guard1, guard2])
+                notSat <- isNotSatisfiable guards invariant
+                if notSat
+                then return False
+                else do -- All action arguments must be able to have the same value.
+                        -- To check this, substitute the (by definition fresh) channel variables of one summand into the other:
+                        let chanVars1 = concatMap snd sortedChans1
+                        let chanVars2 = concatMap snd sortedChans2
+                        let subst = Map.fromList (zipWith (\cv1 cv2 -> (cv2, ValExpr.cstrVar cv1)) chanVars1 chanVars2)
+                        guard2' <- doBlindSubst subst guard2
+                        let guardEq = ValExpr.cstrEqual guard1 guard2'
+                        isSatisfiable guardEq invariant
+-- getPossibleCoActors
+
+
+
+
+
+
+
+
+
+
+
 
