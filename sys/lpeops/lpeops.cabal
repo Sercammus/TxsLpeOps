@@ -29,6 +29,8 @@ library
                     , LPETypes
                     , LPETypeDefs
                     , LPEConfCheck
+                    , LPEIsDet
+                    , LPEAngelic
                     , LPEDeterminize
                     , LPE2MCRL2
                     , LPEParRemoval
@@ -86,6 +88,8 @@ test-suite lpeops-test
                       , LPETypes
                       , LPETypeDefs
                       , LPEConfCheck
+                      , LPEIsDet
+                      , LPEAngelic
                       , LPEDeterminize
                       , LPE2MCRL2
                       , LPEParRemoval

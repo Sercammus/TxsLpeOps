@@ -194,7 +194,9 @@ import qualified LPEIStepElm
 import qualified LPEDataReset
 import qualified LPEParReset
 import qualified LPEConfCheck
+import qualified LPEIsDet
 import qualified LPEDeterminize
+import qualified LPEAngelic
 import qualified LPE2MCRL2
 import ConcatEither
 import ModelIdFactory
@@ -1228,7 +1230,9 @@ txsLPEOp opChain inName outName invariant = do
                                "istepelm" -> Right [LPEOps.LPEOp LPEIStepElm.iStepElm]
                                "datareset" -> Right [LPEOps.LPEOp LPEDataReset.dataReset]
                                "parreset" -> Right [LPEOps.LPEOp LPEParReset.parReset]
+                               "isdet" -> Right [LPEOps.LPEOp LPEIsDet.isDeterministicLPE]
                                "det" -> Right [LPEOps.LPEOp LPEDeterminize.determinizeLPE]
+                               "angelic" -> Right [LPEOps.LPEOp LPEAngelic.makeInputEnabledLPE]
                                "confelm" -> Right [LPEOps.LPEOp LPEConfCheck.confElm]
                                "mcrl2" -> Right [LPEOps.LPEOp LPE2MCRL2.lpe2mcrl2]
                                _ -> Left ["Unknown LPE operation (" ++ opName ++ ")!"]
